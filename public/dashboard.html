@@ -257,6 +257,58 @@
       opacity: 0.8;
     }
 
+    /* === WEATHER === */
+    .weather-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 10px;
+      box-shadow: var(--shadow);
+    }
+
+    .weather-title {
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-light);
+      margin-bottom: 6px;
+      text-align: center;
+    }
+
+    .weather-days {
+      display: flex;
+      justify-content: space-between;
+      gap: 2px;
+    }
+
+    .weather-day {
+      flex: 1;
+      text-align: center;
+    }
+
+    .weather-day-name {
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--text-light);
+      text-transform: uppercase;
+    }
+
+    .weather-day-icon {
+      font-size: 20px;
+      margin: 2px 0;
+    }
+
+    .weather-day-temp {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .weather-day-low {
+      font-size: 9px;
+      color: var(--text-light);
+    }
+
     /* === HEADER === */
     .header {
       grid-area: header;
@@ -630,6 +682,70 @@
     const REFRESH_INTERVAL = 60000;
     const POINTS_PER_MICKEY = 20;
 
+    // Wirral coordinates (Birkenhead area)
+    const WEATHER_LAT = 53.39;
+    const WEATHER_LON = -3.02;
+    let cachedWeather = null;
+    let lastWeatherFetch = 0;
+    const WEATHER_CACHE_MS = 30 * 60 * 1000; // 30 min cache
+
+    // WMO weather code to emoji
+    function weatherEmoji(code) {
+      if (code === 0) return '☀️';
+      if (code <= 3) return '⛅';
+      if (code <= 48) return '🌫️';
+      if (code <= 55) return '🌦️';
+      if (code <= 57) return '🌧️';
+      if (code <= 65) return '🌧️';
+      if (code <= 67) return '🌨️';
+      if (code <= 75) return '🌨️';
+      if (code <= 77) return '🌨️';
+      if (code <= 82) return '🌧️';
+      if (code <= 86) return '❄️';
+      if (code <= 99) return '⛈️';
+      return '🌤️';
+    }
+
+    async function fetchWeather() {
+      const now = Date.now();
+      if (cachedWeather && (now - lastWeatherFetch) < WEATHER_CACHE_MS) {
+        return cachedWeather;
+      }
+      try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&daily=weathercode,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=Europe%2FLondon`;
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const data = await res.json();
+        cachedWeather = data.daily;
+        lastWeatherFetch = now;
+        return cachedWeather;
+      } catch (e) {
+        return cachedWeather;
+      }
+    }
+
+    function renderWeather(weather) {
+      if (!weather) return '';
+      const days = weather.time.map((date, i) => {
+        const d = new Date(date + 'T00:00:00');
+        const dayName = i === 0 ? 'Today' : d.toLocaleDateString('en-US', { weekday: 'short' });
+        return `
+          <div class="weather-day">
+            <div class="weather-day-name">${dayName}</div>
+            <div class="weather-day-icon">${weatherEmoji(weather.weathercode[i])}</div>
+            <div class="weather-day-temp">${Math.round(weather.temperature_2m_max[i])}°</div>
+            <div class="weather-day-low">${Math.round(weather.temperature_2m_min[i])}°</div>
+          </div>
+        `;
+      });
+      return `
+        <div class="weather-card">
+          <div class="weather-title">Wirral Weather</div>
+          <div class="weather-days">${days.join('')}</div>
+        </div>
+      `;
+    }
+
     // Assign color classes by kid name
     function kidColorClass(name) {
       const lower = (name || '').toLowerCase();
@@ -710,7 +826,7 @@
       }).join('');
     }
 
-    function render(data) {
+    function render(data, weather) {
       const dashboard = document.getElementById('dashboard');
       dashboard.innerHTML = `
         <!-- Sidebar -->
@@ -727,6 +843,8 @@
           </div>
 
           ${renderSidebarKidPoints(data.kid_points)}
+
+          ${renderWeather(weather)}
         </div>
 
         <!-- Header -->
@@ -855,8 +973,8 @@
 
     async function init() {
       try {
-        const data = await fetchData();
-        render(data);
+        const [data, weather] = await Promise.all([fetchData(), fetchWeather()]);
+        render(data, weather);
       } catch (err) {
         document.getElementById('dashboard').innerHTML =
           '<div class="loading">Failed to load dashboard. Check your URL.</div>';
@@ -864,8 +982,8 @@
 
       setInterval(async () => {
         try {
-          const data = await fetchData();
-          render(data);
+          const [data, weather] = await Promise.all([fetchData(), fetchWeather()]);
+          render(data, weather);
         } catch (e) { /* silently retry next interval */ }
       }, REFRESH_INTERVAL);
 
