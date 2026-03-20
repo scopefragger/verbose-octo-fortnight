@@ -6,6 +6,7 @@ import { checkReminders } from './routes/cron.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const isWebhookMode = Boolean(process.env.WEBHOOK_URL);
 
 // Health endpoint for cron-job.org keep-alive
 app.get('/health', (_req, res) => {
@@ -26,21 +27,24 @@ app.get('/cron/check', async (req, res) => {
   }
 });
 
-// Telegram webhook
-app.use(express.json());
-app.post('/bot/webhook', webhookCallback(bot, 'express'));
+// Only register webhook route when in webhook mode
+if (isWebhookMode) {
+  app.use(express.json());
+  app.post('/bot/webhook', webhookCallback(bot, 'express'));
+}
 
 // Set webhook and start server
 async function start() {
-  const webhookUrl = process.env.WEBHOOK_URL;
-  if (webhookUrl) {
+  if (isWebhookMode) {
+    const webhookUrl = process.env.WEBHOOK_URL;
     await bot.api.setWebhook(`${webhookUrl}/bot/webhook`, {
       secret_token: process.env.TELEGRAM_WEBHOOK_SECRET,
     });
     console.log(`Webhook set to ${webhookUrl}/bot/webhook`);
   } else {
     // Local development: use long polling
-    console.log('No WEBHOOK_URL set, starting long polling...');
+    console.log('Starting in long polling mode (local dev)...');
+    await bot.api.deleteWebhook();
     bot.start();
   }
 
