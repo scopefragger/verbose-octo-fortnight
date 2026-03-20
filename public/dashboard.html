@@ -41,9 +41,9 @@
       grid-template-rows: auto 1fr 1fr;
       gap: 12px;
       grid-template-areas:
-        "sidebar header   header    header"
-        "sidebar countdown today    upcoming"
-        "sidebar points   lists     reminders";
+        "sidebar header    header    header"
+        "sidebar countdown today     upcoming"
+        "sidebar countdown lists     reminders";
     }
 
     /* Cards */
@@ -89,12 +89,12 @@
       grid-area: sidebar;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
 
     .profile-card {
       text-align: center;
-      padding: 20px 12px;
+      padding: 16px 12px;
       background: linear-gradient(135deg, var(--primary), var(--accent));
       color: white;
       border-radius: var(--radius);
@@ -113,61 +113,148 @@
     }
 
     .profile-avatar {
-      width: 56px;
-      height: 56px;
+      width: 48px;
+      height: 48px;
       border-radius: 50%;
       background: rgba(255,255,255,0.2);
-      margin: 0 auto 10px;
+      margin: 0 auto 8px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 28px;
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-
-    .stat-card {
-      background: var(--card);
-      border-radius: 10px;
-      padding: 10px;
-      text-align: center;
-      box-shadow: var(--shadow);
-    }
-
-    .stat-value {
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--primary);
-    }
-
-    .stat-label {
-      font-size: 9px;
-      color: var(--text-light);
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-      margin-top: 2px;
+      font-size: 24px;
     }
 
     .clock-card {
       text-align: center;
-      padding: 12px;
+      padding: 10px;
     }
 
     .clock-time {
-      font-size: 36px;
+      font-size: 34px;
       font-weight: 200;
       color: var(--primary);
       letter-spacing: -1px;
     }
 
     .clock-date {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-light);
       margin-top: 2px;
+    }
+
+    /* === KID POINTS (in sidebar) === */
+    .kid-points-card {
+      border-radius: var(--radius);
+      padding: 14px;
+      text-align: center;
+      color: white;
+      box-shadow: var(--shadow);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .kid-points-card.sam {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+    }
+
+    .kid-points-card.robyn {
+      background: linear-gradient(135deg, #f093fb, #f5576c);
+    }
+
+    .kid-points-card.default-kid {
+      background: linear-gradient(135deg, #4facfe, #00f2fe);
+    }
+
+    .kid-name {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .mickey-heads {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 6px;
+      min-height: 28px;
+      align-items: center;
+    }
+
+    .mickey-head {
+      width: 28px;
+      height: 28px;
+      position: relative;
+      display: inline-block;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+    }
+
+    .mickey-head .head {
+      width: 18px;
+      height: 18px;
+      background: var(--mickey-gold);
+      border-radius: 50%;
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .mickey-head .ear-left,
+    .mickey-head .ear-right {
+      width: 11px;
+      height: 11px;
+      background: var(--mickey-gold);
+      border-radius: 50%;
+      position: absolute;
+      top: 0;
+    }
+
+    .mickey-head .ear-left { left: 1px; }
+    .mickey-head .ear-right { right: 1px; }
+
+    .points-total {
+      font-size: 32px;
+      font-weight: 800;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    }
+
+    .points-label {
+      font-size: 10px;
+      opacity: 0.85;
+      margin-top: 1px;
+    }
+
+    .points-progress {
+      margin-top: 8px;
+    }
+
+    .progress-bar-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.25);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--mickey-gold);
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    .progress-label {
+      font-size: 9px;
+      opacity: 0.8;
+      margin-top: 3px;
+    }
+
+    .points-empty-msg {
+      font-size: 11px;
+      opacity: 0.8;
     }
 
     /* === HEADER === */
@@ -296,124 +383,6 @@
     .bg-rainbow { background: linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3); }
     .bg-beach { background: linear-gradient(135deg, #0abde3, #48dbfb, #feca57); }
     .bg-party { background: linear-gradient(135deg, #ff6348, #ff9ff3, #feca57, #48dbfb); }
-
-    /* === KID POINTS === */
-    .points-area {
-      grid-area: points;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .kid-points-card {
-      flex: 1;
-      background: var(--card);
-      border-radius: var(--radius);
-      padding: 14px;
-      box-shadow: var(--shadow);
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-
-    .kid-name {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 6px;
-    }
-
-    .mickey-heads {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 8px;
-      min-height: 32px;
-      align-items: center;
-    }
-
-    .mickey-head {
-      width: 32px;
-      height: 32px;
-      position: relative;
-      display: inline-block;
-      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.15));
-    }
-
-    .mickey-head .head {
-      width: 22px;
-      height: 22px;
-      background: var(--mickey-gold);
-      border-radius: 50%;
-      position: absolute;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-
-    .mickey-head .ear-left,
-    .mickey-head .ear-right {
-      width: 13px;
-      height: 13px;
-      background: var(--mickey-gold);
-      border-radius: 50%;
-      position: absolute;
-      top: 0;
-    }
-
-    .mickey-head .ear-left { left: 1px; }
-    .mickey-head .ear-right { right: 1px; }
-
-    .points-total {
-      font-size: 28px;
-      font-weight: 800;
-      color: var(--primary);
-    }
-
-    .points-label {
-      font-size: 11px;
-      color: var(--text-light);
-      margin-top: 2px;
-    }
-
-    .points-progress {
-      margin-top: 8px;
-    }
-
-    .progress-bar-track {
-      width: 100%;
-      height: 8px;
-      background: var(--border);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-
-    .progress-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--mickey-gold), #ffda44);
-      border-radius: 4px;
-      transition: width 0.5s ease;
-    }
-
-    .progress-label {
-      font-size: 10px;
-      color: var(--text-light);
-      margin-top: 4px;
-    }
-
-    .points-empty {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--card);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      color: var(--text-light);
-      font-size: 13px;
-    }
 
     /* === TODAY === */
     .today-card { grid-area: today; }
@@ -604,13 +573,11 @@
         grid-template-areas:
           "header header"
           "countdown countdown"
-          "points points"
           "today upcoming"
           "lists reminders";
       }
       .sidebar { display: none; }
       .countdown-area { flex-direction: row; }
-      .points-area { flex-direction: row; }
     }
 
     @media (max-width: 700px) {
@@ -620,14 +587,12 @@
         grid-template-areas:
           "header"
           "countdown"
-          "points"
           "today"
           "upcoming"
           "lists"
           "reminders";
       }
       .countdown-area { flex-direction: column; }
-      .points-area { flex-direction: column; }
     }
 
     /* Loading */
@@ -664,6 +629,14 @@
   <script>
     const REFRESH_INTERVAL = 60000;
     const POINTS_PER_MICKEY = 20;
+
+    // Assign color classes by kid name
+    function kidColorClass(name) {
+      const lower = (name || '').toLowerCase();
+      if (lower === 'sam') return 'sam';
+      if (lower === 'robyn') return 'robyn';
+      return 'default-kid';
+    }
 
     async function fetchData() {
       const params = new URLSearchParams(window.location.search);
@@ -707,40 +680,34 @@
       `;
     }
 
-    function renderKidPoints(kidPoints) {
-      if (!kidPoints || kidPoints.length === 0) {
-        return `<div class="points-area"><div class="points-empty">No points yet</div></div>`;
-      }
+    function renderSidebarKidPoints(kidPoints) {
+      if (!kidPoints || kidPoints.length === 0) return '';
 
-      return `
-        <div class="points-area">
-          ${kidPoints.map(kid => {
-            const mickeyCount = kid.mickey_heads;
-            const progressInCurrentMickey = kid.points % POINTS_PER_MICKEY;
-            const progressPct = (progressInCurrentMickey / POINTS_PER_MICKEY) * 100;
-            const toNext = POINTS_PER_MICKEY - progressInCurrentMickey;
+      return kidPoints.map(kid => {
+        const mickeyCount = kid.mickey_heads;
+        const progressInCurrentMickey = kid.points % POINTS_PER_MICKEY;
+        const progressPct = (progressInCurrentMickey / POINTS_PER_MICKEY) * 100;
+        const toNext = POINTS_PER_MICKEY - progressInCurrentMickey;
 
-            return `
-              <div class="kid-points-card">
-                <div class="kid-name">${esc(kid.kid_name)}</div>
-                <div class="mickey-heads">
-                  ${mickeyCount > 0
-                    ? Array.from({length: mickeyCount}, () => renderMickeyHead()).join('')
-                    : '<span style="color:var(--text-light);font-size:11px">No Mickey Heads yet!</span>'}
-                </div>
-                <div class="points-total">${kid.points}</div>
-                <div class="points-label">total points</div>
-                <div class="points-progress">
-                  <div class="progress-bar-track">
-                    <div class="progress-bar-fill" style="width:${progressPct}%"></div>
-                  </div>
-                  <div class="progress-label">${toNext} point${toNext !== 1 ? 's' : ''} to next Mickey Head</div>
-                </div>
+        return `
+          <div class="kid-points-card ${kidColorClass(kid.kid_name)}">
+            <div class="kid-name">${esc(kid.kid_name)}</div>
+            <div class="mickey-heads">
+              ${mickeyCount > 0
+                ? Array.from({length: mickeyCount}, () => renderMickeyHead()).join('')
+                : '<span class="points-empty-msg">No Mickey Heads yet!</span>'}
+            </div>
+            <div class="points-total">${kid.points}</div>
+            <div class="points-label">total points</div>
+            <div class="points-progress">
+              <div class="progress-bar-track">
+                <div class="progress-bar-fill" style="width:${progressPct}%"></div>
               </div>
-            `;
-          }).join('')}
-        </div>
-      `;
+              <div class="progress-label">${toNext} point${toNext !== 1 ? 's' : ''} to next Mickey Head</div>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
     function render(data) {
@@ -759,24 +726,7 @@
             <div class="clock-date">${esc(data.today.date)}</div>
           </div>
 
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-value">${data.today.events.length}</div>
-              <div class="stat-label">Today</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-value">${data.week.events.length}</div>
-              <div class="stat-label">This Week</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-value">${data.reminders.length}</div>
-              <div class="stat-label">Reminders</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-value">${data.lists.reduce((n, l) => n + l.items.filter(i => !i.checked).length, 0)}</div>
-              <div class="stat-label">List Items</div>
-            </div>
-          </div>
+          ${renderSidebarKidPoints(data.kid_points)}
         </div>
 
         <!-- Header -->
@@ -859,9 +809,6 @@
               `).join('')}
           </div>
         </div>
-
-        <!-- Kid Points -->
-        ${renderKidPoints(data.kid_points)}
       `;
 
       updateClock();
