@@ -1,0 +1,97 @@
+import { supabase } from '../db/supabase.js';
+import { listEvents } from '../services/calendar.js';
+import { listReminders } from '../services/reminders.js';
+import { getAllLists, getList } from '../services/lists.js';
+import { formatForUser } from '../utils/time.js';
+
+/**
+ * Get all dashboard data for a family.
+ * Returns events (today + upcoming week), reminders, and lists.
+ */
+export async function getDashboardData(familyId) {
+  // Get all family members
+  const { data: members } = await supabase
+    .from('users')
+    .select('id, display_name, telegram_username, timezone')
+    .eq('family_id', familyId);
+
+  const tz = members?.[0]?.timezone || 'America/New_York';
+  const now = new Date();
+
+  // Today's date boundaries
+  const todayStr = now.toLocaleDateString('en-CA', { timeZone: tz });
+  const todayStart = `${todayStr}T00:00:00`;
+  const todayEnd = `${todayStr}T23:59:59`;
+
+  // Next 7 days
+  const weekEnd = new Date(now);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const weekEndStr = weekEnd.toLocaleDateString('en-CA', { timeZone: tz });
+  const weekEndBound = `${weekEndStr}T23:59:59`;
+
+  // Fetch data in parallel
+  const [todayEvents, weekEvents, allLists] = await Promise.all([
+    listEvents(familyId, todayStart, todayEnd),
+    listEvents(familyId, todayStart, weekEndBound),
+    getAllLists(familyId),
+  ]);
+
+  // Get all reminders for all family members
+  const reminderResults = await Promise.all(
+    members.map((m) => listReminders(m.id))
+  );
+  const allReminders = reminderResults.flat();
+
+  // Get items for each list
+  const listsWithItems = await Promise.all(
+    allLists.map(async (list) => {
+      const { items } = await getList(familyId, list.name);
+      return { name: list.name, items };
+    })
+  );
+
+  // Format events for display
+  const formatEvent = (e) => ({
+    id: e.id,
+    title: e.title,
+    description: e.description,
+    starts_at: e.starts_at,
+    starts_at_display: e.all_day ? 'All day' : formatForUser(e.starts_at, tz),
+    ends_at_display: e.ends_at ? formatForUser(e.ends_at, tz) : null,
+    all_day: e.all_day,
+    day_label: new Date(e.starts_at).toLocaleDateString('en-US', {
+      timeZone: tz,
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    }),
+  });
+
+  return {
+    family_name: members.map((m) => m.display_name).join(' & '),
+    members: members.map((m) => ({
+      display_name: m.display_name,
+      username: m.telegram_username,
+    })),
+    today: {
+      date: new Date(now).toLocaleDateString('en-US', {
+        timeZone: tz,
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
+      events: todayEvents.map(formatEvent),
+    },
+    week: {
+      events: weekEvents.map(formatEvent),
+    },
+    reminders: allReminders.map((r) => ({
+      id: r.id,
+      message: r.message,
+      remind_at_display: formatForUser(r.remind_at, tz),
+    })),
+    lists: listsWithItems,
+    updated_at: new Date().toISOString(),
+  };
+}

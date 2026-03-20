@@ -3,6 +3,12 @@ import express from 'express';
 import { webhookCallback } from 'grammy';
 import { bot } from './bot/bot.js';
 import { checkReminders, sendDailyDigest, sendWeeklyDigest } from './routes/cron.js';
+import { getDashboardData } from './routes/dashboard.js';
+import { supabase } from './db/supabase.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -52,6 +58,38 @@ app.get('/cron/weekly', async (req, res) => {
   } catch (err) {
     console.error('Weekly digest failed:', err);
     res.status(500).json({ error: 'digest failed' });
+  }
+});
+
+// Dashboard HTML page
+app.get('/dashboard', (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).send('Unauthorized — add ?secret=YOUR_SECRET to the URL');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+// Dashboard API — returns JSON data for the dashboard
+app.get('/api/dashboard', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    // Get the first family (for a personal bot, there's typically one)
+    const { data: families } = await supabase
+      .from('families')
+      .select('id')
+      .limit(1);
+
+    if (!families || families.length === 0) {
+      return res.json({ error: 'No family found. Send /start to the bot first.' });
+    }
+
+    const data = await getDashboardData(families[0].id);
+    res.json(data);
+  } catch (err) {
+    console.error('Dashboard API error:', err);
+    res.status(500).json({ error: 'Failed to load dashboard data' });
   }
 });
 

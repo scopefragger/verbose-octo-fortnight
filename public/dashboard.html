@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Family Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #e8f0fe;
+      --card: #ffffff;
+      --primary: #4a7af7;
+      --primary-light: #e3ecff;
+      --accent: #9b6dff;
+      --accent-light: #ede5ff;
+      --text: #2d3748;
+      --text-light: #718096;
+      --success: #48bb78;
+      --warning: #f6ad55;
+      --border: #e2e8f0;
+      --shadow: 0 2px 12px rgba(0,0,0,0.06);
+      --radius: 16px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .dashboard {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 280px 1fr 320px;
+      grid-template-rows: auto auto 1fr;
+      gap: 20px;
+      grid-template-areas:
+        "sidebar header header"
+        "sidebar today upcoming"
+        "sidebar lists reminders";
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-light);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title .icon {
+      font-size: 18px;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      grid-area: sidebar;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .profile-card {
+      text-align: center;
+      padding: 32px 24px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .profile-card .family-name {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .profile-card .subtitle {
+      font-size: 13px;
+      opacity: 0.85;
+    }
+
+    .profile-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      margin: 0 auto 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-top: 4px;
+    }
+
+    .clock-card {
+      text-align: center;
+      padding: 20px;
+    }
+
+    .clock-time {
+      font-size: 48px;
+      font-weight: 200;
+      color: var(--primary);
+      letter-spacing: -1px;
+    }
+
+    .clock-date {
+      font-size: 14px;
+      color: var(--text-light);
+      margin-top: 4px;
+    }
+
+    /* Header */
+    .header {
+      grid-area: header;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .header .updated {
+      font-size: 12px;
+      color: var(--text-light);
+    }
+
+    .live-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: var(--success);
+      border-radius: 50%;
+      margin-right: 6px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Today's Events */
+    .today-card { grid-area: today; }
+
+    .event-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .event-item:last-child { border-bottom: none; }
+
+    .event-time-badge {
+      background: var(--primary-light);
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 10px;
+      border-radius: 8px;
+      white-space: nowrap;
+      min-width: 80px;
+      text-align: center;
+    }
+
+    .event-time-badge.all-day {
+      background: var(--accent-light);
+      color: var(--accent);
+    }
+
+    .event-details h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .event-details p {
+      font-size: 12px;
+      color: var(--text-light);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-light);
+      font-size: 14px;
+    }
+
+    .empty-state .icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+
+    /* Upcoming Week */
+    .upcoming-card { grid-area: upcoming; }
+
+    .day-group {
+      margin-bottom: 16px;
+    }
+
+    .day-group:last-child { margin-bottom: 0; }
+
+    .day-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid var(--primary-light);
+    }
+
+    .day-event {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      font-size: 14px;
+    }
+
+    .day-event .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+      flex-shrink: 0;
+    }
+
+    .day-event .time {
+      font-size: 12px;
+      color: var(--text-light);
+      min-width: 70px;
+    }
+
+    /* Lists */
+    .lists-card { grid-area: lists; }
+
+    .list-section {
+      margin-bottom: 20px;
+    }
+
+    .list-section:last-child { margin-bottom: 0; }
+
+    .list-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .list-name .count {
+      background: var(--accent-light);
+      color: var(--accent);
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .list-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      font-size: 14px;
+    }
+
+    .list-item .checkbox {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .list-item.checked .checkbox {
+      background: var(--success);
+      border-color: var(--success);
+      color: white;
+      font-size: 11px;
+    }
+
+    .list-item.checked .item-text {
+      text-decoration: line-through;
+      color: var(--text-light);
+    }
+
+    /* Reminders */
+    .reminders-card { grid-area: reminders; }
+
+    .reminder-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px;
+      background: var(--primary-light);
+      border-radius: 12px;
+      margin-bottom: 10px;
+    }
+
+    .reminder-item:last-child { margin-bottom: 0; }
+
+    .reminder-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .reminder-content h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .reminder-content .time {
+      font-size: 12px;
+      color: var(--text-light);
+    }
+
+    /* Responsive */
+    @media (max-width: 1100px) {
+      .dashboard {
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+          "header header"
+          "today upcoming"
+          "lists reminders";
+      }
+      .sidebar { display: none; }
+    }
+
+    @media (max-width: 700px) {
+      body { padding: 12px; }
+      .dashboard {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "header"
+          "today"
+          "upcoming"
+          "lists"
+          "reminders";
+      }
+    }
+
+    /* Scrollable cards */
+    .upcoming-card .card-body,
+    .lists-card .card-body {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .card-body::-webkit-scrollbar { width: 4px; }
+    .card-body::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    /* Loading */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+      color: var(--text-light);
+      font-size: 16px;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 12px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="dashboard" id="dashboard">
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      Loading dashboard...
+    </div>
+  </div>
+
+  <script>
+    const REFRESH_INTERVAL = 60000; // 1 minute
+
+    async function fetchData() {
+      const params = new URLSearchParams(window.location.search);
+      const secret = params.get('secret');
+      const res = await fetch(`/api/dashboard?secret=${secret}`);
+      if (!res.ok) throw new Error('Failed to load');
+      return res.json();
+    }
+
+    function render(data) {
+      const dashboard = document.getElementById('dashboard');
+      dashboard.innerHTML = `
+        <!-- Sidebar -->
+        <div class="sidebar">
+          <div class="profile-card">
+            <div class="profile-avatar">👨‍👩‍👧‍👦</div>
+            <div class="family-name">${esc(data.family_name)}</div>
+            <div class="subtitle">Family Dashboard</div>
+          </div>
+
+          <div class="card clock-card">
+            <div class="clock-time" id="clock"></div>
+            <div class="clock-date">${esc(data.today.date)}</div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-value">${data.today.events.length}</div>
+              <div class="stat-label">Today</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${data.week.events.length}</div>
+              <div class="stat-label">This Week</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${data.reminders.length}</div>
+              <div class="stat-label">Reminders</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">${data.lists.reduce((n, l) => n + l.items.filter(i => !i.checked).length, 0)}</div>
+              <div class="stat-label">List Items</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Header -->
+        <div class="header card">
+          <h1>📋 Family Dashboard</h1>
+          <div class="updated">
+            <span class="live-dot"></span>
+            Updated ${new Date(data.updated_at).toLocaleTimeString()}
+          </div>
+        </div>
+
+        <!-- Today's Events -->
+        <div class="card today-card">
+          <div class="card-title"><span class="icon">📅</span> Today's Schedule</div>
+          <div class="card-body">
+            ${data.today.events.length === 0
+              ? '<div class="empty-state"><div class="icon">🌤️</div>No events today — enjoy your free time!</div>'
+              : data.today.events.map(e => `
+                <div class="event-item">
+                  <div class="event-time-badge ${e.all_day ? 'all-day' : ''}">${esc(e.starts_at_display)}</div>
+                  <div class="event-details">
+                    <h3>${esc(e.title)}</h3>
+                    ${e.description ? `<p>${esc(e.description)}</p>` : ''}
+                  </div>
+                </div>
+              `).join('')}
+          </div>
+        </div>
+
+        <!-- Upcoming Week -->
+        <div class="card upcoming-card">
+          <div class="card-title"><span class="icon">🗓️</span> Upcoming Week</div>
+          <div class="card-body">
+            ${data.week.events.length === 0
+              ? '<div class="empty-state"><div class="icon">📭</div>No upcoming events</div>'
+              : renderWeekEvents(data.week.events)}
+          </div>
+        </div>
+
+        <!-- Lists -->
+        <div class="card lists-card">
+          <div class="card-title"><span class="icon">📝</span> Shared Lists</div>
+          <div class="card-body">
+            ${data.lists.length === 0
+              ? '<div class="empty-state"><div class="icon">📋</div>No lists yet</div>'
+              : data.lists.map(list => `
+                <div class="list-section">
+                  <div class="list-name">
+                    ${esc(list.name)}
+                    <span class="count">${list.items.filter(i => !i.checked).length}</span>
+                  </div>
+                  ${list.items.map(item => `
+                    <div class="list-item ${item.checked ? 'checked' : ''}">
+                      <div class="checkbox">${item.checked ? '✓' : ''}</div>
+                      <span class="item-text">${esc(item.text)}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              `).join('')}
+          </div>
+        </div>
+
+        <!-- Reminders -->
+        <div class="card reminders-card">
+          <div class="card-title"><span class="icon">⏰</span> Pending Reminders</div>
+          <div class="card-body">
+            ${data.reminders.length === 0
+              ? '<div class="empty-state"><div class="icon">✅</div>No pending reminders</div>'
+              : data.reminders.map(r => `
+                <div class="reminder-item">
+                  <div class="reminder-icon">🔔</div>
+                  <div class="reminder-content">
+                    <h4>${esc(r.message)}</h4>
+                    <div class="time">${esc(r.remind_at_display)}</div>
+                  </div>
+                </div>
+              `).join('')}
+          </div>
+        </div>
+      `;
+
+      updateClock();
+    }
+
+    function renderWeekEvents(events) {
+      const byDay = {};
+      events.forEach(e => {
+        if (!byDay[e.day_label]) byDay[e.day_label] = [];
+        byDay[e.day_label].push(e);
+      });
+
+      return Object.entries(byDay).map(([day, evts]) => `
+        <div class="day-group">
+          <div class="day-label">${esc(day)}</div>
+          ${evts.map(e => `
+            <div class="day-event">
+              <div class="dot"></div>
+              <span class="time">${esc(e.starts_at_display)}</span>
+              <span>${esc(e.title)}</span>
+            </div>
+          `).join('')}
+        </div>
+      `).join('');
+    }
+
+    function esc(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function updateClock() {
+      const el = document.getElementById('clock');
+      if (!el) return;
+      const now = new Date();
+      el.textContent = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+    }
+
+    async function init() {
+      try {
+        const data = await fetchData();
+        render(data);
+      } catch (err) {
+        document.getElementById('dashboard').innerHTML =
+          '<div class="loading">Failed to load dashboard. Check your URL.</div>';
+      }
+
+      // Auto-refresh
+      setInterval(async () => {
+        try {
+          const data = await fetchData();
+          render(data);
+        } catch (e) { /* silently retry next interval */ }
+      }, REFRESH_INTERVAL);
+
+      // Update clock every second
+      setInterval(updateClock, 1000);
+    }
+
+    init();
+  </script>
+</body>
+</html>
