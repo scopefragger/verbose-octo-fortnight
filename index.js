@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import { webhookCallback } from 'grammy';
 import { bot } from './bot/bot.js';
-import { checkReminders } from './routes/cron.js';
+import { checkReminders, sendDailyDigest, sendWeeklyDigest } from './routes/cron.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,6 +24,34 @@ app.get('/cron/check', async (req, res) => {
   } catch (err) {
     console.error('Cron check failed:', err);
     res.status(500).json({ error: 'check failed' });
+  }
+});
+
+// Daily digest — called by cron-job.org at 8am
+app.get('/cron/daily', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const result = await sendDailyDigest(bot);
+    res.json(result);
+  } catch (err) {
+    console.error('Daily digest failed:', err);
+    res.status(500).json({ error: 'digest failed' });
+  }
+});
+
+// Weekly digest — called by cron-job.org every Sunday
+app.get('/cron/weekly', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const result = await sendWeeklyDigest(bot);
+    res.json(result);
+  } catch (err) {
+    console.error('Weekly digest failed:', err);
+    res.status(500).json({ error: 'digest failed' });
   }
 });
 

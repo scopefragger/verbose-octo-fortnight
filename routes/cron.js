@@ -1,4 +1,7 @@
-import { getDueReminders, markSent } from '../services/reminders.js';
+import { getDueReminders, markSent, listReminders } from '../services/reminders.js';
+import { listEvents } from '../services/calendar.js';
+import { supabase } from '../db/supabase.js';
+import { formatForUser } from '../utils/time.js';
 
 /**
  * Check for due reminders and send them via Telegram.
@@ -25,4 +28,152 @@ export async function checkReminders(bot) {
   }
 
   return { checked: due.length, sent };
+}
+
+/**
+ * Send a daily morning digest at 8am.
+ * Shows today's events and pending reminders for each family member.
+ */
+export async function sendDailyDigest(bot) {
+  const users = await getAllUsers();
+  let sent = 0;
+
+  for (const user of users) {
+    const tz = user.timezone || 'America/New_York';
+    const now = new Date();
+    const todayStart = startOfDayInTz(now, tz);
+    const todayEnd = endOfDayInTz(now, tz);
+
+    // Get today's events
+    const events = user.family_id
+      ? await listEvents(user.family_id, todayStart, todayEnd)
+      : [];
+
+    // Get pending reminders for today
+    const pendingReminders = await listReminders(user.id);
+    const todayReminders = pendingReminders.filter((r) => {
+      const remindDate = new Date(r.remind_at);
+      return remindDate >= new Date(todayStart) && remindDate <= new Date(todayEnd);
+    });
+
+    // Skip if nothing to report
+    if (events.length === 0 && todayReminders.length === 0) continue;
+
+    let message = `☀️ Good morning, ${user.display_name}! Here's your day:\n`;
+
+    if (events.length > 0) {
+      message += `\n📅 Today's Events:\n`;
+      for (const event of events) {
+        const time = event.all_day ? 'All day' : formatForUser(event.starts_at, tz);
+        message += `  • ${event.title} — ${time}\n`;
+      }
+    }
+
+    if (todayReminders.length > 0) {
+      message += `\n⏰ Reminders:\n`;
+      for (const r of todayReminders) {
+        message += `  • ${r.message} — ${formatForUser(r.remind_at, tz)}\n`;
+      }
+    }
+
+    try {
+      await bot.api.sendMessage(user.telegram_id, message);
+      sent++;
+    } catch (err) {
+      console.error(`Failed to send daily digest to ${user.telegram_id}:`, err.message);
+    }
+  }
+
+  return { users: users.length, sent };
+}
+
+/**
+ * Send a weekly digest every Sunday.
+ * Shows key events for the upcoming week.
+ */
+export async function sendWeeklyDigest(bot) {
+  const users = await getAllUsers();
+  let sent = 0;
+
+  for (const user of users) {
+    if (!user.family_id) continue;
+
+    const tz = user.timezone || 'America/New_York';
+    const now = new Date();
+    const weekStart = startOfDayInTz(now, tz);
+    const weekEnd = endOfDayInTz(addDays(now, 6), tz);
+
+    const events = await listEvents(user.family_id, weekStart, weekEnd);
+
+    if (events.length === 0) continue;
+
+    let message = `📋 Weekly overview for ${user.display_name}:\n\n`;
+
+    // Group events by day
+    const byDay = {};
+    for (const event of events) {
+      const dayLabel = new Date(event.starts_at).toLocaleDateString('en-US', {
+        timeZone: tz,
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+      });
+      if (!byDay[dayLabel]) byDay[dayLabel] = [];
+      byDay[dayLabel].push(event);
+    }
+
+    for (const [day, dayEvents] of Object.entries(byDay)) {
+      message += `📅 ${day}\n`;
+      for (const event of dayEvents) {
+        const time = event.all_day ? 'All day' : formatForUser(event.starts_at, tz);
+        message += `  • ${event.title} — ${time}\n`;
+      }
+      message += '\n';
+    }
+
+    try {
+      await bot.api.sendMessage(user.telegram_id, message);
+      sent++;
+    } catch (err) {
+      console.error(`Failed to send weekly digest to ${user.telegram_id}:`, err.message);
+    }
+  }
+
+  return { users: users.length, sent };
+}
+
+/**
+ * Get all registered users with their family info.
+ */
+async function getAllUsers() {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, telegram_id, display_name, family_id, timezone');
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Get ISO string for start of day in a timezone.
+ */
+function startOfDayInTz(date, tz) {
+  const dayStr = date.toLocaleDateString('en-CA', { timeZone: tz });
+  return `${dayStr}T00:00:00`;
+}
+
+/**
+ * Get ISO string for end of day in a timezone.
+ */
+function endOfDayInTz(date, tz) {
+  const dayStr = date.toLocaleDateString('en-CA', { timeZone: tz });
+  return `${dayStr}T23:59:59`;
+}
+
+/**
+ * Add days to a date.
+ */
+function addDays(date, days) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
 }
