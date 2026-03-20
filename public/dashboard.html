@@ -20,68 +20,81 @@
       --warning: #f6ad55;
       --border: #e2e8f0;
       --shadow: 0 2px 12px rgba(0,0,0,0.06);
-      --radius: 16px;
+      --radius: 14px;
       --mickey-gold: #f5c518;
     }
 
-    body {
+    html, body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
-      padding: 24px;
+      height: 100vh;
+      overflow: hidden;
     }
 
+    /* === TV LAYOUT: fill viewport exactly === */
     .dashboard {
-      max-width: 1400px;
-      margin: 0 auto;
+      height: 100vh;
+      padding: 12px;
       display: grid;
-      grid-template-columns: 280px 1fr 320px;
-      grid-template-rows: auto auto auto 1fr;
-      gap: 20px;
+      grid-template-columns: 220px 1fr 1fr 1fr;
+      grid-template-rows: auto 1fr 1fr;
+      gap: 12px;
       grid-template-areas:
-        "sidebar header header"
-        "sidebar countdown countdown"
-        "sidebar today upcoming"
-        "sidebar lists reminders"
-        "points points points";
+        "sidebar header   header    header"
+        "sidebar countdown today    upcoming"
+        "sidebar points   lists     reminders";
     }
 
     /* Cards */
     .card {
       background: var(--card);
       border-radius: var(--radius);
-      padding: 24px;
+      padding: 16px;
       box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
 
     .card-title {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--text-light);
-      margin-bottom: 16px;
+      margin-bottom: 10px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
+      flex-shrink: 0;
     }
 
-    .card-title .icon {
-      font-size: 18px;
+    .card-title .icon { font-size: 16px; }
+
+    .card-body {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
     }
 
-    /* Sidebar */
+    .card-body::-webkit-scrollbar { width: 3px; }
+    .card-body::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    /* === SIDEBAR === */
     .sidebar {
       grid-area: sidebar;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 12px;
     }
 
     .profile-card {
       text-align: center;
-      padding: 32px 24px;
+      padding: 20px 12px;
       background: linear-gradient(135deg, var(--primary), var(--accent));
       color: white;
       border-radius: var(--radius);
@@ -89,100 +102,100 @@
     }
 
     .profile-card .family-name {
-      font-size: 22px;
+      font-size: 16px;
       font-weight: 700;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     .profile-card .subtitle {
-      font-size: 13px;
+      font-size: 11px;
       opacity: 0.85;
     }
 
     .profile-avatar {
-      width: 80px;
-      height: 80px;
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
       background: rgba(255,255,255,0.2);
-      margin: 0 auto 16px;
+      margin: 0 auto 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 36px;
+      font-size: 28px;
     }
 
     .stats-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      gap: 8px;
     }
 
     .stat-card {
       background: var(--card);
-      border-radius: 12px;
-      padding: 16px;
+      border-radius: 10px;
+      padding: 10px;
       text-align: center;
       box-shadow: var(--shadow);
     }
 
     .stat-value {
-      font-size: 28px;
+      font-size: 22px;
       font-weight: 700;
       color: var(--primary);
     }
 
     .stat-label {
-      font-size: 11px;
+      font-size: 9px;
       color: var(--text-light);
       text-transform: uppercase;
       letter-spacing: 0.3px;
-      margin-top: 4px;
+      margin-top: 2px;
     }
 
     .clock-card {
       text-align: center;
-      padding: 20px;
+      padding: 12px;
     }
 
     .clock-time {
-      font-size: 48px;
+      font-size: 36px;
       font-weight: 200;
       color: var(--primary);
       letter-spacing: -1px;
     }
 
     .clock-date {
-      font-size: 14px;
+      font-size: 12px;
       color: var(--text-light);
-      margin-top: 4px;
+      margin-top: 2px;
     }
 
-    /* Header */
+    /* === HEADER === */
     .header {
       grid-area: header;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 20px 24px;
+      padding: 10px 16px;
     }
 
     .header h1 {
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 600;
     }
 
     .header .updated {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-light);
     }
 
     .live-dot {
       display: inline-block;
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       background: var(--success);
       border-radius: 50%;
-      margin-right: 6px;
+      margin-right: 4px;
       animation: pulse 2s infinite;
     }
 
@@ -191,40 +204,39 @@
       50% { opacity: 0.4; }
     }
 
-    /* Countdown */
+    /* === COUNTDOWN === */
     .countdown-area {
       grid-area: countdown;
       display: flex;
-      gap: 20px;
-      overflow-x: auto;
+      flex-direction: column;
+      gap: 10px;
     }
 
     .countdown-card {
       flex: 1;
-      min-width: 280px;
       border-radius: var(--radius);
-      padding: 32px;
+      padding: 20px;
       text-align: center;
       color: white;
       position: relative;
       overflow: hidden;
       box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
 
     .countdown-card .sparkles {
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      top: 0; left: 0; right: 0; bottom: 0;
       pointer-events: none;
       overflow: hidden;
     }
 
     .countdown-card .sparkle {
       position: absolute;
-      width: 4px;
-      height: 4px;
+      width: 3px;
+      height: 3px;
       background: rgba(255,255,255,0.6);
       border-radius: 50%;
       animation: sparkle-float 3s infinite ease-in-out;
@@ -232,18 +244,18 @@
 
     @keyframes sparkle-float {
       0%, 100% { transform: translateY(0) scale(1); opacity: 0.6; }
-      50% { transform: translateY(-20px) scale(1.5); opacity: 1; }
+      50% { transform: translateY(-15px) scale(1.5); opacity: 1; }
     }
 
     .countdown-title {
-      font-size: 18px;
+      font-size: 14px;
       font-weight: 600;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
       position: relative;
     }
 
     .countdown-days {
-      font-size: 72px;
+      font-size: 56px;
       font-weight: 800;
       line-height: 1;
       position: relative;
@@ -251,84 +263,88 @@
     }
 
     .countdown-label {
-      font-size: 16px;
+      font-size: 13px;
       font-weight: 500;
       opacity: 0.9;
-      margin-top: 4px;
+      margin-top: 2px;
       position: relative;
     }
 
     .countdown-date {
-      font-size: 12px;
+      font-size: 10px;
       opacity: 0.75;
-      margin-top: 8px;
+      margin-top: 4px;
       position: relative;
     }
 
-    /* Countdown backgrounds */
-    .bg-fireworks {
-      background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
-    }
-    .bg-castle {
-      background: linear-gradient(135deg, #1b1464, #6c3ec1, #c86dd7);
-    }
-    .bg-stars {
-      background: linear-gradient(135deg, #0c0c1d, #1a1a3e, #2d2b55);
-    }
-    .bg-rainbow {
-      background: linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
-    }
-    .bg-beach {
-      background: linear-gradient(135deg, #0abde3, #48dbfb, #feca57);
-    }
-    .bg-party {
-      background: linear-gradient(135deg, #ff6348, #ff9ff3, #feca57, #48dbfb);
+    .countdown-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      color: var(--text-light);
+      font-size: 13px;
     }
 
-    /* Kid Points */
+    /* Countdown backgrounds */
+    .bg-fireworks { background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); }
+    .bg-castle { background: linear-gradient(135deg, #1b1464, #6c3ec1, #c86dd7); }
+    .bg-stars { background: linear-gradient(135deg, #0c0c1d, #1a1a3e, #2d2b55); }
+    .bg-rainbow { background: linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3); }
+    .bg-beach { background: linear-gradient(135deg, #0abde3, #48dbfb, #feca57); }
+    .bg-party { background: linear-gradient(135deg, #ff6348, #ff9ff3, #feca57, #48dbfb); }
+
+    /* === KID POINTS === */
     .points-area {
       grid-area: points;
       display: flex;
-      gap: 20px;
+      flex-direction: column;
+      gap: 10px;
     }
 
     .kid-points-card {
       flex: 1;
       background: var(--card);
       border-radius: var(--radius);
-      padding: 24px;
+      padding: 14px;
       box-shadow: var(--shadow);
       text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
 
     .kid-name {
-      font-size: 20px;
+      font-size: 16px;
       font-weight: 700;
       color: var(--text);
-      margin-bottom: 12px;
+      margin-bottom: 6px;
     }
 
     .mickey-heads {
       display: flex;
       justify-content: center;
       flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 16px;
-      min-height: 48px;
+      gap: 6px;
+      margin-bottom: 8px;
+      min-height: 32px;
       align-items: center;
     }
 
     .mickey-head {
-      width: 40px;
-      height: 40px;
+      width: 32px;
+      height: 32px;
       position: relative;
       display: inline-block;
-      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+      filter: drop-shadow(0 1px 3px rgba(0,0,0,0.15));
     }
 
     .mickey-head .head {
-      width: 28px;
-      height: 28px;
+      width: 22px;
+      height: 22px;
       background: var(--mickey-gold);
       border-radius: 50%;
       position: absolute;
@@ -339,62 +355,74 @@
 
     .mickey-head .ear-left,
     .mickey-head .ear-right {
-      width: 16px;
-      height: 16px;
+      width: 13px;
+      height: 13px;
       background: var(--mickey-gold);
       border-radius: 50%;
       position: absolute;
       top: 0;
     }
 
-    .mickey-head .ear-left { left: 2px; }
-    .mickey-head .ear-right { right: 2px; }
+    .mickey-head .ear-left { left: 1px; }
+    .mickey-head .ear-right { right: 1px; }
 
     .points-total {
-      font-size: 36px;
+      font-size: 28px;
       font-weight: 800;
       color: var(--primary);
     }
 
     .points-label {
-      font-size: 13px;
+      font-size: 11px;
       color: var(--text-light);
-      margin-top: 4px;
+      margin-top: 2px;
     }
 
     .points-progress {
-      margin-top: 16px;
+      margin-top: 8px;
     }
 
     .progress-bar-track {
       width: 100%;
-      height: 12px;
+      height: 8px;
       background: var(--border);
-      border-radius: 6px;
+      border-radius: 4px;
       overflow: hidden;
     }
 
     .progress-bar-fill {
       height: 100%;
       background: linear-gradient(90deg, var(--mickey-gold), #ffda44);
-      border-radius: 6px;
+      border-radius: 4px;
       transition: width 0.5s ease;
     }
 
     .progress-label {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text-light);
-      margin-top: 6px;
+      margin-top: 4px;
     }
 
-    /* Today's Events */
+    .points-empty {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      color: var(--text-light);
+      font-size: 13px;
+    }
+
+    /* === TODAY === */
     .today-card { grid-area: today; }
 
     .event-item {
       display: flex;
       align-items: flex-start;
-      gap: 12px;
-      padding: 14px 0;
+      gap: 8px;
+      padding: 8px 0;
       border-bottom: 1px solid var(--border);
     }
 
@@ -403,12 +431,12 @@
     .event-time-badge {
       background: var(--primary-light);
       color: var(--primary);
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 600;
-      padding: 6px 10px;
-      border-radius: 8px;
+      padding: 4px 8px;
+      border-radius: 6px;
       white-space: nowrap;
-      min-width: 80px;
+      min-width: 65px;
       text-align: center;
     }
 
@@ -418,85 +446,79 @@
     }
 
     .event-details h3 {
-      font-size: 15px;
+      font-size: 13px;
       font-weight: 600;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
     }
 
     .event-details p {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-light);
     }
 
     .empty-state {
       text-align: center;
-      padding: 40px 20px;
+      padding: 20px 10px;
       color: var(--text-light);
-      font-size: 14px;
+      font-size: 13px;
     }
 
     .empty-state .icon {
-      font-size: 40px;
-      margin-bottom: 12px;
+      font-size: 28px;
+      margin-bottom: 8px;
       opacity: 0.5;
     }
 
-    /* Upcoming Week */
+    /* === UPCOMING === */
     .upcoming-card { grid-area: upcoming; }
 
-    .day-group {
-      margin-bottom: 16px;
-    }
-
+    .day-group { margin-bottom: 10px; }
     .day-group:last-child { margin-bottom: 0; }
 
     .day-label {
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 700;
       color: var(--primary);
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      margin-bottom: 8px;
-      padding-bottom: 4px;
+      margin-bottom: 4px;
+      padding-bottom: 2px;
       border-bottom: 2px solid var(--primary-light);
     }
 
     .day-event {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 8px 0;
-      font-size: 14px;
+      gap: 8px;
+      padding: 4px 0;
+      font-size: 12px;
     }
 
     .day-event .dot {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
       background: var(--primary);
       flex-shrink: 0;
     }
 
     .day-event .time {
-      font-size: 12px;
+      font-size: 10px;
       color: var(--text-light);
-      min-width: 70px;
+      min-width: 60px;
     }
 
-    /* Lists */
+    /* === LISTS === */
     .lists-card { grid-area: lists; }
 
-    .list-section {
-      margin-bottom: 20px;
-    }
-
+    .list-section { margin-bottom: 12px; }
     .list-section:last-child { margin-bottom: 0; }
 
     .list-name {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 700;
       color: var(--accent);
-      margin-bottom: 8px;
+      margin-bottom: 4px;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -505,35 +527,35 @@
     .list-name .count {
       background: var(--accent-light);
       color: var(--accent);
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 10px;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 8px;
     }
 
     .list-item {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 6px 0;
-      font-size: 14px;
+      gap: 6px;
+      padding: 3px 0;
+      font-size: 12px;
     }
 
     .list-item .checkbox {
-      width: 18px;
-      height: 18px;
-      border-radius: 4px;
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
       border: 2px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      font-size: 9px;
     }
 
     .list-item.checked .checkbox {
       background: var(--success);
       border-color: var(--success);
       color: white;
-      font-size: 11px;
     }
 
     .list-item.checked .item-text {
@@ -541,80 +563,71 @@
       color: var(--text-light);
     }
 
-    /* Reminders */
+    /* === REMINDERS === */
     .reminders-card { grid-area: reminders; }
 
     .reminder-item {
       display: flex;
       align-items: flex-start;
-      gap: 12px;
-      padding: 12px;
+      gap: 8px;
+      padding: 8px;
       background: var(--primary-light);
-      border-radius: 12px;
-      margin-bottom: 10px;
+      border-radius: 10px;
+      margin-bottom: 6px;
     }
 
     .reminder-item:last-child { margin-bottom: 0; }
 
     .reminder-icon {
-      font-size: 20px;
+      font-size: 16px;
       flex-shrink: 0;
-      margin-top: 2px;
+      margin-top: 1px;
     }
 
     .reminder-content h4 {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 600;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
     }
 
     .reminder-content .time {
-      font-size: 12px;
+      font-size: 10px;
       color: var(--text-light);
     }
 
-    /* Responsive */
+    /* === MOBILE (scrollable) === */
     @media (max-width: 1100px) {
+      html, body { height: auto; overflow: auto; }
       .dashboard {
+        height: auto;
         grid-template-columns: 1fr 1fr;
         grid-template-areas:
           "header header"
           "countdown countdown"
+          "points points"
           "today upcoming"
-          "lists reminders"
-          "points points";
+          "lists reminders";
       }
       .sidebar { display: none; }
+      .countdown-area { flex-direction: row; }
+      .points-area { flex-direction: row; }
     }
 
     @media (max-width: 700px) {
-      body { padding: 12px; }
+      body { padding: 8px; }
       .dashboard {
         grid-template-columns: 1fr;
         grid-template-areas:
           "header"
           "countdown"
+          "points"
           "today"
           "upcoming"
           "lists"
-          "reminders"
-          "points";
+          "reminders";
       }
       .countdown-area { flex-direction: column; }
       .points-area { flex-direction: column; }
-    }
-
-    /* Scrollable cards */
-    .upcoming-card .card-body,
-    .lists-card .card-body {
-      max-height: 400px;
-      overflow-y: auto;
-    }
-
-    .card-body::-webkit-scrollbar { width: 4px; }
-    .card-body::-webkit-scrollbar-thumb {
-      background: var(--border);
-      border-radius: 2px;
     }
 
     /* Loading */
@@ -649,7 +662,7 @@
   </div>
 
   <script>
-    const REFRESH_INTERVAL = 60000; // 1 minute
+    const REFRESH_INTERVAL = 60000;
     const POINTS_PER_MICKEY = 20;
 
     async function fetchData() {
@@ -661,14 +674,16 @@
     }
 
     function renderCountdowns(countdowns) {
-      if (!countdowns || countdowns.length === 0) return '';
+      if (!countdowns || countdowns.length === 0) {
+        return `<div class="countdown-area"><div class="countdown-empty">No countdowns set</div></div>`;
+      }
 
       return `
         <div class="countdown-area">
           ${countdowns.map(c => `
             <div class="countdown-card bg-${esc(c.background || 'fireworks')}">
               <div class="sparkles">
-                ${Array.from({length: 12}, (_, i) => `
+                ${Array.from({length: 10}, (_, i) => `
                   <div class="sparkle" style="left:${Math.random()*100}%;top:${Math.random()*100}%;animation-delay:${(i*0.3).toFixed(1)}s"></div>
                 `).join('')}
               </div>
@@ -693,7 +708,9 @@
     }
 
     function renderKidPoints(kidPoints) {
-      if (!kidPoints || kidPoints.length === 0) return '';
+      if (!kidPoints || kidPoints.length === 0) {
+        return `<div class="points-area"><div class="points-empty">No points yet</div></div>`;
+      }
 
       return `
         <div class="points-area">
@@ -709,7 +726,7 @@
                 <div class="mickey-heads">
                   ${mickeyCount > 0
                     ? Array.from({length: mickeyCount}, () => renderMickeyHead()).join('')
-                    : '<span style="color:var(--text-light);font-size:13px">No Mickey Heads yet — keep going!</span>'}
+                    : '<span style="color:var(--text-light);font-size:11px">No Mickey Heads yet!</span>'}
                 </div>
                 <div class="points-total">${kid.points}</div>
                 <div class="points-label">total points</div>
@@ -898,7 +915,6 @@
           '<div class="loading">Failed to load dashboard. Check your URL.</div>';
       }
 
-      // Auto-refresh
       setInterval(async () => {
         try {
           const data = await fetchData();
@@ -906,7 +922,6 @@
         } catch (e) { /* silently retry next interval */ }
       }, REFRESH_INTERVAL);
 
-      // Update clock every second
       setInterval(updateClock, 1000);
     }
 
