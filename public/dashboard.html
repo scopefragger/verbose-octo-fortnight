@@ -22,7 +22,257 @@
       --shadow: 0 2px 12px rgba(0,0,0,0.06);
       --radius: 14px;
       --mickey-gold: #f5c518;
+      --header-gradient: linear-gradient(135deg, var(--primary), var(--accent));
+      --theme-emoji: '';
     }
+
+    /* ============ THEME DEFINITIONS ============ */
+
+    /* Christmas */
+    .theme-christmas {
+      --bg: #1a472a;
+      --card: rgba(255,255,255,0.95);
+      --primary: #c41e3a;
+      --primary-light: #fde8ec;
+      --accent: #2d7d46;
+      --accent-light: #e6f4ea;
+      --text: #1a2e1a;
+      --text-light: #4a6a4a;
+      --border: #d4e8d4;
+      --header-gradient: linear-gradient(135deg, #c41e3a, #2d7d46);
+      --theme-emoji: '';
+    }
+
+    /* Halloween */
+    .theme-halloween {
+      --bg: #1a1a2e;
+      --card: rgba(30,30,50,0.92);
+      --primary: #ff6f00;
+      --primary-light: rgba(255,111,0,0.15);
+      --accent: #9c27b0;
+      --accent-light: rgba(156,39,176,0.15);
+      --text: #e0e0e0;
+      --text-light: #a0a0b0;
+      --border: #3a3a5a;
+      --shadow: 0 2px 12px rgba(0,0,0,0.3);
+      --header-gradient: linear-gradient(135deg, #ff6f00, #9c27b0);
+    }
+
+    /* Easter */
+    .theme-easter {
+      --bg: #f0f9e8;
+      --card: rgba(255,255,255,0.95);
+      --primary: #e8a0bf;
+      --primary-light: #fce4ec;
+      --accent: #81c784;
+      --accent-light: #e8f5e9;
+      --text: #3e2723;
+      --text-light: #6d5a52;
+      --border: #e0d4e8;
+      --header-gradient: linear-gradient(135deg, #e8a0bf, #81c784);
+    }
+
+    /* Valentine's Day */
+    .theme-valentines {
+      --bg: #fce4ec;
+      --card: rgba(255,255,255,0.95);
+      --primary: #e91e63;
+      --primary-light: #fce4ec;
+      --accent: #ad1457;
+      --accent-light: #f8bbd0;
+      --text: #880e4f;
+      --text-light: #c2185b;
+      --border: #f48fb1;
+      --header-gradient: linear-gradient(135deg, #e91e63, #ad1457);
+    }
+
+    /* Bonfire Night */
+    .theme-bonfire {
+      --bg: #1a1a2e;
+      --card: rgba(40,30,20,0.92);
+      --primary: #ff5722;
+      --primary-light: rgba(255,87,34,0.15);
+      --accent: #ff9800;
+      --accent-light: rgba(255,152,0,0.15);
+      --text: #ffe0b2;
+      --text-light: #ffcc80;
+      --border: #5d4037;
+      --shadow: 0 2px 12px rgba(0,0,0,0.3);
+      --header-gradient: linear-gradient(135deg, #ff5722, #ff9800);
+    }
+
+    /* New Year's */
+    .theme-newyear {
+      --bg: #0d0d2b;
+      --card: rgba(20,20,60,0.92);
+      --primary: #ffd700;
+      --primary-light: rgba(255,215,0,0.15);
+      --accent: #c0c0c0;
+      --accent-light: rgba(192,192,192,0.15);
+      --text: #f0f0f0;
+      --text-light: #c0c0d0;
+      --border: #3a3a6a;
+      --shadow: 0 2px 12px rgba(0,0,0,0.3);
+      --header-gradient: linear-gradient(135deg, #ffd700, #c0c0c0);
+    }
+
+    /* St Patrick's Day */
+    .theme-stpatricks {
+      --bg: #e8f5e9;
+      --card: rgba(255,255,255,0.95);
+      --primary: #2e7d32;
+      --primary-light: #c8e6c9;
+      --accent: #ffd700;
+      --accent-light: #fff9c4;
+      --text: #1b5e20;
+      --text-light: #4caf50;
+      --border: #a5d6a7;
+      --header-gradient: linear-gradient(135deg, #2e7d32, #66bb6a);
+    }
+
+    /* Thanksgiving */
+    .theme-thanksgiving {
+      --bg: #fff3e0;
+      --card: rgba(255,255,255,0.95);
+      --primary: #e65100;
+      --primary-light: #ffe0b2;
+      --accent: #795548;
+      --accent-light: #d7ccc8;
+      --text: #3e2723;
+      --text-light: #6d4c41;
+      --border: #d7ccc8;
+      --header-gradient: linear-gradient(135deg, #e65100, #795548);
+    }
+
+    /* Summer */
+    .theme-summer {
+      --bg: #e0f7fa;
+      --card: rgba(255,255,255,0.95);
+      --primary: #00acc1;
+      --primary-light: #b2ebf2;
+      --accent: #ff7043;
+      --accent-light: #ffccbc;
+      --text: #004d40;
+      --text-light: #00796b;
+      --border: #b2dfdb;
+      --header-gradient: linear-gradient(135deg, #00acc1, #ff7043);
+    }
+
+    /* Frozen */
+    .theme-frozen {
+      --bg: #e3f2fd;
+      --card: rgba(255,255,255,0.92);
+      --primary: #4fc3f7;
+      --primary-light: rgba(79,195,247,0.15);
+      --accent: #b39ddb;
+      --accent-light: rgba(179,157,219,0.15);
+      --text: #1a237e;
+      --text-light: #5c6bc0;
+      --border: #bbdefb;
+      --header-gradient: linear-gradient(135deg, #4fc3f7, #b39ddb);
+    }
+
+    /* Star Wars */
+    .theme-starwars {
+      --bg: #0a0a0a;
+      --card: rgba(20,20,30,0.95);
+      --primary: #ffe81f;
+      --primary-light: rgba(255,232,31,0.12);
+      --accent: #ff0000;
+      --accent-light: rgba(255,0,0,0.12);
+      --text: #e0e0e0;
+      --text-light: #9e9e9e;
+      --border: #333;
+      --shadow: 0 2px 12px rgba(0,0,0,0.5);
+      --header-gradient: linear-gradient(135deg, #ffe81f, #ff0000);
+    }
+
+    /* Princess */
+    .theme-princess {
+      --bg: #fce4ec;
+      --card: rgba(255,255,255,0.95);
+      --primary: #ec407a;
+      --primary-light: #fce4ec;
+      --accent: #ffd700;
+      --accent-light: #fff9c4;
+      --text: #880e4f;
+      --text-light: #c2185b;
+      --border: #f8bbd0;
+      --header-gradient: linear-gradient(135deg, #ec407a, #ffd700);
+    }
+
+    /* Pixar */
+    .theme-pixar {
+      --bg: #e8eaf6;
+      --card: rgba(255,255,255,0.95);
+      --primary: #1565c0;
+      --primary-light: #bbdefb;
+      --accent: #f4511e;
+      --accent-light: #ffccbc;
+      --text: #1a237e;
+      --text-light: #3949ab;
+      --border: #c5cae9;
+      --header-gradient: linear-gradient(135deg, #1565c0, #f4511e);
+    }
+
+    /* Villains */
+    .theme-villains {
+      --bg: #12002e;
+      --card: rgba(30,10,50,0.92);
+      --primary: #7b1fa2;
+      --primary-light: rgba(123,31,162,0.15);
+      --accent: #00e676;
+      --accent-light: rgba(0,230,118,0.15);
+      --text: #e0e0e0;
+      --text-light: #b0b0c0;
+      --border: #4a148c;
+      --shadow: 0 2px 12px rgba(0,0,0,0.4);
+      --header-gradient: linear-gradient(135deg, #7b1fa2, #00e676);
+    }
+
+    /* Mickey & Friends */
+    .theme-mickey {
+      --bg: #fff3e0;
+      --card: rgba(255,255,255,0.95);
+      --primary: #d32f2f;
+      --primary-light: #ffcdd2;
+      --accent: #f9a825;
+      --accent-light: #fff9c4;
+      --text: #1a1a1a;
+      --text-light: #616161;
+      --border: #ffcdd2;
+      --header-gradient: linear-gradient(135deg, #d32f2f, #f9a825);
+    }
+
+    /* Moana */
+    .theme-moana {
+      --bg: #e0f2f1;
+      --card: rgba(255,255,255,0.92);
+      --primary: #00897b;
+      --primary-light: #b2dfdb;
+      --accent: #ff8f00;
+      --accent-light: #ffe0b2;
+      --text: #004d40;
+      --text-light: #00796b;
+      --border: #b2dfdb;
+      --header-gradient: linear-gradient(135deg, #00897b, #ff8f00);
+    }
+
+    /* Encanto */
+    .theme-encanto {
+      --bg: #f3e5f5;
+      --card: rgba(255,255,255,0.95);
+      --primary: #8e24aa;
+      --primary-light: #e1bee7;
+      --accent: #ffb300;
+      --accent-light: #fff8e1;
+      --text: #4a148c;
+      --text-light: #7b1fa2;
+      --border: #ce93d8;
+      --header-gradient: linear-gradient(135deg, #8e24aa, #ffb300);
+    }
+
+    /* ============ BASE STYLES ============ */
 
     html, body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -30,6 +280,7 @@
       color: var(--text);
       height: 100vh;
       overflow: hidden;
+      transition: background 0.5s ease, color 0.3s ease;
     }
 
     /* === TV LAYOUT: fill viewport exactly === */
@@ -43,7 +294,7 @@
       grid-template-areas:
         "sidebar header    header    header"
         "sidebar countdown today     upcoming"
-        "sidebar countdown lists     reminders";
+        "sidebar countdown meals     reminders";
     }
 
     /* Cards */
@@ -55,6 +306,7 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      transition: background 0.3s ease;
     }
 
     .card-title {
@@ -95,7 +347,7 @@
     .profile-card {
       text-align: center;
       padding: 16px 12px;
-      background: linear-gradient(135deg, var(--primary), var(--accent));
+      background: var(--header-gradient);
       color: white;
       border-radius: var(--radius);
       box-shadow: var(--shadow);
@@ -414,6 +666,16 @@
       font-weight: 600;
     }
 
+    .header .theme-badge {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      background: var(--primary-light);
+      color: var(--primary);
+      font-weight: 600;
+      margin-left: 10px;
+    }
+
     .header .updated {
       font-size: 11px;
       color: var(--text-light);
@@ -620,60 +882,78 @@
       min-width: 60px;
     }
 
-    /* === LISTS === */
-    .lists-card { grid-area: lists; }
+    /* === MEALS === */
+    .meals-card { grid-area: meals; }
 
-    .list-section { margin-bottom: 12px; }
-    .list-section:last-child { margin-bottom: 0; }
-
-    .list-name {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--accent);
-      margin-bottom: 4px;
+    .meal-slot {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
     }
 
-    .list-name .count {
-      background: var(--accent-light);
-      color: var(--accent);
+    .meal-slot:last-child { border-bottom: none; }
+
+    .meal-type-badge {
       font-size: 10px;
-      padding: 1px 6px;
-      border-radius: 8px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+      min-width: 60px;
+      text-align: center;
+      text-transform: capitalize;
     }
 
-    .list-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 3px 0;
-      font-size: 12px;
+    .meal-type-breakfast { background: #fff9c4; color: #f57f17; }
+    .meal-type-lunch { background: #c8e6c9; color: #2e7d32; }
+    .meal-type-dinner { background: #e1bee7; color: #7b1fa2; }
+    .meal-type-snack { background: #ffe0b2; color: #e65100; }
+
+    .meal-info h4 {
+      font-size: 13px;
+      font-weight: 600;
     }
 
-    .list-item .checkbox {
-      width: 14px;
-      height: 14px;
-      border-radius: 3px;
-      border: 2px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
+    .meal-info .meal-notes {
+      font-size: 10px;
+      color: var(--text-light);
+      font-style: italic;
+    }
+
+    /* Weekly meal mini view */
+    .week-meals-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .week-meal-day {
+      text-align: center;
       font-size: 9px;
     }
 
-    .list-item.checked .checkbox {
-      background: var(--success);
-      border-color: var(--success);
-      color: white;
+    .week-meal-day-name {
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      margin-bottom: 2px;
     }
 
-    .list-item.checked .item-text {
-      text-decoration: line-through;
-      color: var(--text-light);
+    .week-meal-item {
+      font-size: 9px;
+      color: var(--text);
+      padding: 2px;
+      border-radius: 3px;
+      margin-bottom: 1px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
+
+    .week-meal-item.dinner { background: var(--accent-light); }
+    .week-meal-item.lunch { background: var(--primary-light); }
 
     /* === REMINDERS === */
     .reminders-card { grid-area: reminders; }
@@ -717,7 +997,7 @@
           "header header"
           "countdown countdown"
           "today upcoming"
-          "lists reminders";
+          "meals reminders";
       }
       .sidebar { display: none; }
       .countdown-area { flex-direction: row; }
@@ -732,7 +1012,7 @@
           "countdown"
           "today"
           "upcoming"
-          "lists"
+          "meals"
           "reminders";
       }
       .countdown-area { flex-direction: column; }
@@ -773,28 +1053,71 @@
     const REFRESH_INTERVAL = 60000;
     const POINTS_PER_MICKEY = 20;
 
-    // Wirral coordinates (Birkenhead area)
+    // Theme display names
+    const THEME_NAMES = {
+      default: 'Default',
+      christmas: 'Christmas',
+      halloween: 'Halloween',
+      easter: 'Easter',
+      valentines: "Valentine's Day",
+      bonfire: 'Bonfire Night',
+      newyear: "New Year's",
+      stpatricks: "St Patrick's Day",
+      thanksgiving: 'Thanksgiving',
+      summer: 'Summer',
+      frozen: 'Frozen',
+      starwars: 'Star Wars',
+      princess: 'Princess',
+      pixar: 'Pixar',
+      villains: 'Villains',
+      mickey: 'Mickey & Friends',
+      moana: 'Moana',
+      encanto: 'Encanto',
+    };
+
+    // Theme emojis for the header badge
+    const THEME_EMOJIS = {
+      default: '',
+      christmas: '\u{1F384}',
+      halloween: '\u{1F383}',
+      easter: '\u{1F430}',
+      valentines: '\u{2764}\u{FE0F}',
+      bonfire: '\u{1F386}',
+      newyear: '\u{1F389}',
+      stpatricks: '\u{2618}\u{FE0F}',
+      thanksgiving: '\u{1F983}',
+      summer: '\u{2600}\u{FE0F}',
+      frozen: '\u{2744}\u{FE0F}',
+      starwars: '\u{2B50}',
+      princess: '\u{1F451}',
+      pixar: '\u{1F3AC}',
+      villains: '\u{1F9B9}',
+      mickey: '\u{1F42D}',
+      moana: '\u{1F30A}',
+      encanto: '\u{1F33A}',
+    };
+
+    // Wirral coordinates
     const WEATHER_LAT = 53.39;
     const WEATHER_LON = -3.02;
     let cachedWeather = null;
     let lastWeatherFetch = 0;
-    const WEATHER_CACHE_MS = 30 * 60 * 1000; // 30 min cache
+    const WEATHER_CACHE_MS = 30 * 60 * 1000;
 
-    // WMO weather code to emoji
     function weatherEmoji(code) {
-      if (code === 0) return '☀️';
-      if (code <= 3) return '⛅';
-      if (code <= 48) return '🌫️';
-      if (code <= 55) return '🌦️';
-      if (code <= 57) return '🌧️';
-      if (code <= 65) return '🌧️';
-      if (code <= 67) return '🌨️';
-      if (code <= 75) return '🌨️';
-      if (code <= 77) return '🌨️';
-      if (code <= 82) return '🌧️';
-      if (code <= 86) return '❄️';
-      if (code <= 99) return '⛈️';
-      return '🌤️';
+      if (code === 0) return '\u2600\uFE0F';
+      if (code <= 3) return '\u26C5';
+      if (code <= 48) return '\u{1F32B}\uFE0F';
+      if (code <= 55) return '\u{1F326}\uFE0F';
+      if (code <= 57) return '\u{1F327}\uFE0F';
+      if (code <= 65) return '\u{1F327}\uFE0F';
+      if (code <= 67) return '\u{1F328}\uFE0F';
+      if (code <= 75) return '\u{1F328}\uFE0F';
+      if (code <= 77) return '\u{1F328}\uFE0F';
+      if (code <= 82) return '\u{1F327}\uFE0F';
+      if (code <= 86) return '\u2744\uFE0F';
+      if (code <= 99) return '\u26C8\uFE0F';
+      return '\u{1F324}\uFE0F';
     }
 
     async function fetchWeather() {
@@ -824,8 +1147,8 @@
           <div class="weather-day">
             <div class="weather-day-name">${dayName}</div>
             <div class="weather-day-icon">${weatherEmoji(weather.weathercode[i])}</div>
-            <div class="weather-day-temp">${Math.round(weather.temperature_2m_max[i])}°</div>
-            <div class="weather-day-low">${Math.round(weather.temperature_2m_min[i])}°</div>
+            <div class="weather-day-temp">${Math.round(weather.temperature_2m_max[i])}\u00B0</div>
+            <div class="weather-day-low">${Math.round(weather.temperature_2m_min[i])}\u00B0</div>
           </div>
         `;
       });
@@ -837,7 +1160,6 @@
       `;
     }
 
-    // Assign color classes by kid name
     function kidColorClass(name) {
       const lower = (name || '').toLowerCase();
       if (lower === 'sam') return 'sam';
@@ -851,6 +1173,15 @@
       const res = await fetch(`/api/dashboard?secret=${secret}`);
       if (!res.ok) throw new Error('Failed to load');
       return res.json();
+    }
+
+    function applyTheme(theme) {
+      const body = document.body;
+      // Remove all theme classes
+      body.className = body.className.replace(/theme-\S+/g, '').trim();
+      if (theme && theme !== 'default') {
+        body.classList.add(`theme-${theme}`);
+      }
     }
 
     function renderCountdowns(countdowns) {
@@ -947,7 +1278,69 @@
       }).join('');
     }
 
+    function renderMeals(meals) {
+      const todayMeals = meals?.today || [];
+      const weekMeals = meals?.week || [];
+
+      // Group week meals by day
+      const weekByDay = {};
+      weekMeals.forEach(m => {
+        if (!weekByDay[m.date]) weekByDay[m.date] = { label: m.day_label, meals: [] };
+        weekByDay[m.date].meals.push(m);
+      });
+
+      const mealEmojis = {
+        breakfast: '\u{1F950}',
+        lunch: '\u{1F96A}',
+        dinner: '\u{1F35D}',
+        snack: '\u{1F36A}',
+      };
+
+      let todayHTML = '';
+      if (todayMeals.length > 0) {
+        todayHTML = todayMeals.map(m => `
+          <div class="meal-slot">
+            <div class="meal-type-badge meal-type-${esc(m.type)}">${mealEmojis[m.type] || ''} ${esc(m.type)}</div>
+            <div class="meal-info">
+              <h4>${esc(m.title)}</h4>
+              ${m.notes ? `<div class="meal-notes">${esc(m.notes)}</div>` : ''}
+            </div>
+          </div>
+        `).join('');
+      } else {
+        todayHTML = '<div class="empty-state"><div class="icon">\u{1F37D}\uFE0F</div>No meals planned today</div>';
+      }
+
+      // Week overview (compact)
+      let weekHTML = '';
+      const dayEntries = Object.entries(weekByDay);
+      if (dayEntries.length > 0) {
+        weekHTML = `
+          <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">
+            <div style="font-size:10px;font-weight:700;color:var(--primary);text-transform:uppercase;margin-bottom:6px;">This Week</div>
+            ${dayEntries.map(([date, info]) => `
+              <div style="display:flex;gap:6px;margin-bottom:4px;font-size:11px;">
+                <span style="min-width:65px;color:var(--text-light);font-weight:600;">${esc(info.label)}</span>
+                <span>${info.meals.map(m => `${mealEmojis[m.type] || ''} ${esc(m.title)}`).join(' \u00B7 ')}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      return todayHTML + weekHTML;
+    }
+
     function render(data, weather) {
+      // Apply theme
+      applyTheme(data.theme);
+
+      const themeName = THEME_NAMES[data.theme] || 'Default';
+      const themeEmoji = THEME_EMOJIS[data.theme] || '';
+      const themeBadge = data.theme && data.theme !== 'default'
+        ? `<span class="theme-badge">${themeEmoji} ${esc(themeName)}</span>`
+        : '';
+
       const dashboard = document.getElementById('dashboard');
       dashboard.innerHTML = `
         <!-- Sidebar -->
@@ -970,7 +1363,7 @@
 
         <!-- Header -->
         <div class="header card">
-          <h1>Family Dashboard</h1>
+          <h1>Family Dashboard ${themeBadge}</h1>
           <div class="updated">
             <span class="live-dot"></span>
             Updated ${new Date(data.updated_at).toLocaleTimeString()}
@@ -1008,26 +1401,11 @@
           </div>
         </div>
 
-        <!-- Lists -->
-        <div class="card lists-card">
-          <div class="card-title"><span class="icon">&#x1F4DD;</span> Shared Lists</div>
+        <!-- Meals -->
+        <div class="card meals-card">
+          <div class="card-title"><span class="icon">&#x1F37D;&#xFE0F;</span> Meal Planner</div>
           <div class="card-body">
-            ${data.lists.length === 0
-              ? '<div class="empty-state"><div class="icon">&#x1F4CB;</div>No lists yet</div>'
-              : data.lists.map(list => `
-                <div class="list-section">
-                  <div class="list-name">
-                    ${esc(list.name)}
-                    <span class="count">${list.items.filter(i => !i.checked).length}</span>
-                  </div>
-                  ${list.items.map(item => `
-                    <div class="list-item ${item.checked ? 'checked' : ''}">
-                      <div class="checkbox">${item.checked ? '&#x2713;' : ''}</div>
-                      <span class="item-text">${esc(item.text)}</span>
-                    </div>
-                  `).join('')}
-                </div>
-              `).join('')}
+            ${renderMeals(data.meals)}
           </div>
         </div>
 
@@ -1093,7 +1471,6 @@
     }
 
     function startBackgroundMusic() {
-      // Only on desktop/TV (not mobile)
       if (window.innerWidth <= 1100) return;
       const existing = document.getElementById('bg-music');
       if (existing) return;

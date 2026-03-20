@@ -3,6 +3,8 @@ import * as reminders from '../services/reminders.js';
 import * as lists from '../services/lists.js';
 import * as countdowns from '../services/countdowns.js';
 import * as points from '../services/points.js';
+import * as meals from '../services/meals.js';
+import * as themes from '../services/themes.js';
 import { formatForUser } from '../utils/time.js';
 
 /**
@@ -266,6 +268,104 @@ export const tools = [
       },
     },
   },
+  // --- Meal planner tools ---
+  {
+    type: 'function',
+    function: {
+      name: 'set_meal',
+      description: 'Set a meal for a specific date. Meal types: breakfast, lunch, dinner, snack. Replaces any existing meal in that slot.',
+      parameters: {
+        type: 'object',
+        properties: {
+          meal_date: { type: 'string', description: 'Date in YYYY-MM-DD format' },
+          meal_type: { type: 'string', description: 'One of: breakfast, lunch, dinner, snack' },
+          title: { type: 'string', description: 'What the meal is (e.g. "Spaghetti Bolognese")' },
+          notes: { type: 'string', description: 'Optional notes (e.g. "Use the leftover mince")' },
+        },
+        required: ['meal_date', 'meal_type', 'title'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_meals',
+      description: 'Get meals planned for a specific date.',
+      parameters: {
+        type: 'object',
+        properties: {
+          date: { type: 'string', description: 'Date in YYYY-MM-DD format' },
+        },
+        required: ['date'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_weekly_meals',
+      description: 'Get all meals planned for a week (7 days from start date).',
+      parameters: {
+        type: 'object',
+        properties: {
+          start_date: { type: 'string', description: 'Start date in YYYY-MM-DD format (defaults to today if not provided)' },
+        },
+        required: ['start_date'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'remove_meal',
+      description: 'Remove a planned meal from a specific date and meal slot.',
+      parameters: {
+        type: 'object',
+        properties: {
+          meal_date: { type: 'string', description: 'Date in YYYY-MM-DD format' },
+          meal_type: { type: 'string', description: 'One of: breakfast, lunch, dinner, snack' },
+        },
+        required: ['meal_date', 'meal_type'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'clear_meals',
+      description: 'Clear all planned meals for a specific date.',
+      parameters: {
+        type: 'object',
+        properties: {
+          date: { type: 'string', description: 'Date in YYYY-MM-DD format' },
+        },
+        required: ['date'],
+      },
+    },
+  },
+  // --- Dashboard theme tools ---
+  {
+    type: 'function',
+    function: {
+      name: 'set_dashboard_theme',
+      description: 'Change the family dashboard theme. Available themes include holidays (christmas, halloween, easter, valentines, bonfire, newyear, stpatricks, thanksgiving, summer) and Disney (frozen, starwars, princess, pixar, villains, mickey, moana, encanto). Use "default" to reset.',
+      parameters: {
+        type: 'object',
+        properties: {
+          theme: { type: 'string', description: 'Theme key (e.g. "christmas", "frozen", "default")' },
+        },
+        required: ['theme'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_dashboard_themes',
+      description: 'List all available dashboard themes.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
 ];
 
 /**
@@ -436,6 +536,73 @@ export async function dispatch(functionName, args, context) {
     case 'get_point_history': {
       const history = await points.getPointHistory(familyId, args.kid_name);
       return JSON.stringify(history);
+    }
+
+    // --- Meal planner dispatch ---
+    case 'set_meal': {
+      const meal = await meals.setMeal(familyId, args, userId);
+      return JSON.stringify({
+        success: true,
+        meal: {
+          date: meal.meal_date,
+          type: meal.meal_type,
+          title: meal.title,
+          notes: meal.notes,
+        },
+      });
+    }
+
+    case 'get_meals': {
+      const dayMeals = await meals.getMealsForDate(familyId, args.date);
+      return JSON.stringify({
+        date: args.date,
+        meals: dayMeals.map((m) => ({
+          type: m.meal_type,
+          title: m.title,
+          notes: m.notes,
+        })),
+      });
+    }
+
+    case 'get_weekly_meals': {
+      const endDate = new Date(args.start_date);
+      endDate.setDate(endDate.getDate() + 6);
+      const endStr = endDate.toISOString().split('T')[0];
+      const weekMeals = await meals.getMealsForWeek(familyId, args.start_date, endStr);
+      return JSON.stringify({
+        start_date: args.start_date,
+        end_date: endStr,
+        meals: weekMeals.map((m) => ({
+          date: m.meal_date,
+          type: m.meal_type,
+          title: m.title,
+          notes: m.notes,
+        })),
+      });
+    }
+
+    case 'remove_meal': {
+      const removed = await meals.removeMeal(familyId, args.meal_date, args.meal_type);
+      return JSON.stringify({
+        success: true,
+        removed: removed ? removed.title : null,
+      });
+    }
+
+    case 'clear_meals': {
+      await meals.clearMealsForDate(familyId, args.date);
+      return JSON.stringify({ success: true, date: args.date });
+    }
+
+    // --- Dashboard theme dispatch ---
+    case 'set_dashboard_theme': {
+      const result = await themes.setTheme(familyId, args.theme);
+      return JSON.stringify({ success: true, ...result });
+    }
+
+    case 'list_dashboard_themes': {
+      const available = themes.listThemes();
+      return JSON.stringify(available);
     }
 
     default:

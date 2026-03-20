@@ -4,6 +4,8 @@ import { listReminders } from '../services/reminders.js';
 import { getAllLists, getList } from '../services/lists.js';
 import { listCountdowns } from '../services/countdowns.js';
 import { getAllPoints } from '../services/points.js';
+import { getMealsForDate, getMealsForWeek } from '../services/meals.js';
+import { getTheme } from '../services/themes.js';
 import { formatForUser } from '../utils/time.js';
 
 /**
@@ -32,12 +34,15 @@ export async function getDashboardData(familyId) {
   const weekEndBound = `${weekEndStr}T23:59:59`;
 
   // Fetch data in parallel
-  const [todayEvents, weekEvents, allLists, activeCountdowns, kidPoints] = await Promise.all([
+  const [todayEvents, weekEvents, allLists, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme] = await Promise.all([
     listEvents(familyId, todayStart, todayEnd),
     listEvents(familyId, todayStart, weekEndBound),
     getAllLists(familyId),
     listCountdowns(familyId),
     getAllPoints(familyId),
+    getMealsForDate(familyId, todayStr),
+    getMealsForWeek(familyId, todayStr, weekEndStr),
+    getTheme(familyId),
   ]);
 
   // Get all reminders for all family members
@@ -109,6 +114,26 @@ export async function getDashboardData(familyId) {
       };
     }),
     kid_points: kidPoints,
+    meals: {
+      today: todayMeals.map((m) => ({
+        type: m.meal_type,
+        title: m.title,
+        notes: m.notes,
+      })),
+      week: weekMeals.map((m) => ({
+        date: m.meal_date,
+        type: m.meal_type,
+        title: m.title,
+        notes: m.notes,
+        day_label: new Date(m.meal_date + 'T00:00:00').toLocaleDateString('en-US', {
+          timeZone: tz,
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        }),
+      })),
+    },
+    theme: dashboardTheme,
     updated_at: new Date().toISOString(),
   };
 }
