@@ -167,6 +167,20 @@ export const tools = [
   {
     type: 'function',
     function: {
+      name: 'clear_list',
+      description: 'Remove ALL items from a shared list, clearing it completely.',
+      parameters: {
+        type: 'object',
+        properties: {
+          list_name: { type: 'string', description: 'Name of the list to clear' },
+        },
+        required: ['list_name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'get_all_lists',
       description: 'Get the names of all shared lists for the family.',
       parameters: { type: 'object', properties: {} },
@@ -268,6 +282,11 @@ export async function dispatch(functionName, args, context) {
       const result = await lists.removeItem(familyId, args.list_name, args.item_text);
       if (!result) return JSON.stringify({ success: false, error: 'Item not found' });
       return JSON.stringify({ success: true, removed: result.item.text });
+    }
+
+    case 'clear_list': {
+      const list = await lists.clearList(familyId, args.list_name);
+      return JSON.stringify({ success: true, list_name: list.name, message: 'All items removed' });
     }
 
     case 'create_list': {

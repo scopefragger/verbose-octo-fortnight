@@ -91,6 +91,19 @@ export async function createList(familyId, listName) {
 }
 
 /**
+ * Clear all items from a list.
+ */
+export async function clearList(familyId, listName) {
+  const list = await getOrCreateList(familyId, listName);
+  const { error } = await supabase
+    .from('list_items')
+    .delete()
+    .eq('list_id', list.id);
+  if (error) throw error;
+  return list;
+}
+
+/**
  * Get all lists for a family.
  */
 export async function getAllLists(familyId) {
