@@ -153,10 +153,32 @@
       display: flex;
       flex-direction: column;
       justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kid-points-card .kid-sparkles {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+    }
+
+    .kid-points-card .kid-sparkle {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      background: rgba(255,255,255,0.5);
+      border-radius: 50%;
+      animation: kid-twinkle 2s infinite ease-in-out;
+    }
+
+    @keyframes kid-twinkle {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 1; transform: scale(2); }
     }
 
     .kid-points-card.sam {
-      background: linear-gradient(135deg, #667eea, #764ba2);
+      background: linear-gradient(135deg, #11998e, #38ef7d);
     }
 
     .kid-points-card.robyn {
@@ -171,6 +193,7 @@
       font-size: 15px;
       font-weight: 700;
       margin-bottom: 4px;
+      position: relative;
     }
 
     .mickey-heads {
@@ -181,20 +204,22 @@
       margin-bottom: 6px;
       min-height: 28px;
       align-items: center;
+      position: relative;
     }
 
+    /* Sam: black Mickey heads */
     .mickey-head {
       width: 28px;
       height: 28px;
       position: relative;
       display: inline-block;
-      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
     }
 
     .mickey-head .head {
       width: 18px;
       height: 18px;
-      background: var(--mickey-gold);
+      background: #1a1a1a;
       border-radius: 50%;
       position: absolute;
       bottom: 0;
@@ -206,7 +231,7 @@
     .mickey-head .ear-right {
       width: 11px;
       height: 11px;
-      background: var(--mickey-gold);
+      background: #1a1a1a;
       border-radius: 50%;
       position: absolute;
       top: 0;
@@ -214,6 +239,72 @@
 
     .mickey-head .ear-left { left: 1px; }
     .mickey-head .ear-right { right: 1px; }
+
+    /* Robyn: pink Minnie heads with bow */
+    .minnie-head {
+      width: 28px;
+      height: 30px;
+      position: relative;
+      display: inline-block;
+      filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+    }
+
+    .minnie-head .head {
+      width: 18px;
+      height: 18px;
+      background: #1a1a1a;
+      border-radius: 50%;
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .minnie-head .ear-left,
+    .minnie-head .ear-right {
+      width: 11px;
+      height: 11px;
+      background: #1a1a1a;
+      border-radius: 50%;
+      position: absolute;
+      top: 4px;
+    }
+
+    .minnie-head .ear-left { left: 1px; }
+    .minnie-head .ear-right { right: 1px; }
+
+    .minnie-head .bow {
+      position: absolute;
+      top: -1px;
+      right: -2px;
+      width: 16px;
+      height: 10px;
+      z-index: 1;
+    }
+
+    .minnie-head .bow-left,
+    .minnie-head .bow-right {
+      position: absolute;
+      width: 8px;
+      height: 6px;
+      background: #ff69b4;
+      border-radius: 50%;
+      top: 0;
+    }
+
+    .minnie-head .bow-left { left: 0; transform: rotate(-15deg); }
+    .minnie-head .bow-right { right: 0; transform: rotate(15deg); }
+
+    .minnie-head .bow-center {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: #ff1493;
+      border-radius: 50%;
+      top: 1px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
 
     .points-total {
       font-size: 32px;
@@ -796,6 +887,31 @@
       `;
     }
 
+    function renderMinnieHead() {
+      return `
+        <div class="minnie-head">
+          <div class="bow">
+            <div class="bow-left"></div>
+            <div class="bow-right"></div>
+            <div class="bow-center"></div>
+          </div>
+          <div class="ear-left"></div>
+          <div class="ear-right"></div>
+          <div class="head"></div>
+        </div>
+      `;
+    }
+
+    function renderKidSparkles() {
+      return `
+        <div class="kid-sparkles">
+          ${Array.from({length: 8}, (_, i) => `
+            <div class="kid-sparkle" style="left:${Math.random()*100}%;top:${Math.random()*100}%;animation-delay:${(i*0.35).toFixed(2)}s"></div>
+          `).join('')}
+        </div>
+      `;
+    }
+
     function renderSidebarKidPoints(kidPoints) {
       if (!kidPoints || kidPoints.length === 0) return '';
 
@@ -804,14 +920,19 @@
         const progressInCurrentMickey = kid.points % POINTS_PER_MICKEY;
         const progressPct = (progressInCurrentMickey / POINTS_PER_MICKEY) * 100;
         const toNext = POINTS_PER_MICKEY - progressInCurrentMickey;
+        const isRobyn = (kid.kid_name || '').toLowerCase() === 'robyn';
+        const headFn = isRobyn ? renderMinnieHead : renderMickeyHead;
+        const emptyMsg = isRobyn ? 'No Minnie Heads yet!' : 'No Mickey Heads yet!';
+        const nextLabel = isRobyn ? 'Minnie Head' : 'Mickey Head';
 
         return `
           <div class="kid-points-card ${kidColorClass(kid.kid_name)}">
+            ${renderKidSparkles()}
             <div class="kid-name">${esc(kid.kid_name)}</div>
             <div class="mickey-heads">
               ${mickeyCount > 0
-                ? Array.from({length: mickeyCount}, () => renderMickeyHead()).join('')
-                : '<span class="points-empty-msg">No Mickey Heads yet!</span>'}
+                ? Array.from({length: mickeyCount}, () => headFn()).join('')
+                : `<span class="points-empty-msg">${emptyMsg}</span>`}
             </div>
             <div class="points-total">${kid.points}</div>
             <div class="points-label">total points</div>
@@ -819,7 +940,7 @@
               <div class="progress-bar-track">
                 <div class="progress-bar-fill" style="width:${progressPct}%"></div>
               </div>
-              <div class="progress-label">${toNext} point${toNext !== 1 ? 's' : ''} to next Mickey Head</div>
+              <div class="progress-label">${toNext} point${toNext !== 1 ? 's' : ''} to next ${nextLabel}</div>
             </div>
           </div>
         `;
@@ -842,9 +963,9 @@
             <div class="clock-date">${esc(data.today.date)}</div>
           </div>
 
-          ${renderSidebarKidPoints(data.kid_points)}
-
           ${renderWeather(weather)}
+
+          ${renderSidebarKidPoints(data.kid_points)}
         </div>
 
         <!-- Header -->
@@ -971,10 +1092,24 @@
       });
     }
 
+    function startBackgroundMusic() {
+      // Only on desktop/TV (not mobile)
+      if (window.innerWidth <= 1100) return;
+      const existing = document.getElementById('bg-music');
+      if (existing) return;
+      const iframe = document.createElement('iframe');
+      iframe.id = 'bg-music';
+      iframe.src = 'https://www.youtube.com/embed/ieYJ5Rux4j4?autoplay=1&loop=1&playlist=ieYJ5Rux4j4&controls=0&showinfo=0&modestbranding=1';
+      iframe.allow = 'autoplay';
+      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;pointer-events:none;';
+      document.body.appendChild(iframe);
+    }
+
     async function init() {
       try {
         const [data, weather] = await Promise.all([fetchData(), fetchWeather()]);
         render(data, weather);
+        startBackgroundMusic();
       } catch (err) {
         document.getElementById('dashboard').innerHTML =
           '<div class="loading">Failed to load dashboard. Check your URL.</div>';
