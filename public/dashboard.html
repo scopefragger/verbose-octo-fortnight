@@ -21,6 +21,7 @@
       --border: #e2e8f0;
       --shadow: 0 2px 12px rgba(0,0,0,0.06);
       --radius: 16px;
+      --mickey-gold: #f5c518;
     }
 
     body {
@@ -36,12 +37,14 @@
       margin: 0 auto;
       display: grid;
       grid-template-columns: 280px 1fr 320px;
-      grid-template-rows: auto auto 1fr;
+      grid-template-rows: auto auto auto 1fr;
       gap: 20px;
       grid-template-areas:
         "sidebar header header"
+        "sidebar countdown countdown"
         "sidebar today upcoming"
-        "sidebar lists reminders";
+        "sidebar lists reminders"
+        "points points points";
     }
 
     /* Cards */
@@ -186,6 +189,202 @@
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.4; }
+    }
+
+    /* Countdown */
+    .countdown-area {
+      grid-area: countdown;
+      display: flex;
+      gap: 20px;
+      overflow-x: auto;
+    }
+
+    .countdown-card {
+      flex: 1;
+      min-width: 280px;
+      border-radius: var(--radius);
+      padding: 32px;
+      text-align: center;
+      color: white;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+
+    .countdown-card .sparkles {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .countdown-card .sparkle {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 50%;
+      animation: sparkle-float 3s infinite ease-in-out;
+    }
+
+    @keyframes sparkle-float {
+      0%, 100% { transform: translateY(0) scale(1); opacity: 0.6; }
+      50% { transform: translateY(-20px) scale(1.5); opacity: 1; }
+    }
+
+    .countdown-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      position: relative;
+    }
+
+    .countdown-days {
+      font-size: 72px;
+      font-weight: 800;
+      line-height: 1;
+      position: relative;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+
+    .countdown-label {
+      font-size: 16px;
+      font-weight: 500;
+      opacity: 0.9;
+      margin-top: 4px;
+      position: relative;
+    }
+
+    .countdown-date {
+      font-size: 12px;
+      opacity: 0.75;
+      margin-top: 8px;
+      position: relative;
+    }
+
+    /* Countdown backgrounds */
+    .bg-fireworks {
+      background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+    }
+    .bg-castle {
+      background: linear-gradient(135deg, #1b1464, #6c3ec1, #c86dd7);
+    }
+    .bg-stars {
+      background: linear-gradient(135deg, #0c0c1d, #1a1a3e, #2d2b55);
+    }
+    .bg-rainbow {
+      background: linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+    }
+    .bg-beach {
+      background: linear-gradient(135deg, #0abde3, #48dbfb, #feca57);
+    }
+    .bg-party {
+      background: linear-gradient(135deg, #ff6348, #ff9ff3, #feca57, #48dbfb);
+    }
+
+    /* Kid Points */
+    .points-area {
+      grid-area: points;
+      display: flex;
+      gap: 20px;
+    }
+
+    .kid-points-card {
+      flex: 1;
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+
+    .kid-name {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+
+    .mickey-heads {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+      min-height: 48px;
+      align-items: center;
+    }
+
+    .mickey-head {
+      width: 40px;
+      height: 40px;
+      position: relative;
+      display: inline-block;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+    }
+
+    .mickey-head .head {
+      width: 28px;
+      height: 28px;
+      background: var(--mickey-gold);
+      border-radius: 50%;
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .mickey-head .ear-left,
+    .mickey-head .ear-right {
+      width: 16px;
+      height: 16px;
+      background: var(--mickey-gold);
+      border-radius: 50%;
+      position: absolute;
+      top: 0;
+    }
+
+    .mickey-head .ear-left { left: 2px; }
+    .mickey-head .ear-right { right: 2px; }
+
+    .points-total {
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .points-label {
+      font-size: 13px;
+      color: var(--text-light);
+      margin-top: 4px;
+    }
+
+    .points-progress {
+      margin-top: 16px;
+    }
+
+    .progress-bar-track {
+      width: 100%;
+      height: 12px;
+      background: var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--mickey-gold), #ffda44);
+      border-radius: 6px;
+      transition: width 0.5s ease;
+    }
+
+    .progress-label {
+      font-size: 11px;
+      color: var(--text-light);
+      margin-top: 6px;
     }
 
     /* Today's Events */
@@ -380,8 +579,10 @@
         grid-template-columns: 1fr 1fr;
         grid-template-areas:
           "header header"
+          "countdown countdown"
           "today upcoming"
-          "lists reminders";
+          "lists reminders"
+          "points points";
       }
       .sidebar { display: none; }
     }
@@ -392,11 +593,15 @@
         grid-template-columns: 1fr;
         grid-template-areas:
           "header"
+          "countdown"
           "today"
           "upcoming"
           "lists"
-          "reminders";
+          "reminders"
+          "points";
       }
+      .countdown-area { flex-direction: column; }
+      .points-area { flex-direction: column; }
     }
 
     /* Scrollable cards */
@@ -445,6 +650,7 @@
 
   <script>
     const REFRESH_INTERVAL = 60000; // 1 minute
+    const POINTS_PER_MICKEY = 20;
 
     async function fetchData() {
       const params = new URLSearchParams(window.location.search);
@@ -454,13 +660,79 @@
       return res.json();
     }
 
+    function renderCountdowns(countdowns) {
+      if (!countdowns || countdowns.length === 0) return '';
+
+      return `
+        <div class="countdown-area">
+          ${countdowns.map(c => `
+            <div class="countdown-card bg-${esc(c.background || 'fireworks')}">
+              <div class="sparkles">
+                ${Array.from({length: 12}, (_, i) => `
+                  <div class="sparkle" style="left:${Math.random()*100}%;top:${Math.random()*100}%;animation-delay:${(i*0.3).toFixed(1)}s"></div>
+                `).join('')}
+              </div>
+              <div class="countdown-title">${esc(c.title)}</div>
+              <div class="countdown-days">${c.days_until}</div>
+              <div class="countdown-label">${c.days_until === 1 ? 'day to go!' : 'days to go!'}</div>
+              <div class="countdown-date">${new Date(c.target_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderMickeyHead() {
+      return `
+        <div class="mickey-head">
+          <div class="ear-left"></div>
+          <div class="ear-right"></div>
+          <div class="head"></div>
+        </div>
+      `;
+    }
+
+    function renderKidPoints(kidPoints) {
+      if (!kidPoints || kidPoints.length === 0) return '';
+
+      return `
+        <div class="points-area">
+          ${kidPoints.map(kid => {
+            const mickeyCount = kid.mickey_heads;
+            const progressInCurrentMickey = kid.points % POINTS_PER_MICKEY;
+            const progressPct = (progressInCurrentMickey / POINTS_PER_MICKEY) * 100;
+            const toNext = POINTS_PER_MICKEY - progressInCurrentMickey;
+
+            return `
+              <div class="kid-points-card">
+                <div class="kid-name">${esc(kid.kid_name)}</div>
+                <div class="mickey-heads">
+                  ${mickeyCount > 0
+                    ? Array.from({length: mickeyCount}, () => renderMickeyHead()).join('')
+                    : '<span style="color:var(--text-light);font-size:13px">No Mickey Heads yet — keep going!</span>'}
+                </div>
+                <div class="points-total">${kid.points}</div>
+                <div class="points-label">total points</div>
+                <div class="points-progress">
+                  <div class="progress-bar-track">
+                    <div class="progress-bar-fill" style="width:${progressPct}%"></div>
+                  </div>
+                  <div class="progress-label">${toNext} point${toNext !== 1 ? 's' : ''} to next Mickey Head</div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
     function render(data) {
       const dashboard = document.getElementById('dashboard');
       dashboard.innerHTML = `
         <!-- Sidebar -->
         <div class="sidebar">
           <div class="profile-card">
-            <div class="profile-avatar">👨‍👩‍👧‍👦</div>
+            <div class="profile-avatar">&#x1F468;&#x200D;&#x1F469;&#x200D;&#x1F467;&#x200D;&#x1F466;</div>
             <div class="family-name">${esc(data.family_name)}</div>
             <div class="subtitle">Family Dashboard</div>
           </div>
@@ -492,19 +764,22 @@
 
         <!-- Header -->
         <div class="header card">
-          <h1>📋 Family Dashboard</h1>
+          <h1>Family Dashboard</h1>
           <div class="updated">
             <span class="live-dot"></span>
             Updated ${new Date(data.updated_at).toLocaleTimeString()}
           </div>
         </div>
 
+        <!-- Countdowns -->
+        ${renderCountdowns(data.countdowns)}
+
         <!-- Today's Events -->
         <div class="card today-card">
-          <div class="card-title"><span class="icon">📅</span> Today's Schedule</div>
+          <div class="card-title"><span class="icon">&#x1F4C5;</span> Today's Schedule</div>
           <div class="card-body">
             ${data.today.events.length === 0
-              ? '<div class="empty-state"><div class="icon">🌤️</div>No events today — enjoy your free time!</div>'
+              ? '<div class="empty-state"><div class="icon">&#x1F324;&#xFE0F;</div>No events today</div>'
               : data.today.events.map(e => `
                 <div class="event-item">
                   <div class="event-time-badge ${e.all_day ? 'all-day' : ''}">${esc(e.starts_at_display)}</div>
@@ -519,20 +794,20 @@
 
         <!-- Upcoming Week -->
         <div class="card upcoming-card">
-          <div class="card-title"><span class="icon">🗓️</span> Upcoming Week</div>
+          <div class="card-title"><span class="icon">&#x1F5D3;&#xFE0F;</span> Upcoming Week</div>
           <div class="card-body">
             ${data.week.events.length === 0
-              ? '<div class="empty-state"><div class="icon">📭</div>No upcoming events</div>'
+              ? '<div class="empty-state"><div class="icon">&#x1F4ED;</div>No upcoming events</div>'
               : renderWeekEvents(data.week.events)}
           </div>
         </div>
 
         <!-- Lists -->
         <div class="card lists-card">
-          <div class="card-title"><span class="icon">📝</span> Shared Lists</div>
+          <div class="card-title"><span class="icon">&#x1F4DD;</span> Shared Lists</div>
           <div class="card-body">
             ${data.lists.length === 0
-              ? '<div class="empty-state"><div class="icon">📋</div>No lists yet</div>'
+              ? '<div class="empty-state"><div class="icon">&#x1F4CB;</div>No lists yet</div>'
               : data.lists.map(list => `
                 <div class="list-section">
                   <div class="list-name">
@@ -541,7 +816,7 @@
                   </div>
                   ${list.items.map(item => `
                     <div class="list-item ${item.checked ? 'checked' : ''}">
-                      <div class="checkbox">${item.checked ? '✓' : ''}</div>
+                      <div class="checkbox">${item.checked ? '&#x2713;' : ''}</div>
                       <span class="item-text">${esc(item.text)}</span>
                     </div>
                   `).join('')}
@@ -552,13 +827,13 @@
 
         <!-- Reminders -->
         <div class="card reminders-card">
-          <div class="card-title"><span class="icon">⏰</span> Pending Reminders</div>
+          <div class="card-title"><span class="icon">&#x23F0;</span> Pending Reminders</div>
           <div class="card-body">
             ${data.reminders.length === 0
-              ? '<div class="empty-state"><div class="icon">✅</div>No pending reminders</div>'
+              ? '<div class="empty-state"><div class="icon">&#x2705;</div>No pending reminders</div>'
               : data.reminders.map(r => `
                 <div class="reminder-item">
-                  <div class="reminder-icon">🔔</div>
+                  <div class="reminder-icon">&#x1F514;</div>
                   <div class="reminder-content">
                     <h4>${esc(r.message)}</h4>
                     <div class="time">${esc(r.remind_at_display)}</div>
@@ -567,6 +842,9 @@
               `).join('')}
           </div>
         </div>
+
+        <!-- Kid Points -->
+        ${renderKidPoints(data.kid_points)}
       `;
 
       updateClock();

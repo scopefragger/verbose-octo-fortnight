@@ -2,6 +2,8 @@ import { supabase } from '../db/supabase.js';
 import { listEvents } from '../services/calendar.js';
 import { listReminders } from '../services/reminders.js';
 import { getAllLists, getList } from '../services/lists.js';
+import { listCountdowns } from '../services/countdowns.js';
+import { getAllPoints } from '../services/points.js';
 import { formatForUser } from '../utils/time.js';
 
 /**
@@ -30,10 +32,12 @@ export async function getDashboardData(familyId) {
   const weekEndBound = `${weekEndStr}T23:59:59`;
 
   // Fetch data in parallel
-  const [todayEvents, weekEvents, allLists] = await Promise.all([
+  const [todayEvents, weekEvents, allLists, activeCountdowns, kidPoints] = await Promise.all([
     listEvents(familyId, todayStart, todayEnd),
     listEvents(familyId, todayStart, weekEndBound),
     getAllLists(familyId),
+    listCountdowns(familyId),
+    getAllPoints(familyId),
   ]);
 
   // Get all reminders for all family members
@@ -92,6 +96,19 @@ export async function getDashboardData(familyId) {
       remind_at_display: formatForUser(r.remind_at, tz),
     })),
     lists: listsWithItems,
+    countdowns: activeCountdowns.map((c) => {
+      const daysUntil = Math.ceil(
+        (new Date(c.target_date) - new Date()) / (1000 * 60 * 60 * 24)
+      );
+      return {
+        id: c.id,
+        title: c.title,
+        target_date: c.target_date,
+        background: c.background,
+        days_until: Math.max(0, daysUntil),
+      };
+    }),
+    kid_points: kidPoints,
     updated_at: new Date().toISOString(),
   };
 }

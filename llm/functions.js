@@ -1,6 +1,8 @@
 import * as calendar from '../services/calendar.js';
 import * as reminders from '../services/reminders.js';
 import * as lists from '../services/lists.js';
+import * as countdowns from '../services/countdowns.js';
+import * as points from '../services/points.js';
 import { formatForUser } from '../utils/time.js';
 
 /**
@@ -186,6 +188,84 @@ export const tools = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  // --- Countdown tools ---
+  {
+    type: 'function',
+    function: {
+      name: 'create_countdown',
+      description: 'Create a countdown timer to a future date. Shows on the family dashboard with a fun background. Available backgrounds: fireworks, castle, stars, rainbow, beach, party.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'What the countdown is for (e.g. "Disney Holiday!")' },
+          target_date: { type: 'string', description: 'Target date in YYYY-MM-DD format' },
+          background: { type: 'string', description: 'Background theme: fireworks, castle, stars, rainbow, beach, or party. Defaults to fireworks.' },
+        },
+        required: ['title', 'target_date'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_countdowns',
+      description: 'List all active countdown timers for the family.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_countdown',
+      description: 'Delete a countdown timer by its ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          countdown_id: { type: 'string', description: 'UUID of the countdown to delete' },
+        },
+        required: ['countdown_id'],
+      },
+    },
+  },
+  // --- Kid points tools ---
+  {
+    type: 'function',
+    function: {
+      name: 'adjust_points',
+      description: 'Add or remove points for a child (Sam or Robyn). Use positive numbers to add, negative to remove. 20 points = 1 Mickey Head.',
+      parameters: {
+        type: 'object',
+        properties: {
+          kid_name: { type: 'string', description: 'Name of the child (e.g. "Sam" or "Robyn")' },
+          change: { type: 'integer', description: 'Number of points to add (positive) or remove (negative)' },
+          reason: { type: 'string', description: 'Why the points are being given or taken away' },
+        },
+        required: ['kid_name', 'change'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_points',
+      description: 'Get the current points and Mickey Heads for all kids in the family.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_point_history',
+      description: 'Get recent point history for a specific child.',
+      parameters: {
+        type: 'object',
+        properties: {
+          kid_name: { type: 'string', description: 'Name of the child' },
+        },
+        required: ['kid_name'],
+      },
+    },
+  },
 ];
 
 /**
@@ -297,6 +377,65 @@ export async function dispatch(functionName, args, context) {
     case 'get_all_lists': {
       const allLists = await lists.getAllLists(familyId);
       return JSON.stringify({ lists: allLists.map((l) => l.name) });
+    }
+
+    // --- Countdown dispatch ---
+    case 'create_countdown': {
+      const countdown = await countdowns.createCountdown(familyId, args);
+      const daysUntil = Math.ceil(
+        (new Date(countdown.target_date) - new Date()) / (1000 * 60 * 60 * 24)
+      );
+      return JSON.stringify({
+        success: true,
+        countdown: {
+          id: countdown.id,
+          title: countdown.title,
+          target_date: countdown.target_date,
+          background: countdown.background,
+          days_until: daysUntil,
+        },
+      });
+    }
+
+    case 'list_countdowns': {
+      const items = await countdowns.listCountdowns(familyId);
+      return JSON.stringify({
+        countdowns: items.map((c) => {
+          const daysUntil = Math.ceil(
+            (new Date(c.target_date) - new Date()) / (1000 * 60 * 60 * 24)
+          );
+          return {
+            id: c.id,
+            title: c.title,
+            target_date: c.target_date,
+            background: c.background,
+            days_until: daysUntil,
+          };
+        }),
+      });
+    }
+
+    case 'delete_countdown': {
+      const deleted = await countdowns.deleteCountdown(args.countdown_id, familyId);
+      return JSON.stringify({ success: true, deleted_title: deleted?.title });
+    }
+
+    // --- Kid points dispatch ---
+    case 'adjust_points': {
+      const result = await points.adjustPoints(
+        familyId, args.kid_name, args.change, args.reason, userId
+      );
+      return JSON.stringify({ success: true, ...result });
+    }
+
+    case 'get_points': {
+      const allPoints = await points.getAllPoints(familyId);
+      return JSON.stringify({ kids: allPoints });
+    }
+
+    case 'get_point_history': {
+      const history = await points.getPointHistory(familyId, args.kid_name);
+      return JSON.stringify(history);
     }
 
     default:
