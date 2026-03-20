@@ -27,10 +27,30 @@ if (allowedIds) {
   });
 }
 
+// Cache bot info for group chat mention detection
+let cachedBotInfo = null;
+
 // Register /start, /help, /link commands
 registerCommands(bot);
 
 // All other text messages go through the LLM
-bot.on('message:text', handleMessage);
+// In group chats, only respond when the bot is mentioned or replied to
+bot.on('message:text', async (ctx) => {
+  const isGroup = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
+
+  if (isGroup) {
+    if (!cachedBotInfo) cachedBotInfo = await bot.api.getMe();
+    const botUsername = cachedBotInfo.username?.toLowerCase();
+    const text = (ctx.message.text || '').toLowerCase();
+    const isReplyToBot = ctx.message.reply_to_message?.from?.id === cachedBotInfo.id;
+    const isMentioned = botUsername && text.includes(`@${botUsername}`);
+
+    if (!isMentioned && !isReplyToBot) {
+      return;
+    }
+  }
+
+  await handleMessage(ctx);
+});
 
 export { bot };
