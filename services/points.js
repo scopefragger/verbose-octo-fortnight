@@ -52,8 +52,9 @@ export async function adjustPoints(familyId, kidName, change, reason, userId) {
 
   return {
     kid_name: data.kid_name,
-    points: data.points,
+    total_points: data.points,
     mickey_heads: Math.floor(data.points / POINTS_PER_MICKEY),
+    remaining_points: data.points % POINTS_PER_MICKEY,
     points_to_next_mickey: POINTS_PER_MICKEY - (data.points % POINTS_PER_MICKEY),
   };
 }
@@ -71,8 +72,9 @@ export async function getAllPoints(familyId) {
 
   return (data || []).map((kid) => ({
     kid_name: kid.kid_name,
-    points: kid.points,
+    total_points: kid.points,
     mickey_heads: Math.floor(kid.points / POINTS_PER_MICKEY),
+    remaining_points: kid.points % POINTS_PER_MICKEY,
     points_to_next_mickey: POINTS_PER_MICKEY - (kid.points % POINTS_PER_MICKEY),
   }));
 }
