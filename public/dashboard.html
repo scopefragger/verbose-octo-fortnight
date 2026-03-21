@@ -1333,7 +1333,7 @@
     function renderWeather(weather) {
       if (!weather) return '';
       const days = weather.time.map((date, i) => {
-        const d = new Date(date + 'T00:00:00');
+        const d = new Date(date + 'T12:00:00');
         const dayName = i === 0 ? 'Today' : d.toLocaleDateString('en-US', { weekday: 'short' });
         return `
           <div class="weather-day">
@@ -1393,7 +1393,7 @@
               <div class="countdown-title">${esc(c.title)}</div>
               <div class="countdown-days">${c.days_until}</div>
               <div class="countdown-label">${c.days_until === 1 ? 'day to go!' : 'days to go!'}</div>
-              <div class="countdown-date">${new Date(c.target_date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
+              <div class="countdown-date">${new Date(c.target_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</div>
             </div>
           `).join('')}
         </div>

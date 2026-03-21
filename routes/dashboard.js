@@ -125,7 +125,7 @@ export async function getDashboardData(familyId) {
         type: m.meal_type,
         title: m.title,
         notes: m.notes,
-        day_label: new Date(m.meal_date + 'T00:00:00').toLocaleDateString('en-US', {
+        day_label: new Date(m.meal_date + 'T12:00:00').toLocaleDateString('en-US', {
           timeZone: tz,
           weekday: 'short',
           month: 'short',
