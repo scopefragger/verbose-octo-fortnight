@@ -289,12 +289,13 @@
       padding: 12px;
       display: grid;
       grid-template-columns: 220px 1fr 1fr 1fr;
-      grid-template-rows: auto 1fr 1fr;
+      grid-template-rows: auto auto 1fr 1fr;
       gap: 12px;
       grid-template-areas:
         "sidebar header    header    header"
-        "sidebar countdown today     upcoming"
-        "sidebar countdown meals     reminders";
+        "sidebar countdown countdown countdown"
+        "sidebar today     upcoming  lists"
+        "sidebar meals     meals     reminders";
     }
 
     /* Cards */
@@ -700,14 +701,14 @@
     .countdown-area {
       grid-area: countdown;
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
       gap: 10px;
     }
 
     .countdown-card {
       flex: 1;
       border-radius: var(--radius);
-      padding: 20px;
+      padding: 10px 14px;
       text-align: center;
       color: white;
       position: relative;
@@ -740,14 +741,14 @@
     }
 
     .countdown-title {
-      font-size: 14px;
+      font-size: 11px;
       font-weight: 600;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
       position: relative;
     }
 
     .countdown-days {
-      font-size: 56px;
+      font-size: 32px;
       font-weight: 800;
       line-height: 1;
       position: relative;
@@ -755,17 +756,17 @@
     }
 
     .countdown-label {
-      font-size: 13px;
+      font-size: 10px;
       font-weight: 500;
       opacity: 0.9;
-      margin-top: 2px;
+      margin-top: 1px;
       position: relative;
     }
 
     .countdown-date {
-      font-size: 10px;
+      font-size: 9px;
       opacity: 0.75;
-      margin-top: 4px;
+      margin-top: 2px;
       position: relative;
     }
 
@@ -921,6 +922,146 @@
       font-style: italic;
     }
 
+    .meal-slot { position: relative; }
+
+    .meal-actions {
+      display: flex;
+      gap: 4px;
+      margin-left: auto;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .meal-slot:hover .meal-actions { opacity: 1; }
+
+    .meal-action-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      padding: 2px 6px;
+      font-size: 11px;
+      color: var(--text-light);
+      transition: all 0.15s;
+    }
+
+    .meal-action-btn:hover {
+      background: var(--primary-light);
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .meal-action-btn.delete:hover {
+      background: #fee;
+      color: #c00;
+      border-color: #c00;
+    }
+
+    .meal-add-btn {
+      display: block;
+      width: 100%;
+      padding: 6px;
+      margin-top: 6px;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-light);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .meal-add-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    /* Meal modal */
+    .meal-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      backdrop-filter: blur(2px);
+    }
+
+    .meal-modal {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 20px;
+      width: 340px;
+      max-width: 90vw;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+
+    .meal-modal h3 {
+      margin-bottom: 14px;
+      color: var(--text);
+      font-size: 16px;
+    }
+
+    .meal-modal label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-light);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+
+    .meal-modal input,
+    .meal-modal select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 12px;
+      background: var(--card);
+      color: var(--text);
+    }
+
+    .meal-modal input:focus,
+    .meal-modal select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(74,122,247,0.15);
+    }
+
+    .meal-modal-buttons {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 4px;
+    }
+
+    .meal-modal-buttons button {
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+    }
+
+    .btn-cancel {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    .btn-save {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-save:hover { filter: brightness(1.1); }
+    .btn-cancel:hover { background: #ccc; }
+
     /* Weekly meal mini view */
     .week-meals-grid {
       display: grid;
@@ -954,6 +1095,54 @@
 
     .week-meal-item.dinner { background: var(--accent-light); }
     .week-meal-item.lunch { background: var(--primary-light); }
+
+    /* === LISTS === */
+    .lists-card { grid-area: lists; }
+
+    .list-group { margin-bottom: 10px; }
+    .list-group:last-child { margin-bottom: 0; }
+
+    .list-group-name {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+      padding-bottom: 2px;
+      border-bottom: 2px solid var(--primary-light);
+    }
+
+    .list-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 0;
+      font-size: 12px;
+    }
+
+    .list-item-check {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1.5px solid var(--border);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+    }
+
+    .list-item.done .list-item-check {
+      background: var(--success);
+      border-color: var(--success);
+      color: white;
+    }
+
+    .list-item.done .list-item-text {
+      text-decoration: line-through;
+      opacity: 0.5;
+    }
 
     /* === REMINDERS === */
     .reminders-card { grid-area: reminders; }
@@ -993,25 +1182,28 @@
       .dashboard {
         height: auto;
         grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto;
         grid-template-areas:
           "header header"
           "countdown countdown"
           "today upcoming"
-          "meals reminders";
+          "lists meals"
+          "reminders reminders";
       }
       .sidebar { display: none; }
-      .countdown-area { flex-direction: row; }
     }
 
     @media (max-width: 700px) {
       body { padding: 8px; }
       .dashboard {
         grid-template-columns: 1fr;
+        grid-template-rows: auto;
         grid-template-areas:
           "header"
           "countdown"
           "today"
           "upcoming"
+          "lists"
           "meals"
           "reminders";
       }
@@ -1278,13 +1470,151 @@
       }).join('');
     }
 
+    function getSecret() {
+      return new URLSearchParams(window.location.search).get('secret');
+    }
+
+    function getTodayStr() {
+      return new Date().toLocaleDateString('en-CA');
+    }
+
+    async function saveMeal({ meal_date, meal_type, title, notes }) {
+      const res = await fetch(`/api/meals?secret=${getSecret()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meal_date, meal_type, title, notes }),
+      });
+      if (!res.ok) throw new Error('Failed to save meal');
+      return res.json();
+    }
+
+    async function deleteMeal(meal_date, meal_type) {
+      const res = await fetch(`/api/meals?secret=${getSecret()}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meal_date, meal_type }),
+      });
+      if (!res.ok) throw new Error('Failed to delete meal');
+      return res.json();
+    }
+
+    function openMealModal({ date, type, title, notes } = {}) {
+      const isEdit = Boolean(title);
+      const todayStr = getTodayStr();
+      const overlay = document.createElement('div');
+      overlay.className = 'meal-modal-overlay';
+      overlay.innerHTML = `
+        <div class="meal-modal">
+          <h3>${isEdit ? 'Edit Meal' : 'Add Meal'}</h3>
+          <label>Date</label>
+          <input type="date" id="meal-date" value="${date || todayStr}" min="${todayStr}">
+          <label>Meal Type</label>
+          <select id="meal-type">
+            <option value="breakfast" ${type === 'breakfast' ? 'selected' : ''}>Breakfast</option>
+            <option value="lunch" ${type === 'lunch' ? 'selected' : ''}>Lunch</option>
+            <option value="dinner" ${type === 'dinner' ? 'selected' : ''}>Dinner</option>
+            <option value="snack" ${type === 'snack' ? 'selected' : ''}>Snack</option>
+          </select>
+          <label>Title</label>
+          <input type="text" id="meal-title" value="${esc(title || '')}" placeholder="e.g. Spaghetti Bolognese">
+          <label>Notes (optional)</label>
+          <input type="text" id="meal-notes-input" value="${esc(notes || '')}" placeholder="e.g. with garlic bread">
+          <div class="meal-modal-buttons">
+            <button class="btn-cancel" id="meal-cancel">Cancel</button>
+            <button class="btn-save" id="meal-save">Save</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      overlay.querySelector('#meal-cancel').onclick = () => overlay.remove();
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+      overlay.querySelector('#meal-save').onclick = async () => {
+        const meal_date = overlay.querySelector('#meal-date').value;
+        const meal_type = overlay.querySelector('#meal-type').value;
+        const titleVal = overlay.querySelector('#meal-title').value.trim();
+        if (!titleVal) { overlay.querySelector('#meal-title').focus(); return; }
+        try {
+          await saveMeal({ meal_date, meal_type, title: titleVal, notes: overlay.querySelector('#meal-notes-input').value.trim() || null });
+          overlay.remove();
+          refreshDashboard();
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
+      setTimeout(() => overlay.querySelector('#meal-title').focus(), 50);
+    }
+
+    async function handleDeleteMeal(date, type) {
+      try {
+        await deleteMeal(date, type);
+        refreshDashboard();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Event delegation for meal buttons
+    document.addEventListener('click', (e) => {
+      const editBtn = e.target.closest('.meal-edit-btn');
+      if (editBtn) {
+        openMealModal({
+          date: editBtn.dataset.date,
+          type: editBtn.dataset.type,
+          title: editBtn.dataset.title,
+          notes: editBtn.dataset.notes,
+        });
+        return;
+      }
+      const delBtn = e.target.closest('.meal-del-btn');
+      if (delBtn) {
+        handleDeleteMeal(delBtn.dataset.date, delBtn.dataset.type);
+        return;
+      }
+      if (e.target.closest('.meal-add-new')) {
+        openMealModal();
+        return;
+      }
+      const addForDate = e.target.closest('.meal-add-for-date');
+      if (addForDate) {
+        openMealModal({ date: addForDate.dataset.date });
+        return;
+      }
+    });
+
+    function renderLists(lists) {
+      if (!lists || lists.length === 0) {
+        return '<div class="empty-state"><div class="icon">&#x1F4CB;</div>No lists yet</div>';
+      }
+      return lists.map(list => {
+        const items = list.items || [];
+        if (items.length === 0) return '';
+        return `
+          <div class="list-group">
+            <div class="list-group-name">${esc(list.name)}</div>
+            ${items.map(item => `
+              <div class="list-item ${item.checked ? 'done' : ''}">
+                <div class="list-item-check">${item.checked ? '&#x2713;' : ''}</div>
+                <span class="list-item-text">${esc(item.text || item.name)}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }).filter(Boolean).join('') || '<div class="empty-state"><div class="icon">&#x1F4CB;</div>No lists yet</div>';
+    }
+
     function renderMeals(meals) {
       const todayMeals = meals?.today || [];
       const weekMeals = meals?.week || [];
+      const todayStr = getTodayStr();
 
-      // Group week meals by day
+      // Group week meals by day, excluding today (shown separately above)
       const weekByDay = {};
       weekMeals.forEach(m => {
+        if (m.date === todayStr) return; // skip today — already shown
+        if (m.date < todayStr) return;   // skip past days
         if (!weekByDay[m.date]) weekByDay[m.date] = { label: m.day_label, meals: [] };
         weekByDay[m.date].meals.push(m);
       });
@@ -1298,30 +1628,39 @@
 
       let todayHTML = '';
       if (todayMeals.length > 0) {
-        todayHTML = todayMeals.map(m => `
+        todayHTML = todayMeals.map(m => {
+          const dataAttrs = `data-date="${todayStr}" data-type="${esc(m.type)}" data-title="${esc(m.title)}" data-notes="${esc(m.notes || '')}"`;
+          return `
           <div class="meal-slot">
             <div class="meal-type-badge meal-type-${esc(m.type)}">${mealEmojis[m.type] || ''} ${esc(m.type)}</div>
             <div class="meal-info">
               <h4>${esc(m.title)}</h4>
               ${m.notes ? `<div class="meal-notes">${esc(m.notes)}</div>` : ''}
             </div>
+            <div class="meal-actions">
+              <button class="meal-action-btn meal-edit-btn" ${dataAttrs}>Edit</button>
+              <button class="meal-action-btn delete meal-del-btn" data-date="${todayStr}" data-type="${esc(m.type)}">Del</button>
+            </div>
           </div>
-        `).join('');
+        `}).join('');
       } else {
         todayHTML = '<div class="empty-state"><div class="icon">\u{1F37D}\uFE0F</div>No meals planned today</div>';
       }
 
-      // Week overview (compact)
+      todayHTML += `<button class="meal-add-btn meal-add-new">+ Add meal</button>`;
+
+      // Week overview (compact) — future days only
       let weekHTML = '';
       const dayEntries = Object.entries(weekByDay);
       if (dayEntries.length > 0) {
         weekHTML = `
           <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">
-            <div style="font-size:10px;font-weight:700;color:var(--primary);text-transform:uppercase;margin-bottom:6px;">This Week</div>
+            <div style="font-size:10px;font-weight:700;color:var(--primary);text-transform:uppercase;margin-bottom:6px;">Coming Up</div>
             ${dayEntries.map(([date, info]) => `
-              <div style="display:flex;gap:6px;margin-bottom:4px;font-size:11px;">
+              <div style="display:flex;gap:6px;margin-bottom:4px;font-size:11px;align-items:center;">
                 <span style="min-width:65px;color:var(--text-light);font-weight:600;">${esc(info.label)}</span>
-                <span>${info.meals.map(m => `${mealEmojis[m.type] || ''} ${esc(m.title)}`).join(' \u00B7 ')}</span>
+                <span style="flex:1">${info.meals.map(m => `${mealEmojis[m.type] || ''} ${esc(m.title)}`).join(' \u00B7 ')}</span>
+                <button class="meal-action-btn meal-add-for-date" data-date="${date}" style="opacity:1;font-size:10px;padding:1px 5px;">+</button>
               </div>
             `).join('')}
           </div>
@@ -1398,6 +1737,14 @@
             ${data.week.events.length === 0
               ? '<div class="empty-state"><div class="icon">&#x1F4ED;</div>No upcoming events</div>'
               : renderWeekEvents(data.week.events)}
+          </div>
+        </div>
+
+        <!-- Lists -->
+        <div class="card lists-card">
+          <div class="card-title"><span class="icon">&#x1F4CB;</span> Lists</div>
+          <div class="card-body">
+            ${renderLists(data.lists)}
           </div>
         </div>
 
@@ -1482,23 +1829,25 @@
       document.body.appendChild(iframe);
     }
 
-    async function init() {
+    async function refreshDashboard() {
       try {
         const [data, weather] = await Promise.all([fetchData(), fetchWeather()]);
         render(data, weather);
+      } catch (e) { /* silently retry */ }
+    }
+
+    window.refreshDashboard = refreshDashboard;
+
+    async function init() {
+      try {
+        await refreshDashboard();
         startBackgroundMusic();
       } catch (err) {
         document.getElementById('dashboard').innerHTML =
           '<div class="loading">Failed to load dashboard. Check your URL.</div>';
       }
 
-      setInterval(async () => {
-        try {
-          const [data, weather] = await Promise.all([fetchData(), fetchWeather()]);
-          render(data, weather);
-        } catch (e) { /* silently retry next interval */ }
-      }, REFRESH_INTERVAL);
-
+      setInterval(refreshDashboard, REFRESH_INTERVAL);
       setInterval(updateClock, 1000);
     }
 

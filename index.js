@@ -4,6 +4,7 @@ import { webhookCallback } from 'grammy';
 import { bot } from './bot/bot.js';
 import { checkReminders, sendDailyDigest, sendWeeklyDigest } from './routes/cron.js';
 import { getDashboardData } from './routes/dashboard.js';
+import { setMeal, removeMeal } from './services/meals.js';
 import { supabase } from './db/supabase.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,6 +12,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
+app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const isWebhookMode = Boolean(process.env.WEBHOOK_URL);
 
@@ -93,9 +95,50 @@ app.get('/api/dashboard', async (req, res) => {
   }
 });
 
+// Helper to get the first family ID
+async function getFamilyId() {
+  const { data: families } = await supabase
+    .from('families')
+    .select('id')
+    .limit(1);
+  return families?.[0]?.id;
+}
+
+// Meal API — create or update a meal
+app.post('/api/meals', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const meal = await setMeal(familyId, req.body, null);
+    res.json(meal);
+  } catch (err) {
+    console.error('Meal create/update error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Meal API — delete a meal
+app.delete('/api/meals', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { meal_date, meal_type } = req.body;
+    await removeMeal(familyId, meal_date, meal_type);
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error('Meal delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Only register webhook route when in webhook mode
 if (isWebhookMode) {
-  app.use(express.json());
   app.post('/bot/webhook', webhookCallback(bot, 'express'));
 }
 
