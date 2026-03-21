@@ -52,6 +52,46 @@ export async function deleteEvent(eventId, familyId) {
 }
 
 /**
+ * Find and delete an event by title and/or date (fuzzy match).
+ * Returns the deleted event, or null if no match found.
+ */
+export async function findAndDeleteEvent(familyId, { title, date }) {
+  let query = supabase
+    .from('events')
+    .select('id, title, starts_at')
+    .eq('family_id', familyId)
+    .order('starts_at');
+
+  if (date) {
+    // Match events starting on that date (any time)
+    query = query.gte('starts_at', `${date}T00:00:00`).lte('starts_at', `${date}T23:59:59`);
+  }
+
+  const { data: events, error } = await query;
+  if (error) throw error;
+  if (!events || events.length === 0) return null;
+
+  let match;
+  if (title) {
+    const needle = title.toLowerCase().trim();
+    // Exact title match first
+    match = events.find((e) => e.title.toLowerCase() === needle);
+    // Then substring match
+    if (!match) match = events.find((e) => e.title.toLowerCase().includes(needle));
+    // Then reverse substring (search term contains event title)
+    if (!match) match = events.find((e) => needle.includes(e.title.toLowerCase()));
+  }
+
+  // If no title given or no title match, use the first event on that date
+  if (!match) {
+    if (!date) return null; // Need at least a title or date match
+    match = events[0];
+  }
+
+  return deleteEvent(match.id, familyId);
+}
+
+/**
  * Get a single event by ID.
  */
 export async function getEvent(eventId) {

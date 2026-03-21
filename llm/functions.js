@@ -48,13 +48,13 @@ export const tools = [
     type: 'function',
     function: {
       name: 'delete_event',
-      description: 'Delete a calendar event by its ID.',
+      description: 'Delete a calendar event. You can specify the event by title and/or date — no ID needed. If both title and date are given, matches by both. If only one is given, matches by that.',
       parameters: {
         type: 'object',
         properties: {
-          event_id: { type: 'string', description: 'UUID of the event to delete' },
+          title: { type: 'string', description: 'Title or description of the event to delete (fuzzy match)' },
+          date: { type: 'string', description: 'Date of the event in YYYY-MM-DD format' },
         },
-        required: ['event_id'],
       },
     },
   },
@@ -403,8 +403,20 @@ export async function dispatch(functionName, args, context) {
     }
 
     case 'delete_event': {
-      const deleted = await calendar.deleteEvent(args.event_id, familyId);
-      return JSON.stringify({ success: true, deleted_title: deleted?.title });
+      if (args.event_id) {
+        // Legacy: delete by ID if provided
+        const deleted = await calendar.deleteEvent(args.event_id, familyId);
+        return JSON.stringify({ success: true, deleted_title: deleted?.title });
+      }
+      // Delete by title/date match
+      const deleted = await calendar.findAndDeleteEvent(familyId, {
+        title: args.title,
+        date: args.date,
+      });
+      if (!deleted) {
+        return JSON.stringify({ success: false, error: 'No matching event found. Try listing events first to see what\'s on the calendar.' });
+      }
+      return JSON.stringify({ success: true, deleted_title: deleted.title });
     }
 
     case 'create_reminder': {
