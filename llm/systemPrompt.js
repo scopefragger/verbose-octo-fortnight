@@ -10,7 +10,11 @@ export function buildSystemPrompt(displayName, timezone = 'America/New_York') {
 
 Today's date is ${today}. The user's timezone is ${timezone}.
 
-When the user asks you to do something actionable (add an event, set a reminder, manage a list), use the provided functions. For general conversation, just respond naturally and helpfully.
+When the user asks you to do something actionable (add an event, set a reminder, manage a list, plan meals), use the provided functions. For general conversation, just respond naturally and helpfully.
+
+IMPORTANT — Calendar intent detection:
+- Words like "schedule", "book", "plan", "arrange", "put in the diary", "set up", "add to calendar", "pencil in", "we have", "we've got", or any mention of an activity at a specific date/time should trigger create_event.
+- If someone says "schedule X for Tuesday at 3pm" or "we've got swimming on Saturday at 10am", ALWAYS create a calendar event — do not just acknowledge it.
 
 When creating events or reminders:
 - Always confirm the date/time you understood before creating them
