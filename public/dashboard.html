@@ -936,43 +936,44 @@
 
     .meal-action-btn {
       background: none;
-      border: 1px solid var(--border);
+      border: none;
       border-radius: 6px;
       cursor: pointer;
       padding: 2px 6px;
-      font-size: 11px;
+      font-size: 10px;
       color: var(--text-light);
+      opacity: 0.3;
       transition: all 0.15s;
     }
 
     .meal-action-btn:hover {
+      opacity: 1;
       background: var(--primary-light);
       color: var(--primary);
-      border-color: var(--primary);
     }
 
     .meal-action-btn.delete:hover {
       background: #fee;
       color: #c00;
-      border-color: #c00;
     }
 
     .meal-add-btn {
       display: block;
       width: 100%;
-      padding: 6px;
-      margin-top: 6px;
-      border: 1px dashed var(--border);
-      border-radius: 8px;
+      padding: 3px;
+      margin-top: 4px;
+      border: none;
+      border-radius: 6px;
       background: transparent;
       color: var(--text-light);
-      font-size: 12px;
+      font-size: 10px;
       cursor: pointer;
+      opacity: 0.4;
       transition: all 0.15s;
     }
 
     .meal-add-btn:hover {
-      border-color: var(--primary);
+      opacity: 1;
       color: var(--primary);
       background: var(--primary-light);
     }
@@ -1660,7 +1661,7 @@
               <div style="display:flex;gap:6px;margin-bottom:4px;font-size:11px;align-items:center;">
                 <span style="min-width:65px;color:var(--text-light);font-weight:600;">${esc(info.label)}</span>
                 <span style="flex:1">${info.meals.map(m => `${mealEmojis[m.type] || ''} ${esc(m.title)}`).join(' \u00B7 ')}</span>
-                <button class="meal-action-btn meal-add-for-date" data-date="${date}" style="opacity:1;font-size:10px;padding:1px 5px;">+</button>
+                <button class="meal-action-btn meal-add-for-date" data-date="${date}" style="opacity:0.3;font-size:10px;padding:1px 5px;border:none;">+</button>
               </div>
             `).join('')}
           </div>
