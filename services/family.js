@@ -17,16 +17,29 @@ export async function getUserByTelegramId(telegramId) {
 }
 
 /**
- * Register a new user. Creates a family for them automatically.
+ * Register a new user. Joins existing family if one exists (single-family app),
+ * otherwise creates a new family.
  */
 export async function registerUser(telegramId, displayName, username) {
-  // Create a family first
-  const { data: family, error: famErr } = await supabase
+  // Single-family app: reuse existing family if one exists
+  let family;
+  const { data: existing } = await supabase
     .from('families')
-    .insert({ name: `${displayName}'s Family` })
-    .select()
+    .select('id, name')
+    .limit(1)
     .single();
-  if (famErr) throw famErr;
+
+  if (existing) {
+    family = existing;
+  } else {
+    const { data: newFamily, error: famErr } = await supabase
+      .from('families')
+      .insert({ name: `${displayName}'s Family` })
+      .select()
+      .single();
+    if (famErr) throw famErr;
+    family = newFamily;
+  }
 
   // Create the user in that family
   const { data: user, error: userErr } = await supabase
