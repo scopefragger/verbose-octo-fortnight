@@ -1975,17 +1975,6 @@
       });
     }
 
-    function startBackgroundMusic() {
-      if (window.innerWidth <= 1100) return;
-      const existing = document.getElementById('bg-music');
-      if (existing) return;
-      const iframe = document.createElement('iframe');
-      iframe.id = 'bg-music';
-      iframe.src = 'https://www.youtube.com/embed/ieYJ5Rux4j4?autoplay=1&loop=1&playlist=ieYJ5Rux4j4&controls=0&showinfo=0&modestbranding=1';
-      iframe.allow = 'autoplay';
-      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;pointer-events:none;';
-      document.body.appendChild(iframe);
-    }
 
     async function refreshDashboard() {
       try {
@@ -1999,7 +1988,6 @@
     async function init() {
       try {
         await refreshDashboard();
-        startBackgroundMusic();
       } catch (err) {
         document.getElementById('dashboard').innerHTML =
           '<div class="loading">Failed to load dashboard. Check your URL.</div>';
