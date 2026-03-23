@@ -74,11 +74,20 @@ app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
-// Dashboard API — returns JSON data for the dashboard
+// Dashboard API — returns JSON data for the dashboard (cached to reduce Supabase load)
+let dashboardCache = { data: null, timestamp: 0 };
+const CACHE_TTL = 60_000; // 60 seconds
+
 app.get('/api/dashboard', async (req, res) => {
   if (req.query.secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'unauthorized' });
   }
+
+  // Return cached data if fresh enough
+  if (dashboardCache.data && Date.now() - dashboardCache.timestamp < CACHE_TTL) {
+    return res.json(dashboardCache.data);
+  }
+
   try {
     // Get the first family (for a personal bot, there's typically one)
     const { data: families } = await supabase
@@ -91,9 +100,14 @@ app.get('/api/dashboard', async (req, res) => {
     }
 
     const data = await getDashboardData(families[0].id);
+    dashboardCache = { data, timestamp: Date.now() };
     res.json(data);
   } catch (err) {
     console.error('Dashboard API error:', err);
+    // Return stale cache if available rather than an error
+    if (dashboardCache.data) {
+      return res.json(dashboardCache.data);
+    }
     res.status(500).json({ error: 'Failed to load dashboard data' });
   }
 });
