@@ -117,6 +117,22 @@ export async function getAllLists(familyId) {
 }
 
 /**
+ * Get all lists with their items in a single efficient query (for dashboard).
+ */
+export async function getAllListsWithItems(familyId) {
+  const { data, error } = await supabase
+    .from('lists')
+    .select('id, name, list_items(id, text, checked)')
+    .eq('family_id', familyId)
+    .order('created_at');
+  if (error) throw error;
+  return (data || []).map((list) => ({
+    name: list.name,
+    items: list.list_items || [],
+  }));
+}
+
+/**
  * Find the closest matching item by text (case-insensitive substring).
  */
 function findClosestItem(items, searchText) {

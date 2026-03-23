@@ -1,7 +1,7 @@
 import { supabase } from '../db/supabase.js';
 import { listEvents } from '../services/calendar.js';
 import { listReminders } from '../services/reminders.js';
-import { getAllLists, getList } from '../services/lists.js';
+import { getAllListsWithItems } from '../services/lists.js';
 import { listCountdowns } from '../services/countdowns.js';
 import { getAllPoints } from '../services/points.js';
 import { getMealsForDate, getMealsForWeek } from '../services/meals.js';
@@ -33,31 +33,20 @@ export async function getDashboardData(familyId) {
   const weekEndStr = weekEnd.toLocaleDateString('en-CA', { timeZone: tz });
   const weekEndBound = `${weekEndStr}T23:59:59`;
 
-  // Fetch data in parallel
-  const [todayEvents, weekEvents, allLists, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme] = await Promise.all([
+  // Fetch all data in a single parallel batch
+  const reminderPromises = members.map((m) => listReminders(m.id));
+  const [todayEvents, weekEvents, listsWithItems, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme, ...reminderResults] = await Promise.all([
     listEvents(familyId, todayStart, todayEnd),
     listEvents(familyId, todayStart, weekEndBound),
-    getAllLists(familyId),
+    getAllListsWithItems(familyId),
     listCountdowns(familyId),
     getAllPoints(familyId),
     getMealsForDate(familyId, todayStr),
     getMealsForWeek(familyId, todayStr, weekEndStr),
     getTheme(familyId),
+    ...reminderPromises,
   ]);
-
-  // Get all reminders for all family members
-  const reminderResults = await Promise.all(
-    members.map((m) => listReminders(m.id))
-  );
   const allReminders = reminderResults.flat();
-
-  // Get items for each list
-  const listsWithItems = await Promise.all(
-    allLists.map(async (list) => {
-      const { items } = await getList(familyId, list.name);
-      return { name: list.name, items };
-    })
-  );
 
   // Format events for display
   const formatEvent = (e) => ({
