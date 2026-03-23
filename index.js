@@ -5,6 +5,9 @@ import { bot } from './bot/bot.js';
 import { checkReminders, sendDailyDigest, sendWeeklyDigest } from './routes/cron.js';
 import { getDashboardData } from './routes/dashboard.js';
 import { setMeal, removeMeal } from './services/meals.js';
+import { createEvent, deleteEvent } from './services/calendar.js';
+import { addItem, removeItem } from './services/lists.js';
+import { createReminder, deleteReminder } from './services/reminders.js';
 import { supabase } from './db/supabase.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -133,6 +136,105 @@ app.delete('/api/meals', async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     console.error('Meal delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Event API — create an event
+app.post('/api/events', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const event = await createEvent(familyId, null, req.body);
+    res.json(event);
+  } catch (err) {
+    console.error('Event create error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Event API — delete an event
+app.delete('/api/events', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    await deleteEvent(req.body.event_id, familyId);
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error('Event delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// List item API — add an item
+app.post('/api/list-items', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { list_name, text } = req.body;
+    const result = await addItem(familyId, list_name, text, null);
+    res.json(result);
+  } catch (err) {
+    console.error('List item add error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// List item API — remove an item
+app.delete('/api/list-items', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { list_name, text } = req.body;
+    await removeItem(familyId, list_name, text);
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error('List item remove error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reminder API — create a reminder
+app.post('/api/reminders', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    // Get the first user to associate the reminder with
+    const { data: users } = await supabase.from('users').select('id').limit(1);
+    if (!users?.length) return res.status(404).json({ error: 'No user found' });
+    const reminder = await createReminder(users[0].id, req.body);
+    res.json(reminder);
+  } catch (err) {
+    console.error('Reminder create error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reminder API — delete a reminder
+app.delete('/api/reminders', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const { data: users } = await supabase.from('users').select('id').limit(1);
+    if (!users?.length) return res.status(404).json({ error: 'No user found' });
+    await deleteReminder(req.body.reminder_id, users[0].id);
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error('Reminder delete error:', err);
     res.status(500).json({ error: err.message });
   }
 });

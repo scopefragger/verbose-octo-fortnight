@@ -957,29 +957,31 @@
       color: #c00;
     }
 
-    .meal-add-btn {
-      display: block;
-      width: 100%;
-      padding: 3px;
-      margin-top: 4px;
-      border: none;
+    .card-add-btn {
+      display: inline-block;
+      margin-left: auto;
+      padding: 2px 8px;
+      border: 1px dashed var(--border);
       border-radius: 6px;
       background: transparent;
       color: var(--text-light);
       font-size: 10px;
       cursor: pointer;
-      opacity: 0.4;
+      opacity: 0;
       transition: all 0.15s;
     }
 
-    .meal-add-btn:hover {
-      opacity: 1;
+    .card:hover .card-add-btn { opacity: 0.5; }
+
+    .card-add-btn:hover {
+      opacity: 1 !important;
       color: var(--primary);
       background: var(--primary-light);
+      border-color: var(--primary);
     }
 
-    /* Meal modal */
-    .meal-modal-overlay {
+    /* Generic modal (shared by meals, events, lists, reminders) */
+    .modal-overlay {
       position: fixed;
       inset: 0;
       background: rgba(0,0,0,0.5);
@@ -990,7 +992,7 @@
       backdrop-filter: blur(2px);
     }
 
-    .meal-modal {
+    .modal {
       background: var(--card);
       border-radius: var(--radius);
       padding: 20px;
@@ -999,13 +1001,13 @@
       box-shadow: 0 8px 32px rgba(0,0,0,0.2);
     }
 
-    .meal-modal h3 {
+    .modal h3 {
       margin-bottom: 14px;
       color: var(--text);
       font-size: 16px;
     }
 
-    .meal-modal label {
+    .modal label {
       display: block;
       font-size: 11px;
       font-weight: 600;
@@ -1014,8 +1016,8 @@
       text-transform: uppercase;
     }
 
-    .meal-modal input,
-    .meal-modal select {
+    .modal input,
+    .modal select {
       width: 100%;
       padding: 8px 10px;
       border: 1px solid var(--border);
@@ -1026,21 +1028,21 @@
       color: var(--text);
     }
 
-    .meal-modal input:focus,
-    .meal-modal select:focus {
+    .modal input:focus,
+    .modal select:focus {
       outline: none;
       border-color: var(--primary);
       box-shadow: 0 0 0 2px rgba(74,122,247,0.15);
     }
 
-    .meal-modal-buttons {
+    .modal-buttons {
       display: flex;
       gap: 8px;
       justify-content: flex-end;
       margin-top: 4px;
     }
 
-    .meal-modal-buttons button {
+    .modal-buttons button {
       padding: 7px 16px;
       border-radius: 8px;
       font-size: 12px;
@@ -1489,6 +1491,36 @@
       return res.json();
     }
 
+    async function saveEvent({ title, starts_at, ends_at, description, all_day }) {
+      const res = await fetch(`/api/events?secret=${getSecret()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, starts_at, ends_at, description, all_day }),
+      });
+      if (!res.ok) throw new Error('Failed to save event');
+      return res.json();
+    }
+
+    async function saveListItem(list_name, text) {
+      const res = await fetch(`/api/list-items?secret=${getSecret()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ list_name, text }),
+      });
+      if (!res.ok) throw new Error('Failed to add list item');
+      return res.json();
+    }
+
+    async function saveReminder({ message, remind_at }) {
+      const res = await fetch(`/api/reminders?secret=${getSecret()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, remind_at }),
+      });
+      if (!res.ok) throw new Error('Failed to save reminder');
+      return res.json();
+    }
+
     async function deleteMeal(meal_date, meal_type) {
       const res = await fetch(`/api/meals?secret=${getSecret()}`, {
         method: 'DELETE',
@@ -1503,7 +1535,7 @@
       const isEdit = Boolean(title);
       const todayStr = getTodayStr();
       const overlay = document.createElement('div');
-      overlay.className = 'meal-modal-overlay';
+      overlay.className = 'modal-overlay';
       overlay.innerHTML = `
         <div class="meal-modal">
           <h3>${isEdit ? 'Edit Meal' : 'Add Meal'}</h3>
@@ -1520,7 +1552,7 @@
           <input type="text" id="meal-title" value="${esc(title || '')}" placeholder="e.g. Spaghetti Bolognese">
           <label>Notes (optional)</label>
           <input type="text" id="meal-notes-input" value="${esc(notes || '')}" placeholder="e.g. with garlic bread">
-          <div class="meal-modal-buttons">
+          <div class="modal-buttons">
             <button class="btn-cancel" id="meal-cancel">Cancel</button>
             <button class="btn-save" id="meal-save">Save</button>
           </div>
@@ -1557,7 +1589,120 @@
       }
     }
 
-    // Event delegation for meal buttons
+    function openEventModal() {
+      const todayStr = getTodayStr();
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal">
+          <h3>Add Event</h3>
+          <label>Title</label>
+          <input type="text" id="evt-title" placeholder="e.g. Swimming lesson">
+          <label>Date</label>
+          <input type="date" id="evt-date" value="${todayStr}" min="${todayStr}">
+          <label>Time (optional)</label>
+          <input type="time" id="evt-time">
+          <label style="display:flex;align-items:center;gap:6px;text-transform:none;font-size:12px;">
+            <input type="checkbox" id="evt-allday"> All day event
+          </label>
+          <label>Description (optional)</label>
+          <input type="text" id="evt-desc" placeholder="Optional details">
+          <div class="modal-buttons">
+            <button class="btn-cancel" id="evt-cancel">Cancel</button>
+            <button class="btn-save" id="evt-save">Save</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      overlay.querySelector('#evt-cancel').onclick = () => overlay.remove();
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+      overlay.querySelector('#evt-save').onclick = async () => {
+        const title = overlay.querySelector('#evt-title').value.trim();
+        if (!title) { overlay.querySelector('#evt-title').focus(); return; }
+        const date = overlay.querySelector('#evt-date').value;
+        const time = overlay.querySelector('#evt-time').value;
+        const allDay = overlay.querySelector('#evt-allday').checked;
+        const desc = overlay.querySelector('#evt-desc').value.trim();
+        const starts_at = allDay || !time ? `${date}T00:00:00` : `${date}T${time}:00`;
+        try {
+          await saveEvent({ title, starts_at, all_day: allDay, description: desc || null });
+          overlay.remove();
+          refreshDashboard();
+        } catch (err) { console.error(err); }
+      };
+      setTimeout(() => overlay.querySelector('#evt-title').focus(), 50);
+    }
+
+    function openListItemModal() {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal">
+          <h3>Add List Item</h3>
+          <label>List</label>
+          <input type="text" id="li-list" value="shopping" placeholder="e.g. shopping, to-do">
+          <label>Item</label>
+          <input type="text" id="li-text" placeholder="e.g. Milk">
+          <div class="modal-buttons">
+            <button class="btn-cancel" id="li-cancel">Cancel</button>
+            <button class="btn-save" id="li-save">Add</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      overlay.querySelector('#li-cancel').onclick = () => overlay.remove();
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+      overlay.querySelector('#li-save').onclick = async () => {
+        const list_name = overlay.querySelector('#li-list').value.trim();
+        const text = overlay.querySelector('#li-text').value.trim();
+        if (!text) { overlay.querySelector('#li-text').focus(); return; }
+        try {
+          await saveListItem(list_name || 'shopping', text);
+          overlay.remove();
+          refreshDashboard();
+        } catch (err) { console.error(err); }
+      };
+      setTimeout(() => overlay.querySelector('#li-text').focus(), 50);
+    }
+
+    function openReminderModal() {
+      const todayStr = getTodayStr();
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal">
+          <h3>Add Reminder</h3>
+          <label>Message</label>
+          <input type="text" id="rem-msg" placeholder="e.g. Put the bins out">
+          <label>Date</label>
+          <input type="date" id="rem-date" value="${todayStr}" min="${todayStr}">
+          <label>Time</label>
+          <input type="time" id="rem-time" value="09:00">
+          <div class="modal-buttons">
+            <button class="btn-cancel" id="rem-cancel">Cancel</button>
+            <button class="btn-save" id="rem-save">Save</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      overlay.querySelector('#rem-cancel').onclick = () => overlay.remove();
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+      overlay.querySelector('#rem-save').onclick = async () => {
+        const message = overlay.querySelector('#rem-msg').value.trim();
+        if (!message) { overlay.querySelector('#rem-msg').focus(); return; }
+        const date = overlay.querySelector('#rem-date').value;
+        const time = overlay.querySelector('#rem-time').value || '09:00';
+        const remind_at = `${date}T${time}:00`;
+        try {
+          await saveReminder({ message, remind_at });
+          overlay.remove();
+          refreshDashboard();
+        } catch (err) { console.error(err); }
+      };
+      setTimeout(() => overlay.querySelector('#rem-msg').focus(), 50);
+    }
+
+    // Event delegation for all add/edit/delete buttons
     document.addEventListener('click', (e) => {
       const editBtn = e.target.closest('.meal-edit-btn');
       if (editBtn) {
@@ -1581,6 +1726,18 @@
       const addForDate = e.target.closest('.meal-add-for-date');
       if (addForDate) {
         openMealModal({ date: addForDate.dataset.date });
+        return;
+      }
+      if (e.target.closest('.event-add-btn')) {
+        openEventModal();
+        return;
+      }
+      if (e.target.closest('.list-add-btn')) {
+        openListItemModal();
+        return;
+      }
+      if (e.target.closest('.reminder-add-btn')) {
+        openReminderModal();
         return;
       }
     });
@@ -1648,7 +1805,7 @@
         todayHTML = '<div class="empty-state"><div class="icon">\u{1F37D}\uFE0F</div>No meals planned today</div>';
       }
 
-      todayHTML += `<button class="meal-add-btn meal-add-new">+ Add meal</button>`;
+      todayHTML += `<button class="card-add-btn meal-add-new">+ Add meal</button>`;
 
       // Week overview (compact) — future days only
       let weekHTML = '';
@@ -1715,7 +1872,7 @@
 
         <!-- Today's Events -->
         <div class="card today-card">
-          <div class="card-title"><span class="icon">&#x1F4C5;</span> Today's Schedule</div>
+          <div class="card-title"><span class="icon">&#x1F4C5;</span> Today's Schedule <button class="card-add-btn event-add-btn">+ Add</button></div>
           <div class="card-body">
             ${data.today.events.length === 0
               ? '<div class="empty-state"><div class="icon">&#x1F324;&#xFE0F;</div>No events today</div>'
@@ -1743,7 +1900,7 @@
 
         <!-- Lists -->
         <div class="card lists-card">
-          <div class="card-title"><span class="icon">&#x1F4CB;</span> Lists</div>
+          <div class="card-title"><span class="icon">&#x1F4CB;</span> Lists <button class="card-add-btn list-add-btn">+ Add</button></div>
           <div class="card-body">
             ${renderLists(data.lists)}
           </div>
@@ -1759,7 +1916,7 @@
 
         <!-- Reminders -->
         <div class="card reminders-card">
-          <div class="card-title"><span class="icon">&#x23F0;</span> Pending Reminders</div>
+          <div class="card-title"><span class="icon">&#x23F0;</span> Pending Reminders <button class="card-add-btn reminder-add-btn">+ Add</button></div>
           <div class="card-body">
             ${data.reminders.length === 0
               ? '<div class="empty-state"><div class="icon">&#x2705;</div>No pending reminders</div>'
