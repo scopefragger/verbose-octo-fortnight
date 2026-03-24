@@ -1145,6 +1145,128 @@
     .btn-save:hover { filter: brightness(1.1); }
     .btn-cancel:hover { background: #ccc; }
 
+    /* Meal picker wheel */
+    .wheel-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      backdrop-filter: blur(4px);
+    }
+
+    .wheel-container {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      max-width: 340px;
+      width: 90vw;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+
+    .wheel-container h3 {
+      margin-bottom: 16px;
+      font-size: 18px;
+      color: var(--text);
+    }
+
+    .wheel-display {
+      position: relative;
+      height: 180px;
+      overflow: hidden;
+      border-radius: 12px;
+      background: var(--bg);
+      margin-bottom: 16px;
+    }
+
+    .wheel-items {
+      position: absolute;
+      width: 100%;
+      transition: transform 3s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+    }
+
+    .wheel-item {
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .wheel-item.highlight {
+      background: var(--primary);
+      color: white;
+      font-size: 18px;
+      border-radius: 8px;
+      border: none;
+    }
+
+    .wheel-pointer {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 60px;
+      margin-top: -30px;
+      border-top: 3px solid var(--primary);
+      border-bottom: 3px solid var(--primary);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .wheel-result {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--primary);
+      margin: 12px 0;
+      min-height: 36px;
+    }
+
+    .wheel-buttons {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 12px;
+    }
+
+    .wheel-buttons button {
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+    }
+
+    .btn-spin {
+      background: var(--primary);
+      color: white;
+    }
+    .btn-spin:hover { filter: brightness(1.1); }
+    .btn-spin:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .meal-picker-btn {
+      background: none;
+      border: 1px dashed var(--border) !important;
+      color: var(--text-light);
+      font-size: 11px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .meal-picker-btn:hover {
+      border-color: var(--primary) !important;
+      color: var(--primary);
+    }
+
     /* Settings panel */
     .settings-btn {
       position: fixed;
@@ -2263,7 +2385,7 @@
 
         <!-- Meals -->
         <div class="card meals-card">
-          <div class="card-title"><span class="icon">&#x1F37D;&#xFE0F;</span> Meal Planner</div>
+          <div class="card-title"><span class="icon">&#x1F37D;&#xFE0F;</span> Meal Planner <button class="meal-picker-btn" onclick="openMealWheel()">&#x1F3B0; Pick for me</button></div>
           <div class="card-body">
             ${renderMeals(data.meals)}
           </div>
@@ -2316,6 +2438,96 @@
           `}).join('')}
         </div>
       `).join('');
+    }
+
+    /* ---- Meal picker wheel ---- */
+    let wheelMeals = [];
+
+    async function openMealWheel() {
+      // Fetch all historical meal titles
+      try {
+        const res = await fetch(`/api/meal-titles?secret=${getSecret()}`);
+        const data = await res.json();
+        wheelMeals = data.titles || [];
+      } catch (err) {
+        console.error('Failed to load meals:', err);
+        wheelMeals = [];
+      }
+
+      if (wheelMeals.length < 2) {
+        alert('Not enough meals in history to spin! Add more meals first.');
+        return;
+      }
+
+      const overlay = document.createElement('div');
+      overlay.className = 'wheel-overlay';
+
+      // Shuffle meals and duplicate for seamless scrolling
+      const shuffled = [...wheelMeals].sort(() => Math.random() - 0.5);
+      const displayItems = [];
+      for (let i = 0; i < 60; i++) {
+        displayItems.push(shuffled[i % shuffled.length]);
+      }
+
+      overlay.innerHTML = `
+        <div class="wheel-container">
+          <h3>&#x1F3B0; Meal Picker</h3>
+          <div class="wheel-display">
+            <div class="wheel-pointer"></div>
+            <div class="wheel-items" id="wheelItems">
+              ${displayItems.map(m => `<div class="wheel-item">${esc(m)}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wheel-result" id="wheelResult"></div>
+          <div class="wheel-buttons">
+            <button class="btn-cancel" id="wheelClose">Close</button>
+            <button class="btn-spin" id="wheelSpin">&#x1F3B2; Spin!</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+      overlay.querySelector('#wheelClose').onclick = () => overlay.remove();
+
+      const itemsEl = overlay.querySelector('#wheelItems');
+      const resultEl = overlay.querySelector('#wheelResult');
+      const spinBtn = overlay.querySelector('#wheelSpin');
+
+      // Center the items initially
+      itemsEl.style.transform = 'translateY(60px)';
+
+      spinBtn.onclick = () => {
+        spinBtn.disabled = true;
+        resultEl.textContent = '';
+
+        // Pick random landing position (items 30-50 range)
+        const winIndex = 30 + Math.floor(Math.random() * 15);
+        const targetOffset = -(winIndex * 60) + 60; // 60px = item height, offset to center
+
+        // Reset and spin
+        itemsEl.style.transition = 'none';
+        itemsEl.style.transform = 'translateY(60px)';
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            itemsEl.style.transition = 'transform 3s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
+            itemsEl.style.transform = `translateY(${targetOffset}px)`;
+          });
+        });
+
+        setTimeout(() => {
+          const winner = displayItems[winIndex];
+          resultEl.textContent = winner;
+
+          // Highlight the winning item
+          const items = itemsEl.querySelectorAll('.wheel-item');
+          items.forEach((el, i) => el.classList.toggle('highlight', i === winIndex));
+
+          spinBtn.disabled = false;
+          spinBtn.textContent = '🎲 Spin again!';
+        }, 3200);
+      };
     }
 
     /* ---- Settings panel ---- */

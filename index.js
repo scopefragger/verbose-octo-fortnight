@@ -4,7 +4,7 @@ import { webhookCallback } from 'grammy';
 import { bot } from './bot/bot.js';
 import { checkReminders, sendDailyDigest, sendWeeklyDigest } from './routes/cron.js';
 import { getDashboardData } from './routes/dashboard.js';
-import { setMeal, removeMeal } from './services/meals.js';
+import { setMeal, removeMeal, getUniqueMealTitles } from './services/meals.js';
 import { createEvent, deleteEvent } from './services/calendar.js';
 import { addItem, removeItem } from './services/lists.js';
 import { createReminder, deleteReminder } from './services/reminders.js';
@@ -159,6 +159,22 @@ app.delete('/api/meals', async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     console.error('Meal delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get unique meal titles for the meal picker wheel
+app.get('/api/meal-titles', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const titles = await getUniqueMealTitles(familyId);
+    res.json({ titles });
+  } catch (err) {
+    console.error('Meal titles error:', err);
     res.status(500).json({ error: err.message });
   }
 });

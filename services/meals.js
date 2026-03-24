@@ -84,6 +84,21 @@ export async function removeMeal(familyId, mealDate, mealType) {
 }
 
 /**
+ * Get all unique meal titles for a family (for the meal picker wheel).
+ */
+export async function getUniqueMealTitles(familyId) {
+  const { data, error } = await supabase
+    .from('meal_plans')
+    .select('title')
+    .eq('family_id', familyId)
+    .order('title');
+
+  if (error) throw error;
+  const unique = [...new Set((data || []).map(m => m.title))];
+  return unique;
+}
+
+/**
  * Clear all meals for a specific date.
  */
 export async function clearMealsForDate(familyId, date) {
