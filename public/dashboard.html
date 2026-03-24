@@ -1350,6 +1350,74 @@
     }
 
     /* === MOBILE (scrollable) === */
+    /* Mobile-only sections (hidden on desktop where sidebar shows them) */
+    .mobile-kids { display: none; grid-area: mobilekids; }
+    .mobile-info { display: none; grid-area: mobileinfo; }
+
+    .mobile-kids-row {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .mobile-kids-row .kid-points-card {
+      min-width: 140px;
+      flex: 1;
+      padding: 10px;
+    }
+
+    .mobile-kids-row .points-total { font-size: 24px; }
+    .mobile-kids-row .kid-name { font-size: 13px; }
+    .mobile-kids-row .mickey-head,
+    .mobile-kids-row .minnie-head { width: 22px; height: 22px; }
+    .mobile-kids-row .mickey-head .head { width: 14px; height: 14px; }
+    .mobile-kids-row .mickey-head .ear-left,
+    .mobile-kids-row .mickey-head .ear-right { width: 8px; height: 8px; }
+    .mobile-kids-row .minnie-head .head { width: 14px; height: 14px; }
+    .mobile-kids-row .minnie-head .ear-left,
+    .mobile-kids-row .minnie-head .ear-right { width: 8px; height: 8px; }
+
+    .mobile-info-row {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .mobile-info-row .mobile-clock {
+      flex: 1;
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+
+    .mobile-info-row .mobile-clock .time {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .mobile-info-row .mobile-clock .date {
+      font-size: 10px;
+      color: var(--text-light);
+    }
+
+    .mobile-info-row .mobile-weather {
+      flex: 1;
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text);
+    }
+
     @media (max-width: 1100px) {
       html, body { height: auto; overflow: auto; }
       .dashboard {
@@ -1358,21 +1426,28 @@
         grid-template-rows: auto;
         grid-template-areas:
           "header header"
+          "mobileinfo mobileinfo"
+          "mobilekids mobilekids"
           "countdown countdown"
           "today upcoming"
           "lists meals"
           "reminders reminders";
       }
       .sidebar { display: none; }
+      .mobile-kids { display: block; }
+      .mobile-info { display: block; }
     }
 
     @media (max-width: 700px) {
       body { padding: 8px; }
       .dashboard {
+        gap: 8px;
         grid-template-columns: 1fr;
         grid-template-rows: auto;
         grid-template-areas:
           "header"
+          "mobileinfo"
+          "mobilekids"
           "countdown"
           "today"
           "upcoming"
@@ -1381,6 +1456,8 @@
           "reminders";
       }
       .countdown-area { flex-direction: column; }
+      .card { padding: 12px; }
+      .card-title { font-size: 12px; }
     }
 
     /* Loading */
@@ -2080,6 +2157,24 @@
           </div>
         </div>
 
+        <!-- Mobile-only: info bar (clock + weather) -->
+        <div class="mobile-info">
+          <div class="mobile-info-row">
+            <div class="mobile-clock">
+              <div class="time" id="mobile-clock"></div>
+              <div class="date">${esc(data.today.date)}</div>
+            </div>
+            <div class="mobile-weather" id="mobile-weather"></div>
+          </div>
+        </div>
+
+        <!-- Mobile-only: kid points row -->
+        <div class="mobile-kids">
+          <div class="mobile-kids-row">
+            ${renderSidebarKidPoints(data.kid_points)}
+          </div>
+        </div>
+
         <!-- Countdowns -->
         ${renderCountdowns(data.countdowns)}
 
@@ -2265,14 +2360,27 @@
     }
 
     function updateClock() {
-      const el = document.getElementById('clock');
-      if (!el) return;
       const now = new Date();
-      el.textContent = now.toLocaleTimeString('en-US', {
+      const timeStr = now.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
         hour12: true,
       });
+      const el = document.getElementById('clock');
+      if (el) el.textContent = timeStr;
+      const mob = document.getElementById('mobile-clock');
+      if (mob) mob.textContent = timeStr;
+    }
+
+    function updateMobileWeather() {
+      const el = document.getElementById('mobile-weather');
+      if (!el || !window._lastWeather) return;
+      const w = window._lastWeather;
+      if (!w || !w.time) { el.textContent = ''; return; }
+      const emoji = weatherEmoji(w.weathercode[0]);
+      const hi = Math.round(w.temperature_2m_max[0]);
+      const lo = Math.round(w.temperature_2m_min[0]);
+      el.innerHTML = `<span style="font-size:20px">${emoji}</span> <span>${hi}°/${lo}°</span>`;
     }
 
 
@@ -2280,7 +2388,9 @@
       try {
         const [data, weather] = await Promise.all([fetchData(), fetchWeather()]);
         window._dashData = data;
+        window._lastWeather = weather;
         render(data, weather);
+        updateMobileWeather();
       } catch (e) { /* silently retry */ }
     }
 
