@@ -1650,6 +1650,44 @@
     const POINTS_PER_MICKEY = 20;
 
     // Theme display names
+    // Map all-day event titles to auto-theme keys
+    // When a holiday appears in today's events, the theme auto-switches for the day
+    const EVENT_TO_THEME = {
+      'christmas day': 'christmas',
+      'christmas': 'christmas',
+      'boxing day': 'christmas',
+      'halloween': 'halloween',
+      'easter sunday': 'easter',
+      'easter monday': 'easter',
+      'good friday': 'easter',
+      "valentine's day": 'valentines',
+      'valentines day': 'valentines',
+      'bonfire night': 'bonfire',
+      "new year's day": 'newyear',
+      "new year's eve": 'newyear',
+      'new years day': 'newyear',
+      'new years eve': 'newyear',
+      "st patrick's day": 'stpatricks',
+      'st patricks day': 'stpatricks',
+      'thanksgiving': 'thanksgiving',
+      "mother's day": 'easter',        // Mothering Sunday is near Easter
+      'mothering sunday': 'easter',
+    };
+
+    /**
+     * Check today's all-day events and return matching theme key, or null.
+     * Priority: first match wins (events are in time order).
+     */
+    function detectAutoTheme(todayEvents) {
+      if (!todayEvents || todayEvents.length === 0) return null;
+      for (const e of todayEvents) {
+        if (!e.all_day) continue;
+        const key = EVENT_TO_THEME[e.title.toLowerCase().trim()];
+        if (key) return key;
+      }
+      return null;
+    }
+
     const THEME_NAMES = {
       default: 'Default',
       christmas: 'Christmas',
@@ -2284,13 +2322,18 @@
     }
 
     function render(data, weather) {
-      // Apply theme
-      applyTheme(data.theme);
+      // Auto-detect theme from today's all-day events (e.g. Christmas, Halloween)
+      const autoTheme = detectAutoTheme(data.today.events);
+      const activeTheme = autoTheme || data.theme;
 
-      const themeName = THEME_NAMES[data.theme] || 'Default';
-      const themeEmoji = THEME_EMOJIS[data.theme] || '';
-      const themeBadge = data.theme && data.theme !== 'default'
-        ? `<span class="theme-badge">${themeEmoji} ${esc(themeName)}</span>`
+      // Apply theme
+      applyTheme(activeTheme);
+
+      const themeName = THEME_NAMES[activeTheme] || 'Default';
+      const themeEmoji = THEME_EMOJIS[activeTheme] || '';
+      const isAutoThemed = autoTheme && autoTheme !== data.theme;
+      const themeBadge = activeTheme && activeTheme !== 'default'
+        ? `<span class="theme-badge">${themeEmoji} ${esc(themeName)}${isAutoThemed ? ' (auto)' : ''}</span>`
         : '';
 
       const dashboard = document.getElementById('dashboard');
