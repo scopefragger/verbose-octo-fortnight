@@ -1,4 +1,4 @@
-import { getDueReminders, markSent, listReminders } from '../services/reminders.js';
+import { getDueReminders, markSent, listReminders, createReminder, getNextOccurrence } from '../services/reminders.js';
 import { listEvents } from '../services/calendar.js';
 import { supabase } from '../db/supabase.js';
 import { formatForUser } from '../utils/time.js';
@@ -16,12 +16,25 @@ export async function checkReminders(bot) {
     if (!telegramId) continue;
 
     try {
+      const recurLabel = reminder.recurrence ? ` (${reminder.recurrence})` : '';
       await bot.api.sendMessage(
         telegramId,
-        `⏰ Reminder: ${reminder.message}`
+        `⏰ Reminder${recurLabel}: ${reminder.message}`
       );
       await markSent(reminder.id);
       sent++;
+
+      // Schedule next occurrence for recurring reminders
+      if (reminder.recurrence) {
+        const nextAt = getNextOccurrence(reminder.remind_at, reminder.recurrence);
+        if (nextAt) {
+          await createReminder(reminder.user_id, {
+            message: reminder.message,
+            remind_at: nextAt,
+            recurrence: reminder.recurrence,
+          });
+        }
+      }
     } catch (err) {
       console.error(`Failed to send reminder ${reminder.id}:`, err.message);
     }

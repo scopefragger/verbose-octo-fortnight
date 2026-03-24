@@ -63,12 +63,13 @@ export const tools = [
     type: 'function',
     function: {
       name: 'create_reminder',
-      description: 'Set a personal reminder. The bot will send a Telegram message at the specified time.',
+      description: 'Set a personal reminder. The bot will send a Telegram message at the specified time. Can be one-off or recurring.',
       parameters: {
         type: 'object',
         properties: {
           message: { type: 'string', description: 'Reminder message text' },
-          remind_at: { type: 'string', description: 'ISO 8601 datetime for when to send the reminder' },
+          remind_at: { type: 'string', description: 'ISO 8601 datetime for when to send the first reminder' },
+          recurrence: { type: 'string', enum: ['daily', 'weekdays', 'weekly', 'biweekly', 'monthly'], description: 'Optional recurrence pattern. Omit for one-off reminders.' },
         },
         required: ['message', 'remind_at'],
       },
