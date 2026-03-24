@@ -5,6 +5,7 @@ import * as countdowns from '../services/countdowns.js';
 import * as points from '../services/points.js';
 import * as meals from '../services/meals.js';
 import * as themes from '../services/themes.js';
+import { seedUKHolidays } from '../services/holidays.js';
 import { formatForUser } from '../utils/time.js';
 import { invalidateDashboardCache } from '../utils/cache.js';
 
@@ -368,6 +369,20 @@ export const tools = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  // --- UK Holidays ---
+  {
+    type: 'function',
+    function: {
+      name: 'seed_uk_holidays',
+      description: 'Add all UK bank holidays and notable dates (Christmas, Easter, Halloween, Bonfire Night, etc.) to the calendar for a given year.',
+      parameters: {
+        type: 'object',
+        properties: {
+          year: { type: 'integer', description: 'Year to seed holidays for (e.g. 2026). Defaults to current year.' },
+        },
+      },
+    },
+  },
 ];
 
 /**
@@ -623,6 +638,18 @@ export async function dispatch(functionName, args, context) {
     case 'list_dashboard_themes': {
       const available = themes.listThemes();
       return JSON.stringify(available);
+    }
+
+    case 'seed_uk_holidays': {
+      const year = args.year || new Date().getFullYear();
+      const results = await seedUKHolidays(familyId, userId, year);
+      const created = results.filter(r => r.status === 'created').length;
+      return JSON.stringify({
+        success: true,
+        year,
+        created,
+        holidays: results.map(r => `${r.title} (${r.date})`),
+      });
     }
 
     default:

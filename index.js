@@ -8,6 +8,7 @@ import { setMeal, removeMeal } from './services/meals.js';
 import { createEvent, deleteEvent } from './services/calendar.js';
 import { addItem, removeItem } from './services/lists.js';
 import { createReminder, deleteReminder } from './services/reminders.js';
+import { seedUKHolidays } from './services/holidays.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import path from 'path';
@@ -262,6 +263,25 @@ app.delete('/api/reminders', async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     console.error('Reminder delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Seed UK holidays for a year
+app.post('/api/seed-holidays', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { data: users } = await supabase.from('users').select('id').eq('family_id', familyId).limit(1);
+    const year = req.body.year || new Date().getFullYear();
+    const results = await seedUKHolidays(familyId, users?.[0]?.id || null, year);
+    invalidateCache();
+    res.json({ year, holidays: results });
+  } catch (err) {
+    console.error('Seed holidays error:', err);
     res.status(500).json({ error: err.message });
   }
 });
