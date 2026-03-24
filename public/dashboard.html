@@ -1547,7 +1547,7 @@
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
       overlay.innerHTML = `
-        <div class="meal-modal">
+        <div class="modal">
           <h3>${isEdit ? 'Edit Meal' : 'Add Meal'}</h3>
           <label>Date</label>
           <input type="date" id="meal-date" value="${date || todayStr}" min="${todayStr}">
