@@ -27,7 +27,11 @@ export async function getDashboardData(familyId) {
   const todayStart = `${todayStr}T00:00:00`;
   const todayEnd = `${todayStr}T23:59:59`;
 
-  // Next 30 days (for upcoming section)
+  // Tomorrow through next 30 days (for upcoming section — excludes today)
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toLocaleDateString('en-CA', { timeZone: tz });
+  const tomorrowStart = `${tomorrowStr}T00:00:00`;
   const weekEnd = new Date(now);
   weekEnd.setDate(weekEnd.getDate() + 30);
   const weekEndStr = weekEnd.toLocaleDateString('en-CA', { timeZone: tz });
@@ -37,7 +41,7 @@ export async function getDashboardData(familyId) {
   const reminderPromises = members.map((m) => listReminders(m.id));
   const [todayEvents, weekEvents, listsWithItems, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme, ...reminderResults] = await Promise.all([
     listEvents(familyId, todayStart, todayEnd),
-    listEvents(familyId, todayStart, weekEndBound),
+    listEvents(familyId, tomorrowStart, weekEndBound),
     getAllListsWithItems(familyId),
     listCountdowns(familyId),
     getAllPoints(familyId),
