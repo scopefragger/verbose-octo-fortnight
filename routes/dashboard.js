@@ -54,6 +54,8 @@ export async function getDashboardData(familyId) {
     title: e.title,
     description: e.description,
     starts_at: e.starts_at,
+    starts_at_raw: e.starts_at,
+    ends_at_raw: e.ends_at || null,
     starts_at_display: e.all_day ? 'All day' : formatForUser(e.starts_at, tz),
     ends_at_display: e.ends_at ? formatForUser(e.ends_at, tz) : null,
     all_day: e.all_day,
