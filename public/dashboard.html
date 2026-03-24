@@ -1981,6 +1981,14 @@
       wrapper.appendChild(toast);
       setTimeout(() => toast.remove(), 800);
 
+      // Optimistically update the number in the UI
+      const card = btn.closest('.kid-points-card');
+      const totalEl = card?.querySelector('.points-total');
+      if (totalEl) {
+        const current = parseInt(totalEl.textContent, 10) || 0;
+        totalEl.textContent = Math.max(0, current + change);
+      }
+
       try {
         const res = await fetch(`/api/points?secret=${getSecret()}`, {
           method: 'POST',
@@ -1988,9 +1996,12 @@
           body: JSON.stringify({ kid_name: kidName, change, reason: 'Dashboard' }),
         });
         if (!res.ok) throw new Error('Failed');
-        refreshDashboard();
+        // Small delay so cache invalidation takes effect
+        setTimeout(() => refreshDashboard(), 500);
       } catch (err) {
         console.error('Points adjust error:', err);
+        // Revert optimistic update
+        await refreshDashboard();
       } finally {
         btn.disabled = false;
       }
