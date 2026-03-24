@@ -6,6 +6,7 @@ import * as points from '../services/points.js';
 import * as meals from '../services/meals.js';
 import * as themes from '../services/themes.js';
 import { formatForUser } from '../utils/time.js';
+import { invalidateDashboardCache } from '../utils/cache.js';
 
 /**
  * Tool definitions in OpenAI-compatible format (used by Groq).
@@ -374,6 +375,12 @@ export const tools = [
  */
 export async function dispatch(functionName, args, context) {
   const { familyId, userId, timezone } = context;
+
+  // Invalidate dashboard cache for any write operation
+  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes']);
+  if (!readOnlyFns.has(functionName)) {
+    invalidateDashboardCache();
+  }
 
   switch (functionName) {
     case 'create_event': {

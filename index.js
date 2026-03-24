@@ -9,6 +9,7 @@ import { createEvent, deleteEvent } from './services/calendar.js';
 import { addItem, removeItem } from './services/lists.js';
 import { createReminder, deleteReminder } from './services/reminders.js';
 import { supabase } from './db/supabase.js';
+import { registerInvalidator } from './utils/cache.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -79,6 +80,7 @@ let dashboardCache = { data: null, timestamp: 0 };
 const CACHE_TTL = 300_000; // 5 minutes
 
 function invalidateCache() { dashboardCache.timestamp = 0; }
+registerInvalidator(invalidateCache);
 
 app.get('/api/dashboard', async (req, res) => {
   if (req.query.secret !== process.env.CRON_SECRET) {
