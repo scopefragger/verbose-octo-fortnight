@@ -4,6 +4,11 @@ import { supabase } from '../db/supabase.js';
  * Create a calendar event.
  */
 export async function createEvent(familyId, userId, { title, description, starts_at, ends_at, all_day }) {
+  // Ensure we always have a valid created_by (NOT NULL constraint)
+  if (!userId) {
+    const { data: users } = await supabase.from('users').select('id').eq('family_id', familyId).limit(1);
+    userId = users?.[0]?.id;
+  }
   const { data, error } = await supabase
     .from('events')
     .insert({
