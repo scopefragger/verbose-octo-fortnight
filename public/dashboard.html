@@ -1235,6 +1235,116 @@
     .btn-save:hover { filter: brightness(1.1); }
     .btn-cancel:hover { background: #ccc; }
 
+    /* Settings panel */
+    .settings-btn {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+      z-index: 9998;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s;
+    }
+    .settings-btn:hover { transform: scale(1.1); }
+
+    .settings-panel {
+      position: fixed;
+      right: -360px;
+      top: 0;
+      bottom: 0;
+      width: 340px;
+      max-width: 85vw;
+      background: var(--card);
+      box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+      z-index: 10000;
+      padding: 20px;
+      overflow-y: auto;
+      transition: right 0.3s ease;
+    }
+    .settings-panel.open { right: 0; }
+
+    .settings-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 9999;
+      display: none;
+    }
+    .settings-backdrop.open { display: block; }
+
+    .settings-panel h2 {
+      font-size: 18px;
+      margin-bottom: 16px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .settings-section {
+      margin-bottom: 20px;
+    }
+
+    .settings-section h3 {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-light);
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    .theme-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .theme-option {
+      padding: 8px 6px;
+      border-radius: 8px;
+      border: 2px solid var(--border);
+      background: var(--card);
+      cursor: pointer;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+
+    .theme-option:hover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .theme-option.active {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: white;
+    }
+
+    .settings-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: var(--text-light);
+    }
+
     /* Weekly meal mini view */
     .week-meals-grid {
       display: grid;
@@ -1488,6 +1598,18 @@
     <div class="loading" id="loading">
       <div class="spinner"></div>
       Loading dashboard...
+    </div>
+  </div>
+
+  <!-- Settings button + panel -->
+  <button class="settings-btn" onclick="toggleSettings()" title="Settings">&#x2699;&#xFE0F;</button>
+  <div class="settings-backdrop" id="settingsBackdrop" onclick="toggleSettings()"></div>
+  <div class="settings-panel" id="settingsPanel">
+    <button class="settings-close" onclick="toggleSettings()">&times;</button>
+    <h2>&#x2699;&#xFE0F; Settings</h2>
+    <div class="settings-section">
+      <h3>Dashboard Theme</h3>
+      <div class="theme-grid" id="themeGrid">Loading themes...</div>
     </div>
   </div>
 
@@ -2350,6 +2472,68 @@
     function navMonth(dir) {
       monthCalDate.setMonth(monthCalDate.getMonth() + dir);
       renderMonthCal();
+    }
+
+    /* ---- Settings panel ---- */
+    let settingsLoaded = false;
+
+    function toggleSettings() {
+      const panel = document.getElementById('settingsPanel');
+      const backdrop = document.getElementById('settingsBackdrop');
+      const isOpen = panel.classList.contains('open');
+      panel.classList.toggle('open');
+      backdrop.classList.toggle('open');
+      if (!isOpen && !settingsLoaded) {
+        loadThemes();
+        settingsLoaded = true;
+      }
+    }
+
+    async function loadThemes() {
+      const grid = document.getElementById('themeGrid');
+      try {
+        const res = await fetch(`/api/themes?secret=${getSecret()}`);
+        const themes = await res.json();
+        const currentTheme = window._dashData?.theme || 'default';
+
+        let html = '';
+        const sections = [
+          { label: 'General', items: themes.general },
+          { label: 'Holiday', items: themes.holiday },
+          { label: 'Disney', items: themes.disney },
+        ];
+
+        for (const section of sections) {
+          html += `<div style="grid-column:1/-1;font-size:10px;font-weight:700;color:var(--text-light);text-transform:uppercase;margin-top:6px;">${section.label}</div>`;
+          for (const t of section.items) {
+            const active = t.key === currentTheme ? ' active' : '';
+            html += `<button class="theme-option${active}" data-theme="${t.key}">${t.name}</button>`;
+          }
+        }
+        grid.innerHTML = html;
+
+        grid.addEventListener('click', async (e) => {
+          const btn = e.target.closest('.theme-option');
+          if (!btn) return;
+          const theme = btn.dataset.theme;
+          grid.querySelectorAll('.theme-option').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          try {
+            await fetch(`/api/theme?secret=${getSecret()}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ theme }),
+            });
+            // Apply theme class to body immediately
+            document.body.className = theme !== 'default' ? `theme-${theme}` : '';
+            refreshDashboard();
+          } catch (err) {
+            console.error('Theme set error:', err);
+          }
+        });
+      } catch (err) {
+        grid.textContent = 'Failed to load themes';
+      }
     }
 
     function esc(str) {

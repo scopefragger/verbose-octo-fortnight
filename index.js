@@ -9,6 +9,7 @@ import { createEvent, deleteEvent } from './services/calendar.js';
 import { addItem, removeItem } from './services/lists.js';
 import { createReminder, deleteReminder } from './services/reminders.js';
 import { seedUKHolidays } from './services/holidays.js';
+import { setTheme, listThemes } from './services/themes.js';
 import { adjustPoints } from './services/points.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
@@ -285,6 +286,31 @@ app.post('/api/points', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('Points adjust error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get available themes
+app.get('/api/themes', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  res.json(listThemes());
+});
+
+// Set dashboard theme
+app.post('/api/theme', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const result = await setTheme(familyId, req.body.theme);
+    invalidateCache();
+    res.json(result);
+  } catch (err) {
+    console.error('Theme set error:', err);
     res.status(500).json({ error: err.message });
   }
 });
