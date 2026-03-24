@@ -27,9 +27,9 @@ export async function getDashboardData(familyId) {
   const todayStart = `${todayStr}T00:00:00`;
   const todayEnd = `${todayStr}T23:59:59`;
 
-  // Next 7 days
+  // Next 30 days (for upcoming section)
   const weekEnd = new Date(now);
-  weekEnd.setDate(weekEnd.getDate() + 7);
+  weekEnd.setDate(weekEnd.getDate() + 30);
   const weekEndStr = weekEnd.toLocaleDateString('en-CA', { timeZone: tz });
   const weekEndBound = `${weekEndStr}T23:59:59`;
 

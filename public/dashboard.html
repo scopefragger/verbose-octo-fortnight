@@ -907,20 +907,6 @@
     .upcoming-card { grid-area: upcoming; }
     .upcoming-card .card-title { display: flex; align-items: center; gap: 8px; }
 
-    .cal-toggle-btn {
-      margin-left: auto;
-      background: var(--border);
-      border: none;
-      border-radius: 6px;
-      padding: 3px 8px;
-      font-size: 10px;
-      font-weight: 600;
-      cursor: pointer;
-      color: var(--text-light);
-      transition: all 0.15s;
-    }
-    .cal-toggle-btn:hover { background: var(--primary-light); color: var(--primary); }
-
     .day-group { margin-bottom: 10px; }
     .day-group:last-child { margin-bottom: 0; }
 
@@ -966,82 +952,6 @@
       min-width: 60px;
     }
 
-    /* Month calendar pop-out */
-    .month-calendar {
-      display: none;
-      margin-top: 10px;
-    }
-    .month-calendar.visible { display: block; }
-
-    .month-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-    }
-    .month-header span {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--text);
-    }
-    .month-nav-btn {
-      background: var(--border);
-      border: none;
-      border-radius: 4px;
-      padding: 2px 8px;
-      cursor: pointer;
-      font-size: 12px;
-      color: var(--text-light);
-    }
-    .month-nav-btn:hover { background: var(--primary-light); color: var(--primary); }
-
-    .month-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 1px;
-      text-align: center;
-      font-size: 10px;
-    }
-    .month-grid .dow {
-      font-weight: 700;
-      color: var(--text-light);
-      padding: 2px 0;
-      font-size: 9px;
-    }
-    .month-grid .day-cell {
-      padding: 3px 2px;
-      border-radius: 4px;
-      cursor: default;
-      position: relative;
-      color: var(--text);
-    }
-    .month-grid .day-cell.empty { visibility: hidden; }
-    .month-grid .day-cell.today {
-      background: var(--primary);
-      color: white;
-      font-weight: 700;
-      border-radius: 50%;
-    }
-    .month-grid .day-cell.has-events {
-      font-weight: 700;
-    }
-    .month-grid .day-cell.has-events::after {
-      content: '';
-      position: absolute;
-      bottom: 1px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      background: var(--primary);
-    }
-    .month-grid .day-cell.today.has-events::after {
-      background: white;
-    }
-    .month-grid .day-cell.past {
-      opacity: 0.4;
-    }
 
     /* === MEALS === */
     .meals-card { grid-area: meals; }
@@ -2335,13 +2245,11 @@
         <div class="card upcoming-card">
           <div class="card-title">
             <span class="icon">&#x1F5D3;&#xFE0F;</span> Upcoming
-            <button class="cal-toggle-btn" onclick="toggleMonthCal()">&#x1F4C5; Month</button>
           </div>
           <div class="card-body">
-            <div class="month-calendar" id="monthCal"></div>
             ${data.week.events.length === 0
               ? '<div class="empty-state"><div class="icon">&#x1F4ED;</div>No upcoming events</div>'
-              : renderWeekEvents(data.week.events)}
+              : renderUpcomingEvents(data.week.events)}
           </div>
         </div>
 
@@ -2383,10 +2291,12 @@
       updateClock();
     }
 
-    function renderWeekEvents(events) {
+    function renderUpcomingEvents(events) {
       const now = new Date();
+      // Take next 6 events only
+      const upcoming = events.slice(0, 6);
       const byDay = {};
-      events.forEach(e => {
+      upcoming.forEach(e => {
         if (!byDay[e.day_label]) byDay[e.day_label] = [];
         byDay[e.day_label].push(e);
       });
@@ -2406,83 +2316,6 @@
           `}).join('')}
         </div>
       `).join('');
-    }
-
-    /* ---- Month calendar ---- */
-    let monthCalDate = new Date();
-    let monthCalVisible = false;
-
-    function toggleMonthCal() {
-      monthCalVisible = !monthCalVisible;
-      const el = document.getElementById('monthCal');
-      if (!el) return;
-      if (monthCalVisible) {
-        monthCalDate = new Date();
-        el.classList.add('visible');
-        renderMonthCal();
-      } else {
-        el.classList.remove('visible');
-      }
-    }
-
-    function renderMonthCal() {
-      const el = document.getElementById('monthCal');
-      if (!el) return;
-
-      const year = monthCalDate.getFullYear();
-      const month = monthCalDate.getMonth();
-      const today = new Date();
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-
-      const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
-      const startIdx = firstDay === 0 ? 6 : firstDay - 1; // Mon-start
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      const monthName = monthCalDate.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
-
-      // Collect event dates from current dashboard data
-      const eventDates = new Set();
-      if (window._dashData && window._dashData.week && window._dashData.week.events) {
-        window._dashData.week.events.forEach(e => {
-          if (e.starts_at_raw) {
-            eventDates.add(e.starts_at_raw.slice(0, 10));
-          }
-        });
-      }
-
-      let html = `
-        <div class="month-header">
-          <button class="month-nav-btn" onclick="navMonth(-1)">&laquo;</button>
-          <span>${monthName}</span>
-          <button class="month-nav-btn" onclick="navMonth(1)">&raquo;</button>
-        </div>
-        <div class="month-grid">
-          <div class="dow">Mo</div><div class="dow">Tu</div><div class="dow">We</div>
-          <div class="dow">Th</div><div class="dow">Fr</div><div class="dow">Sa</div><div class="dow">Su</div>
-      `;
-
-      for (let i = 0; i < startIdx; i++) {
-        html += '<div class="day-cell empty"></div>';
-      }
-
-      for (let d = 1; d <= daysInMonth; d++) {
-        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const isToday = dateStr === todayStr;
-        const isPast = new Date(year, month, d) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        const hasEvents = eventDates.has(dateStr);
-        const classes = ['day-cell'];
-        if (isToday) classes.push('today');
-        if (isPast) classes.push('past');
-        if (hasEvents) classes.push('has-events');
-        html += `<div class="${classes.join(' ')}">${d}</div>`;
-      }
-
-      html += '</div>';
-      el.innerHTML = html;
-    }
-
-    function navMonth(dir) {
-      monthCalDate.setMonth(monthCalDate.getMonth() + dir);
-      renderMonthCal();
     }
 
     /* ---- Settings panel ---- */
