@@ -1446,6 +1446,23 @@
       align-items: center;
       justify-content: center;
       font-size: 9px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .list-item-check:hover {
+      border-color: var(--success);
+      background: rgba(72, 187, 120, 0.1);
+    }
+
+    .list-item.checking-off {
+      animation: checkOff 0.5s ease forwards;
+    }
+
+    @keyframes checkOff {
+      0% { opacity: 1; transform: translateX(0); }
+      50% { opacity: 0.6; transform: translateX(4px); }
+      100% { opacity: 0; transform: translateX(20px); max-height: 0; padding: 0; margin: 0; overflow: hidden; }
     }
 
     .list-item.done .list-item-check {
@@ -2233,7 +2250,56 @@
         handlePointsAdjust(pointsBtn);
         return;
       }
+      // List item checkbox — tick to remove
+      const checkBox = e.target.closest('.list-item-check');
+      if (checkBox) {
+        const listItem = checkBox.closest('.list-item');
+        if (listItem && !listItem.classList.contains('checking-off')) {
+          handleCheckOffItem(listItem);
+        }
+        return;
+      }
     });
+
+    async function handleCheckOffItem(itemEl) {
+      const listName = itemEl.dataset.listName;
+      const itemText = itemEl.dataset.itemText;
+      if (!listName || !itemText) return;
+
+      // Optimistic UI: animate check + fade out
+      const check = itemEl.querySelector('.list-item-check');
+      check.innerHTML = '&#x2713;';
+      check.style.background = 'var(--success)';
+      check.style.borderColor = 'var(--success)';
+      check.style.color = 'white';
+      itemEl.querySelector('.list-item-text').style.textDecoration = 'line-through';
+
+      // Slight delay then animate removal
+      await new Promise(r => setTimeout(r, 300));
+      itemEl.classList.add('checking-off');
+
+      // Call API to remove
+      try {
+        await fetch(`/api/list-items?secret=${getSecret()}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ list_name: listName, text: itemText }),
+        });
+      } catch (err) {
+        console.error('Failed to remove list item:', err);
+      }
+
+      // Remove from DOM after animation, then refresh
+      setTimeout(() => {
+        itemEl.remove();
+        // If the list group is now empty, remove it too
+        const group = itemEl.closest && document.querySelectorAll('.list-group');
+        group?.forEach(g => {
+          if (g.querySelectorAll('.list-item').length === 0) g.remove();
+        });
+        refreshDashboard();
+      }, 500);
+    }
 
     function renderLists(lists) {
       if (!lists || lists.length === 0) {
@@ -2246,7 +2312,7 @@
           <div class="list-group">
             <div class="list-group-name">${esc(list.name)}</div>
             ${items.map(item => `
-              <div class="list-item ${item.checked ? 'done' : ''}">
+              <div class="list-item ${item.checked ? 'done' : ''}" data-list-name="${esc(list.name)}" data-item-text="${esc(item.text || item.name)}">
                 <div class="list-item-check">${item.checked ? '&#x2713;' : ''}</div>
                 <span class="list-item-text">${esc(item.text || item.name)}</span>
               </div>
