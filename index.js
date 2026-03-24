@@ -9,6 +9,7 @@ import { createEvent, deleteEvent } from './services/calendar.js';
 import { addItem, removeItem } from './services/lists.js';
 import { createReminder, deleteReminder } from './services/reminders.js';
 import { seedUKHolidays } from './services/holidays.js';
+import { adjustPoints } from './services/points.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import path from 'path';
@@ -263,6 +264,27 @@ app.delete('/api/reminders', async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     console.error('Reminder delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Adjust kid points
+app.post('/api/points', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { kid_name, change, reason } = req.body;
+    if (!kid_name || change === undefined) {
+      return res.status(400).json({ error: 'kid_name and change are required' });
+    }
+    const result = await adjustPoints(familyId, kid_name, change, reason || 'Dashboard', null);
+    invalidateCache();
+    res.json(result);
+  } catch (err) {
+    console.error('Points adjust error:', err);
     res.status(500).json({ error: err.message });
   }
 });

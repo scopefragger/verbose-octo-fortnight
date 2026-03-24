@@ -601,6 +601,61 @@
       opacity: 0.8;
     }
 
+    .points-adjust {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 8px;
+      position: relative;
+    }
+
+    .points-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.5);
+      background: rgba(255,255,255,0.15);
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      line-height: 1;
+    }
+
+    .points-btn:hover {
+      background: rgba(255,255,255,0.35);
+      border-color: rgba(255,255,255,0.8);
+      transform: scale(1.1);
+    }
+
+    .points-btn:active {
+      transform: scale(0.95);
+    }
+
+    .points-btn.btn-minus { font-size: 18px; }
+
+    .points-toast {
+      position: absolute;
+      top: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.3);
+      animation: points-float 0.8s ease-out forwards;
+      pointer-events: none;
+    }
+
+    @keyframes points-float {
+      0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-24px); }
+    }
+
     /* === WEATHER === */
     .weather-card {
       background: var(--card);
@@ -1583,6 +1638,10 @@
               </div>
               <div class="progress-label">${toNext} point${toNext !== 1 ? 's' : ''} to next ${nextLabel}</div>
             </div>
+            <div class="points-adjust">
+              <button class="points-btn btn-minus" data-kid="${esc(kid.kid_name)}" data-change="-1">−</button>
+              <button class="points-btn btn-plus" data-kid="${esc(kid.kid_name)}" data-change="1">+</button>
+            </div>
           </div>
         `;
       }).join('');
@@ -1707,6 +1766,34 @@
       } catch (err) {
         console.error(err);
         if (row) row.classList.remove('removing');
+      }
+    }
+
+    async function handlePointsAdjust(btn) {
+      const kidName = btn.dataset.kid;
+      const change = parseInt(btn.dataset.change, 10);
+      btn.disabled = true;
+
+      // Show floating toast
+      const wrapper = btn.closest('.points-adjust');
+      const toast = document.createElement('span');
+      toast.className = 'points-toast';
+      toast.textContent = change > 0 ? `+${change}` : `${change}`;
+      wrapper.appendChild(toast);
+      setTimeout(() => toast.remove(), 800);
+
+      try {
+        const res = await fetch(`/api/points?secret=${getSecret()}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kid_name: kidName, change, reason: 'Dashboard' }),
+        });
+        if (!res.ok) throw new Error('Failed');
+        refreshDashboard();
+      } catch (err) {
+        console.error('Points adjust error:', err);
+      } finally {
+        btn.disabled = false;
       }
     }
 
@@ -1859,6 +1946,11 @@
       }
       if (e.target.closest('.reminder-add-btn')) {
         openReminderModal();
+        return;
+      }
+      const pointsBtn = e.target.closest('.points-btn');
+      if (pointsBtn) {
+        handlePointsAdjust(pointsBtn);
         return;
       }
     });
