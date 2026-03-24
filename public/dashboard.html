@@ -1128,6 +1128,27 @@
 
     .event-item:last-child { border-bottom: none; }
 
+    .event-del-btn {
+      background: none;
+      border: none;
+      color: var(--text-light);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: all 0.2s;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    .event-item:hover .event-del-btn,
+    .day-event:hover .event-del-btn { opacity: 0.5; }
+    .event-del-btn:hover { opacity: 1 !important; color: #e53e3e; background: rgba(229,62,62,0.1); }
+
+    .event-item.removing, .day-event.removing {
+      animation: checkOff 0.5s ease forwards;
+    }
+
     .event-time-badge {
       background: var(--primary-light);
       color: var(--primary);
@@ -2567,6 +2588,12 @@
         }
         return;
       }
+      // Event delete button
+      const eventDelBtn = e.target.closest('.event-del-btn');
+      if (eventDelBtn) {
+        handleDeleteEvent(eventDelBtn);
+        return;
+      }
     });
 
     async function handleCheckOffItem(itemEl) {
@@ -2604,6 +2631,41 @@
         const group = itemEl.closest && document.querySelectorAll('.list-group');
         group?.forEach(g => {
           if (g.querySelectorAll('.list-item').length === 0) g.remove();
+        });
+        refreshDashboard();
+      }, 500);
+    }
+
+    async function handleDeleteEvent(btn) {
+      const eventId = btn.dataset.eventId;
+      if (!eventId) return;
+
+      // Find the parent row (works for both today .event-item and upcoming .day-event)
+      const row = btn.closest('.event-item') || btn.closest('.day-event');
+      if (!row) return;
+
+      btn.disabled = true;
+
+      // Animate out
+      row.classList.add('removing');
+
+      // Call API
+      try {
+        await fetch(`/api/events?secret=${getSecret()}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event_id: eventId }),
+        });
+      } catch (err) {
+        console.error('Failed to delete event:', err);
+      }
+
+      // Remove from DOM after animation, then refresh
+      setTimeout(() => {
+        row.remove();
+        // If a day-group is now empty, remove it too
+        document.querySelectorAll('.day-group').forEach(g => {
+          if (g.querySelectorAll('.day-event').length === 0) g.remove();
         });
         refreshDashboard();
       }, 500);
@@ -2769,12 +2831,13 @@
               : data.today.events.map(e => {
                 const isPassed = !e.all_day && new Date(e.starts_at) < new Date();
                 return `
-                <div class="event-item${isPassed ? ' passed' : ''}">
+                <div class="event-item${isPassed ? ' passed' : ''}" data-event-id="${e.id}">
                   <div class="event-time-badge ${e.all_day ? 'all-day' : ''}">${esc(e.starts_at_display)}</div>
                   <div class="event-details">
                     <h3>${esc(e.title)}</h3>
                     ${e.description ? `<p>${esc(e.description)}</p>` : ''}
                   </div>
+                  <button class="event-del-btn" data-event-id="${e.id}" title="Delete event">&times;</button>
                 </div>
               `}).join('')}
           </div>
@@ -2847,10 +2910,11 @@
             const eventEnd = e.ends_at_raw ? new Date(e.ends_at_raw) : new Date(e.starts_at_raw);
             const isPast = !e.all_day && eventEnd < now;
             return `
-            <div class="day-event${isPast ? ' past-event' : ''}">
+            <div class="day-event${isPast ? ' past-event' : ''}" data-event-id="${e.id}">
               <div class="dot"></div>
               <span class="time">${esc(e.starts_at_display)}</span>
               <span>${esc(e.title)}</span>
+              <button class="event-del-btn" data-event-id="${e.id}" title="Delete event">&times;</button>
             </div>
           `}).join('')}
         </div>
