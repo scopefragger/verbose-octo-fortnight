@@ -76,7 +76,9 @@ app.get('/dashboard', (req, res) => {
 
 // Dashboard API — returns JSON data for the dashboard (cached to reduce Supabase load)
 let dashboardCache = { data: null, timestamp: 0 };
-const CACHE_TTL = 60_000; // 60 seconds
+const CACHE_TTL = 300_000; // 5 minutes
+
+function invalidateCache() { dashboardCache.timestamp = 0; }
 
 app.get('/api/dashboard', async (req, res) => {
   if (req.query.secret !== process.env.CRON_SECRET) {
@@ -130,6 +132,7 @@ app.post('/api/meals', async (req, res) => {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
     const meal = await setMeal(familyId, req.body, null);
+    invalidateCache();
     res.json(meal);
   } catch (err) {
     console.error('Meal create/update error:', err);
@@ -147,6 +150,7 @@ app.delete('/api/meals', async (req, res) => {
     if (!familyId) return res.status(404).json({ error: 'No family found' });
     const { meal_date, meal_type } = req.body;
     await removeMeal(familyId, meal_date, meal_type);
+    invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
     console.error('Meal delete error:', err);
@@ -163,6 +167,7 @@ app.post('/api/events', async (req, res) => {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
     const event = await createEvent(familyId, null, req.body);
+    invalidateCache();
     res.json(event);
   } catch (err) {
     console.error('Event create error:', err);
@@ -179,6 +184,7 @@ app.delete('/api/events', async (req, res) => {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
     await deleteEvent(req.body.event_id, familyId);
+    invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
     console.error('Event delete error:', err);
@@ -196,6 +202,7 @@ app.post('/api/list-items', async (req, res) => {
     if (!familyId) return res.status(404).json({ error: 'No family found' });
     const { list_name, text } = req.body;
     const result = await addItem(familyId, list_name, text, null);
+    invalidateCache();
     res.json(result);
   } catch (err) {
     console.error('List item add error:', err);
@@ -213,6 +220,7 @@ app.delete('/api/list-items', async (req, res) => {
     if (!familyId) return res.status(404).json({ error: 'No family found' });
     const { list_name, text } = req.body;
     await removeItem(familyId, list_name, text);
+    invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
     console.error('List item remove error:', err);
@@ -230,6 +238,7 @@ app.post('/api/reminders', async (req, res) => {
     const { data: users } = await supabase.from('users').select('id').limit(1);
     if (!users?.length) return res.status(404).json({ error: 'No user found' });
     const reminder = await createReminder(users[0].id, req.body);
+    invalidateCache();
     res.json(reminder);
   } catch (err) {
     console.error('Reminder create error:', err);
@@ -246,6 +255,7 @@ app.delete('/api/reminders', async (req, res) => {
     const { data: users } = await supabase.from('users').select('id').limit(1);
     if (!users?.length) return res.status(404).json({ error: 'No user found' });
     await deleteReminder(req.body.reminder_id, users[0].id);
+    invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
     console.error('Reminder delete error:', err);
