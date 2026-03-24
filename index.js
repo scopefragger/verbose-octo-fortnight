@@ -168,7 +168,8 @@ app.post('/api/events', async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
-    const event = await createEvent(familyId, null, req.body);
+    const { data: users } = await supabase.from('users').select('id').eq('family_id', familyId).limit(1);
+    const event = await createEvent(familyId, users?.[0]?.id || null, req.body);
     invalidateCache();
     res.json(event);
   } catch (err) {
