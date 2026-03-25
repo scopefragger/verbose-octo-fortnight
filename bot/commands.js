@@ -5,6 +5,7 @@ import {
   joinFamily,
   getFamilyMembers,
 } from '../services/family.js';
+import { supabase } from '../db/supabase.js';
 
 /**
  * Register all slash commands on the bot.
@@ -13,6 +14,7 @@ export function registerCommands(bot) {
   bot.command('start', handleStart);
   bot.command('help', handleHelp);
   bot.command('link', handleLink);
+  bot.command('setgroup', handleSetGroup);
 }
 
 async function handleStart(ctx) {
@@ -61,6 +63,35 @@ async function handleHelp(ctx) {
     `/link — Link with your partner\n` +
     `/help — Show this message`
   );
+}
+
+async function handleSetGroup(ctx) {
+  const isGroup = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
+  if (!isGroup) {
+    await ctx.reply('Run this command in a group chat to set it as your family group.');
+    return;
+  }
+
+  const telegramId = ctx.from.id;
+  const user = await getUserByTelegramId(telegramId);
+  if (!user) {
+    await ctx.reply('Please /start in a DM first to register.');
+    return;
+  }
+
+  const chatId = String(ctx.chat.id);
+  const { error } = await supabase
+    .from('families')
+    .update({ group_chat_id: chatId })
+    .eq('id', user.family_id);
+
+  if (error) {
+    console.error('Failed to set group chat:', error);
+    await ctx.reply('Failed to save group chat. Please try again.');
+    return;
+  }
+
+  await ctx.reply('✅ This group is now set as your family chat! Daily briefings will be sent here too.');
 }
 
 async function handleLink(ctx) {

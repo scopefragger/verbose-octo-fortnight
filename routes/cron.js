@@ -1,5 +1,7 @@
 import { getDueReminders, markSent, listReminders, createReminder, getNextOccurrence } from '../services/reminders.js';
 import { listEvents } from '../services/calendar.js';
+import { getMealsForDate } from '../services/meals.js';
+import { getAllPoints } from '../services/points.js';
 import { supabase } from '../db/supabase.js';
 import { formatForUser } from '../utils/time.js';
 
@@ -50,12 +52,15 @@ export async function checkReminders(bot) {
 export async function sendDailyDigest(bot) {
   const users = await getAllUsers();
   let sent = 0;
+  const familyDigests = new Map(); // familyId -> digest message (for group chat)
 
   for (const user of users) {
-    const tz = user.timezone || 'America/New_York';
+    const tz = user.timezone || 'Europe/London';
     const now = new Date();
     const todayStart = startOfDayInTz(now, tz);
     const todayEnd = endOfDayInTz(now, tz);
+    const todayStr = now.toLocaleDateString('en-CA', { timeZone: tz });
+    const dayName = now.toLocaleDateString('en-US', { timeZone: tz, weekday: 'long' });
 
     // Get today's events
     const events = user.family_id
@@ -69,16 +74,33 @@ export async function sendDailyDigest(bot) {
       return remindDate >= new Date(todayStart) && remindDate <= new Date(todayEnd);
     });
 
-    // Skip if nothing to report
-    if (events.length === 0 && todayReminders.length === 0) continue;
+    // Get today's meals
+    const meals = user.family_id
+      ? await getMealsForDate(user.family_id, todayStr)
+      : [];
 
-    let message = `☀️ Good morning, ${user.display_name}! Here's your day:\n`;
+    // Get kid points
+    const kidPoints = user.family_id
+      ? await getAllPoints(user.family_id)
+      : [];
+
+    // Build the enriched digest
+    let message = `☀️ Good morning, ${user.display_name}! Here's your ${dayName}:\n`;
 
     if (events.length > 0) {
-      message += `\n📅 Today's Events:\n`;
+      message += `\n📅 Today's Schedule:\n`;
       for (const event of events) {
         const time = event.all_day ? 'All day' : formatForUser(event.starts_at, tz);
         message += `  • ${event.title} — ${time}\n`;
+      }
+    }
+
+    if (meals.length > 0) {
+      message += `\n🍽️ Today's Meals:\n`;
+      const mealLabels = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' };
+      for (const meal of meals) {
+        const label = mealLabels[meal.meal_type] || meal.meal_type;
+        message += `  • ${label}: ${meal.title}\n`;
       }
     }
 
@@ -89,11 +111,46 @@ export async function sendDailyDigest(bot) {
       }
     }
 
+    if (kidPoints.length > 0) {
+      message += `\n⭐ Points Update:\n`;
+      for (const kid of kidPoints) {
+        const mickeyStr = kid.mickey_heads > 0
+          ? `${kid.mickey_heads} Mickey Head${kid.mickey_heads > 1 ? 's' : ''} + ${kid.remaining_points} pts`
+          : `${kid.total_points} pts`;
+        message += `  • ${kid.kid_name}: ${mickeyStr}\n`;
+      }
+    }
+
+    message += `\nHave a great day! 🎉`;
+
+    // Send DM to user
     try {
       await bot.api.sendMessage(user.telegram_id, message);
       sent++;
     } catch (err) {
       console.error(`Failed to send daily digest to ${user.telegram_id}:`, err.message);
+    }
+
+    // Store family digest for group chat (use first user's digest per family)
+    if (user.family_id && !familyDigests.has(user.family_id)) {
+      familyDigests.set(user.family_id, message);
+    }
+  }
+
+  // Send digest to family group chats
+  for (const [familyId, digest] of familyDigests) {
+    try {
+      const { data: family } = await supabase
+        .from('families')
+        .select('group_chat_id')
+        .eq('id', familyId)
+        .single();
+
+      if (family?.group_chat_id) {
+        await bot.api.sendMessage(family.group_chat_id, digest);
+      }
+    } catch (err) {
+      console.error(`Failed to send group digest for family ${familyId}:`, err.message);
     }
   }
 
