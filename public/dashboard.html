@@ -2597,9 +2597,8 @@
     });
 
     async function handleCheckOffItem(itemEl) {
-      const listName = itemEl.dataset.listName;
-      const itemText = itemEl.dataset.itemText;
-      if (!listName || !itemText) return;
+      const itemId = itemEl.dataset.itemId;
+      if (!itemId) return;
 
       // Optimistic UI: animate check + fade out
       const check = itemEl.querySelector('.list-item-check');
@@ -2613,12 +2612,10 @@
       await new Promise(r => setTimeout(r, 300));
       itemEl.classList.add('checking-off');
 
-      // Call API to remove
+      // Call API to remove by ID
       try {
-        await fetch(`/api/list-items?secret=${getSecret()}`, {
+        await fetch(`/api/list-items/${itemId}?secret=${getSecret()}`, {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ list_name: listName, text: itemText }),
         });
       } catch (err) {
         console.error('Failed to remove list item:', err);
@@ -2682,7 +2679,7 @@
           <div class="list-group">
             <div class="list-group-name">${esc(list.name)}</div>
             ${items.map(item => `
-              <div class="list-item ${item.checked ? 'done' : ''}" data-list-name="${esc(list.name)}" data-item-text="${esc(item.text || item.name)}">
+              <div class="list-item ${item.checked ? 'done' : ''}" data-list-name="${esc(list.name)}" data-item-text="${esc(item.text || item.name)}" data-item-id="${item.id}">
                 <div class="list-item-check">${item.checked ? '&#x2713;' : ''}</div>
                 <span class="list-item-text">${esc(item.text || item.name)}</span>
               </div>

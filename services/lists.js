@@ -83,6 +83,15 @@ export async function removeItem(familyId, listName, itemText) {
 }
 
 /**
+ * Remove an item directly by its ID (used by dashboard UI).
+ */
+export async function removeItemById(itemId) {
+  const { error } = await supabase.from('list_items').delete().eq('id', itemId);
+  if (error) throw error;
+  return { deleted: true };
+}
+
+/**
  * Create a new empty list.
  */
 export async function createList(familyId, listName) {

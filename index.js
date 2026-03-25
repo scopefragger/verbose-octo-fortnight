@@ -6,7 +6,7 @@ import { checkReminders, sendDailyDigest, sendWeeklyDigest } from './routes/cron
 import { getDashboardData } from './routes/dashboard.js';
 import { setMeal, removeMeal, getUniqueMealTitles } from './services/meals.js';
 import { createEvent, deleteEvent } from './services/calendar.js';
-import { addItem, removeItem } from './services/lists.js';
+import { addItem, removeItem, removeItemById } from './services/lists.js';
 import { createReminder, deleteReminder } from './services/reminders.js';
 import { seedUKHolidays } from './services/holidays.js';
 import { setTheme, listThemes } from './services/themes.js';
@@ -246,6 +246,21 @@ app.delete('/api/list-items', async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     console.error('List item remove error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// List item delete by ID (used by dashboard checkboxes)
+app.delete('/api/list-items/:id', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    await removeItemById(req.params.id);
+    invalidateCache();
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error('List item delete error:', err);
     res.status(500).json({ error: err.message });
   }
 });
