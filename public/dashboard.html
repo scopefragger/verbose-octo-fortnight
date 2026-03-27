@@ -565,7 +565,7 @@
         "sidebar header    header    header"
         "sidebar countdown countdown countdown"
         "sidebar today     upcoming  lists"
-        "sidebar meals     meals     reminders";
+        "sidebar meals     foodexp   reminders";
     }
 
     /* Cards */
@@ -1246,6 +1246,7 @@
 
     /* === MEALS === */
     .meals-card { grid-area: meals; }
+    .foodexp-card { grid-area: foodexp; }
 
     .meal-slot {
       display: flex;
@@ -2138,7 +2139,7 @@
           "countdown countdown"
           "today upcoming"
           "lists meals"
-          "reminders reminders";
+          "foodexp reminders";
       }
       .sidebar { display: none; }
       .mobile-kids { display: block; }
@@ -2160,6 +2161,7 @@
           "upcoming"
           "lists"
           "meals"
+          "foodexp"
           "reminders";
       }
       .countdown-area { flex-direction: column; }
@@ -3036,18 +3038,10 @@
 
     function renderFoodExpiry(foodItems) {
       if (!foodItems || foodItems.length === 0) {
-        return `
-          <div class="food-expiry-section">
-            <div class="food-expiry-title">
-              &#x1F9CA; Use It Up
-              <button class="card-add-btn food-add-btn" style="margin-left:auto">+ Add</button>
-            </div>
-            <div class="empty-state" style="padding:8px 0;font-size:11px;">No items being tracked</div>
-          </div>
-        `;
+        return '<div class="empty-state"><div class="icon">&#x1F9CA;</div>No items being tracked</div>';
       }
 
-      const items = foodItems.map(f => {
+      return foodItems.map(f => {
         let badgeClass = 'ok';
         let label = `${f.days_left}d left`;
         if (f.days_left < 0) { badgeClass = 'expired'; label = 'Expired'; }
@@ -3064,16 +3058,6 @@
           </div>
         `;
       }).join('');
-
-      return `
-        <div class="food-expiry-section">
-          <div class="food-expiry-title">
-            &#x1F9CA; Use It Up
-            <button class="card-add-btn food-add-btn" style="margin-left:auto">+ Add</button>
-          </div>
-          ${items}
-        </div>
-      `;
     }
 
     function openFoodModal() {
@@ -3271,6 +3255,13 @@
           <div class="card-title" data-expandable="meals"><span class="icon">&#x1F37D;&#xFE0F;</span> Meal Planner <button class="meal-picker-btn" onclick="event.stopPropagation(); openMealWheel()">&#x1F3B0; Pick for me</button></div>
           <div class="card-body">
             ${renderMeals(data.meals)}
+          </div>
+        </div>
+
+        <!-- Food Expiry -->
+        <div class="card foodexp-card">
+          <div class="card-title"><span class="icon">&#x1F9CA;</span> Use It Up <button class="card-add-btn food-add-btn">+ Add</button></div>
+          <div class="card-body">
             ${renderFoodExpiry(data.food_items)}
           </div>
         </div>
