@@ -3035,7 +3035,17 @@
     }
 
     function renderFoodExpiry(foodItems) {
-      if (!foodItems || foodItems.length === 0) return '';
+      if (!foodItems || foodItems.length === 0) {
+        return `
+          <div class="food-expiry-section">
+            <div class="food-expiry-title">
+              &#x1F9CA; Use It Up
+              <button class="card-add-btn food-add-btn" style="margin-left:auto">+ Add</button>
+            </div>
+            <div class="empty-state" style="padding:8px 0;font-size:11px;">No items being tracked</div>
+          </div>
+        `;
+      }
 
       const items = foodItems.map(f => {
         let badgeClass = 'ok';
