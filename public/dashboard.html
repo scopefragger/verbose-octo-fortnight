@@ -1964,6 +1964,98 @@
       color: var(--text-light);
     }
 
+    .reminder-done-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-light);
+      cursor: pointer;
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-left: auto;
+      flex-shrink: 0;
+      transition: all 0.2s;
+      align-self: center;
+    }
+    .reminder-done-btn:hover {
+      background: var(--success, #48bb78);
+      color: white;
+      border-color: var(--success, #48bb78);
+    }
+    .reminder-item.completing {
+      animation: checkOff 0.5s ease forwards;
+    }
+
+    /* === FOOD EXPIRY === */
+    .food-expiry-section {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .food-expiry-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .food-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px;
+      font-size: 12px;
+      border-radius: 8px;
+      margin-bottom: 3px;
+      transition: all 0.2s;
+    }
+    .food-item:hover { background: var(--primary-light); }
+    .food-item .food-name { flex: 1; font-weight: 500; }
+    .food-item .food-qty {
+      font-size: 10px;
+      color: var(--text-light);
+    }
+    .food-item .food-expiry-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+    .food-expiry-badge.expired {
+      background: #fed7d7;
+      color: #c53030;
+    }
+    .food-expiry-badge.urgent {
+      background: #fefcbf;
+      color: #b7791f;
+    }
+    .food-expiry-badge.soon {
+      background: #fef3c7;
+      color: #d69e2e;
+    }
+    .food-expiry-badge.ok {
+      background: #c6f6d5;
+      color: #2f855a;
+    }
+    .food-del-btn {
+      background: none;
+      border: none;
+      color: var(--text-light);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: all 0.2s;
+    }
+    .food-item:hover .food-del-btn { opacity: 0.5; }
+    .food-del-btn:hover { opacity: 1 !important; color: #e53e3e; }
+    .food-item.removing { animation: checkOff 0.5s ease forwards; }
+
     /* === MOBILE (scrollable) === */
     /* Mobile-only sections (hidden on desktop where sidebar shows them) */
     .mobile-kids { display: none; grid-area: mobilekids; }
@@ -2766,6 +2858,22 @@
         openFullscreenPanel(panelType);
         return;
       }
+      // Food expiry buttons
+      if (e.target.closest('.food-add-btn')) {
+        openFoodModal();
+        return;
+      }
+      const foodDelBtn = e.target.closest('.food-del-btn');
+      if (foodDelBtn) {
+        handleDeleteFood(foodDelBtn);
+        return;
+      }
+      // Reminder done button
+      const reminderDoneBtn = e.target.closest('.reminder-done-btn');
+      if (reminderDoneBtn) {
+        handleReminderDone(reminderDoneBtn);
+        return;
+      }
     });
 
     async function handleCheckOffItem(itemEl) {
@@ -2926,6 +3034,122 @@
       return todayHTML + weekHTML;
     }
 
+    function renderFoodExpiry(foodItems) {
+      if (!foodItems || foodItems.length === 0) return '';
+
+      const items = foodItems.map(f => {
+        let badgeClass = 'ok';
+        let label = `${f.days_left}d left`;
+        if (f.days_left < 0) { badgeClass = 'expired'; label = 'Expired'; }
+        else if (f.days_left === 0) { badgeClass = 'urgent'; label = 'Today!'; }
+        else if (f.days_left <= 2) { badgeClass = 'urgent'; label = `${f.days_left}d left`; }
+        else if (f.days_left <= 5) { badgeClass = 'soon'; }
+
+        return `
+          <div class="food-item" data-food-id="${f.id}">
+            <span class="food-name">${esc(f.name)}</span>
+            ${f.quantity ? `<span class="food-qty">${esc(f.quantity)}</span>` : ''}
+            <span class="food-expiry-badge ${badgeClass}">${label}</span>
+            <button class="food-del-btn" data-food-id="${f.id}" title="Remove">&times;</button>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="food-expiry-section">
+          <div class="food-expiry-title">
+            &#x1F9CA; Use It Up
+            <button class="card-add-btn food-add-btn" style="margin-left:auto">+ Add</button>
+          </div>
+          ${items}
+        </div>
+      `;
+    }
+
+    function openFoodModal() {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal">
+          <h3>Track Food Expiry</h3>
+          <label>Item Name</label>
+          <input id="food-name" type="text" placeholder="e.g. Chicken breast">
+          <label>Use By Date</label>
+          <input id="food-date" type="date">
+          <label>Quantity (optional)</label>
+          <input id="food-qty" type="text" placeholder="e.g. 2 packs, 500g">
+          <div class="modal-buttons">
+            <button class="btn-cancel" id="food-cancel">Cancel</button>
+            <button class="btn-save" id="food-save">Add</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+      // Default date to 3 days from now
+      const d = new Date();
+      d.setDate(d.getDate() + 3);
+      overlay.querySelector('#food-date').value = d.toISOString().split('T')[0];
+      overlay.querySelector('#food-name').focus();
+
+      overlay.querySelector('#food-cancel').onclick = () => overlay.remove();
+      overlay.querySelector('#food-save').onclick = async () => {
+        const name = overlay.querySelector('#food-name').value.trim();
+        const expires_at = overlay.querySelector('#food-date').value;
+        const quantity = overlay.querySelector('#food-qty').value.trim() || null;
+        if (!name || !expires_at) { overlay.querySelector('#food-name').focus(); return; }
+
+        try {
+          await fetch(`/api/food-items?secret=${getSecret()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, expires_at, quantity }),
+          });
+          overlay.remove();
+          refreshDashboard();
+        } catch (err) {
+          console.error('Add food item error:', err);
+        }
+      };
+    }
+
+    async function handleDeleteFood(btn) {
+      const foodId = btn.dataset.foodId;
+      if (!foodId) return;
+      const row = btn.closest('.food-item');
+      if (row) row.classList.add('removing');
+
+      try {
+        await fetch(`/api/food-items?secret=${getSecret()}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ item_id: foodId }),
+        });
+      } catch (err) {
+        console.error('Delete food error:', err);
+      }
+      setTimeout(() => refreshDashboard(), 500);
+    }
+
+    async function handleReminderDone(btn) {
+      const reminderId = btn.dataset.reminderId;
+      if (!reminderId) return;
+      const row = btn.closest('.reminder-item');
+      if (row) row.classList.add('completing');
+
+      try {
+        await fetch(`/api/reminders?secret=${getSecret()}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reminder_id: reminderId }),
+        });
+      } catch (err) {
+        console.error('Complete reminder error:', err);
+      }
+      setTimeout(() => refreshDashboard(), 500);
+    }
+
     function render(data, weather) {
       // Auto-detect theme from today's all-day events (e.g. Christmas, Halloween)
       const autoTheme = detectAutoTheme(data.today.events);
@@ -3037,6 +3261,7 @@
           <div class="card-title"><span class="icon">&#x1F37D;&#xFE0F;</span> Meal Planner <button class="meal-picker-btn" onclick="openMealWheel()">&#x1F3B0; Pick for me</button></div>
           <div class="card-body">
             ${renderMeals(data.meals)}
+            ${renderFoodExpiry(data.food_items)}
           </div>
         </div>
 
@@ -3053,6 +3278,7 @@
                     <h4>${esc(r.message)}</h4>
                     <div class="time">${esc(r.remind_at_display)}</div>
                   </div>
+                  <button class="reminder-done-btn" data-reminder-id="${r.id}">&#x2713; Done</button>
                 </div>
               `).join('')}
           </div>

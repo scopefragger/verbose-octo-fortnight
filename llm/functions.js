@@ -6,6 +6,7 @@ import * as points from '../services/points.js';
 import * as meals from '../services/meals.js';
 import * as themes from '../services/themes.js';
 import { seedUKHolidays } from '../services/holidays.js';
+import * as foodExpiry from '../services/foodExpiry.js';
 import { formatForUser } from '../utils/time.js';
 import { invalidateDashboardCache } from '../utils/cache.js';
 
@@ -383,6 +384,44 @@ export const tools = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'add_food_item',
+      description: 'Track a food item that needs to be eaten before it expires. Use when someone says they bought something perishable, or when food needs using up by a date.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Name of the food item (e.g. "chicken breast", "milk", "strawberries")' },
+          expires_at: { type: 'string', description: 'Expiry/use-by date in YYYY-MM-DD format' },
+          quantity: { type: 'string', description: 'Optional quantity (e.g. "2 packs", "500g", "1 bottle")' },
+        },
+        required: ['name', 'expires_at'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_food_items',
+      description: 'List all tracked food items and their expiry dates, sorted by soonest expiring first.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'remove_food_item',
+      description: 'Remove a food item from the expiry tracker (e.g. when it has been eaten or thrown away).',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Name of the food item to remove' },
+        },
+        required: ['name'],
+      },
+    },
+  },
 ];
 
 /**
@@ -393,7 +432,7 @@ export async function dispatch(functionName, args, context) {
   const { familyId, userId, timezone } = context;
 
   // Invalidate dashboard cache for any write operation
-  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes']);
+  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items']);
   if (!readOnlyFns.has(functionName)) {
     invalidateDashboardCache();
   }
@@ -638,6 +677,49 @@ export async function dispatch(functionName, args, context) {
     case 'list_dashboard_themes': {
       const available = themes.listThemes();
       return JSON.stringify(available);
+    }
+
+    case 'add_food_item': {
+      const item = await foodExpiry.addFoodItem(familyId, args.name, args.expires_at, args.quantity || null, userId);
+      const daysLeft = Math.ceil((new Date(args.expires_at + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24));
+      return JSON.stringify({
+        success: true,
+        item: item.name,
+        expires_at: args.expires_at,
+        quantity: args.quantity || null,
+        days_left: daysLeft,
+        message: `Added "${item.name}" — use by ${args.expires_at} (${daysLeft} day${daysLeft !== 1 ? 's' : ''} left)`,
+      });
+    }
+
+    case 'list_food_items': {
+      const items = await foodExpiry.getFoodItems(familyId);
+      const now = new Date();
+      const formatted = items.map(i => {
+        const daysLeft = Math.ceil((new Date(i.expires_at + 'T23:59:59') - now) / (1000 * 60 * 60 * 24));
+        let status = '';
+        if (daysLeft < 0) status = '🚫 EXPIRED';
+        else if (daysLeft === 0) status = '⚠️ Expires TODAY';
+        else if (daysLeft <= 2) status = `🔴 ${daysLeft} day${daysLeft > 1 ? 's' : ''} left`;
+        else status = `${daysLeft} days left`;
+        return `${i.name}${i.quantity ? ` (${i.quantity})` : ''} — ${status} (${i.expires_at})`;
+      });
+      return JSON.stringify({
+        items: formatted,
+        count: items.length,
+        message: items.length === 0 ? 'No food items being tracked.' : `${items.length} item(s) being tracked.`,
+      });
+    }
+
+    case 'remove_food_item': {
+      const removed = await foodExpiry.removeFoodItem(familyId, args.name);
+      if (!removed) {
+        return JSON.stringify({ success: false, message: `Couldn't find "${args.name}" in the food tracker.` });
+      }
+      return JSON.stringify({
+        success: true,
+        message: `Removed "${removed.name}" from the food tracker.`,
+      });
     }
 
     case 'seed_uk_holidays': {

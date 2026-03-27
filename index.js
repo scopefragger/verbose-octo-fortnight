@@ -11,6 +11,7 @@ import { createReminder, deleteReminder } from './services/reminders.js';
 import { seedUKHolidays } from './services/holidays.js';
 import { setTheme, listThemes } from './services/themes.js';
 import { adjustPoints } from './services/points.js';
+import { addFoodItem, getFoodItems, removeFoodItemById } from './services/foodExpiry.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import fs from 'fs';
@@ -178,6 +179,54 @@ app.get('/api/meal-titles', async (req, res) => {
     res.json({ titles });
   } catch (err) {
     console.error('Meal titles error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Food expiry API
+app.get('/api/food-items', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const items = await getFoodItems(familyId);
+    res.json({ items });
+  } catch (err) {
+    console.error('Food items error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/food-items', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { name, expires_at, quantity } = req.body;
+    const item = await addFoodItem(familyId, name, expires_at, quantity);
+    invalidateCache();
+    res.json({ item });
+  } catch (err) {
+    console.error('Add food item error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/food-items', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const { item_id } = req.body;
+    await removeFoodItemById(item_id);
+    invalidateCache();
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error('Remove food item error:', err);
     res.status(500).json({ error: err.message });
   }
 });
