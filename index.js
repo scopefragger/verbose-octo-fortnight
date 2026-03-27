@@ -13,6 +13,7 @@ import { setTheme, listThemes } from './services/themes.js';
 import { adjustPoints } from './services/points.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -75,7 +76,9 @@ app.get('/dashboard', (req, res) => {
   if (req.query.secret !== process.env.CRON_SECRET) {
     return res.status(401).send('Unauthorized — add ?secret=YOUR_SECRET to the URL');
   }
-  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+  const filePath = path.join(__dirname, 'public', 'dashboard.html');
+  const html = fs.readFileSync(filePath, 'utf-8');
+  res.type('html').send(html);
 });
 
 // Dashboard API — returns JSON data for the dashboard (cached to reduce Supabase load)

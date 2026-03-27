@@ -1436,6 +1436,171 @@
     .btn-save:hover { filter: brightness(1.1); }
     .btn-cancel:hover { background: #ccc; }
 
+    /* === FULLSCREEN PANEL === */
+    .fullscreen-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 9998;
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .fullscreen-overlay.active { opacity: 1; }
+
+    .fullscreen-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 500px;
+      max-width: 100vw;
+      background: var(--bg);
+      z-index: 9999;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      box-shadow: -4px 0 24px rgba(0,0,0,0.2);
+    }
+    .fullscreen-panel.active { transform: translateX(0); }
+
+    .fullscreen-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .fullscreen-header h2 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0;
+      flex: 1;
+    }
+
+    .fullscreen-header .icon { font-size: 22px; }
+
+    .fullscreen-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: var(--text-light);
+      padding: 4px 8px;
+      border-radius: 8px;
+      transition: all 0.15s;
+    }
+    .fullscreen-close:hover {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    .fullscreen-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 24px;
+    }
+
+    .fullscreen-body::-webkit-scrollbar { width: 4px; }
+    .fullscreen-body::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+
+    .fullscreen-body .day-group { margin-bottom: 16px; }
+
+    .fullscreen-body .day-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid var(--primary-light);
+    }
+
+    .fullscreen-body .day-event {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      font-size: 14px;
+      border-radius: 8px;
+      transition: background 0.15s;
+    }
+    .fullscreen-body .day-event:hover { background: var(--card); }
+
+    .fullscreen-body .day-event .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--primary);
+      flex-shrink: 0;
+    }
+
+    .fullscreen-body .day-event.past-event {
+      opacity: 0.4;
+      text-decoration: line-through;
+    }
+    .fullscreen-body .day-event.past-event .dot { background: var(--text-light); }
+
+    .fullscreen-body .day-event .time {
+      font-size: 12px;
+      color: var(--text-light);
+      min-width: 75px;
+    }
+
+    .fullscreen-body .event-del-btn {
+      opacity: 0;
+      margin-left: auto;
+    }
+    .fullscreen-body .day-event:hover .event-del-btn { opacity: 0.5; }
+
+    .fullscreen-stats {
+      display: flex;
+      gap: 12px;
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .fullscreen-stat {
+      background: var(--card);
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      color: var(--text-light);
+    }
+    .fullscreen-stat strong {
+      display: block;
+      font-size: 20px;
+      color: var(--text);
+    }
+
+    /* Card title clickable */
+    .card-title[data-expandable] {
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .card-title[data-expandable]:hover {
+      color: var(--primary);
+    }
+    .card-title[data-expandable]::after {
+      content: '↗';
+      font-size: 10px;
+      opacity: 0.4;
+      margin-left: auto;
+    }
+
+    @media (max-width: 700px) {
+      .fullscreen-panel { width: 100vw; }
+      .fullscreen-body .day-event { font-size: 13px; padding: 6px 8px; }
+    }
+
     /* Meal picker wheel */
     .wheel-overlay {
       position: fixed;
@@ -2594,6 +2759,13 @@
         handleDeleteEvent(eventDelBtn);
         return;
       }
+      // Expandable card titles → fullscreen panel
+      const expandTitle = e.target.closest('.card-title[data-expandable]');
+      if (expandTitle) {
+        const panelType = expandTitle.dataset.expandable;
+        openFullscreenPanel(panelType);
+        return;
+      }
     });
 
     async function handleCheckOffItem(itemEl) {
@@ -2842,7 +3014,7 @@
 
         <!-- Upcoming -->
         <div class="card upcoming-card">
-          <div class="card-title">
+          <div class="card-title" data-expandable="upcoming">
             <span class="icon">&#x1F5D3;&#xFE0F;</span> Upcoming
           </div>
           <div class="card-body">
@@ -2916,6 +3088,120 @@
           `}).join('')}
         </div>
       `).join('');
+    }
+
+    /* ---- Fullscreen panel ---- */
+    function openFullscreenPanel(panelType) {
+      // Close any existing panel first
+      closeFullscreenPanel();
+
+      const data = window._dashData;
+      if (!data) return;
+
+      let title = '';
+      let icon = '';
+      let statsHtml = '';
+      let bodyHtml = '';
+
+      if (panelType === 'upcoming') {
+        icon = '&#x1F5D3;&#xFE0F;';
+        title = 'All Upcoming Events';
+
+        // Combine today + upcoming events
+        const allEvents = [...(data.today.events || []), ...(data.week.events || [])];
+        const now = new Date();
+
+        // Stats
+        const totalEvents = allEvents.length;
+        const todayCount = (data.today.events || []).length;
+        const daysWithEvents = new Set(allEvents.map(e => e.day_label)).size;
+
+        statsHtml = `
+          <div class="fullscreen-stat"><strong>${totalEvents}</strong> total events</div>
+          <div class="fullscreen-stat"><strong>${todayCount}</strong> today</div>
+          <div class="fullscreen-stat"><strong>${daysWithEvents}</strong> days</div>
+        `;
+
+        // Render ALL events grouped by day
+        const byDay = {};
+        allEvents.forEach(e => {
+          if (!byDay[e.day_label]) byDay[e.day_label] = [];
+          byDay[e.day_label].push(e);
+        });
+
+        if (allEvents.length === 0) {
+          bodyHtml = '<div class="empty-state"><div class="icon">&#x1F4ED;</div>No upcoming events</div>';
+        } else {
+          bodyHtml = Object.entries(byDay).map(([day, evts]) => `
+            <div class="day-group">
+              <div class="day-label">${esc(day)}</div>
+              ${evts.map(e => {
+                const eventEnd = e.ends_at_raw ? new Date(e.ends_at_raw) : new Date(e.starts_at_raw);
+                const isPast = !e.all_day && eventEnd < now;
+                return `
+                <div class="day-event${isPast ? ' past-event' : ''}" data-event-id="${e.id}">
+                  <div class="dot"></div>
+                  <span class="time">${esc(e.starts_at_display)}</span>
+                  <span>${esc(e.title)}</span>
+                  <button class="event-del-btn" data-event-id="${e.id}" title="Delete event">&times;</button>
+                </div>
+              `}).join('')}
+            </div>
+          `).join('');
+        }
+      }
+
+      // Build the panel
+      const overlay = document.createElement('div');
+      overlay.className = 'fullscreen-overlay';
+      overlay.onclick = () => closeFullscreenPanel();
+
+      const panel = document.createElement('div');
+      panel.className = 'fullscreen-panel';
+      panel.id = 'fullscreen-panel';
+      panel.innerHTML = `
+        <div class="fullscreen-header">
+          <span class="icon">${icon}</span>
+          <h2>${title}</h2>
+          <button class="fullscreen-close" onclick="closeFullscreenPanel()">&times;</button>
+        </div>
+        ${statsHtml ? `<div class="fullscreen-stats">${statsHtml}</div>` : ''}
+        <div class="fullscreen-body">${bodyHtml}</div>
+      `;
+
+      // Prevent clicks inside panel from closing
+      panel.onclick = (e) => e.stopPropagation();
+
+      document.body.appendChild(overlay);
+      document.body.appendChild(panel);
+
+      // Trigger animation on next frame
+      requestAnimationFrame(() => {
+        overlay.classList.add('active');
+        panel.classList.add('active');
+      });
+
+      // ESC to close
+      panel._escHandler = (e) => { if (e.key === 'Escape') closeFullscreenPanel(); };
+      document.addEventListener('keydown', panel._escHandler);
+    }
+
+    function closeFullscreenPanel() {
+      const overlay = document.querySelector('.fullscreen-overlay');
+      const panel = document.getElementById('fullscreen-panel');
+      if (!overlay && !panel) return;
+
+      if (panel?._escHandler) {
+        document.removeEventListener('keydown', panel._escHandler);
+      }
+
+      if (overlay) overlay.classList.remove('active');
+      if (panel) panel.classList.remove('active');
+
+      setTimeout(() => {
+        overlay?.remove();
+        panel?.remove();
+      }, 350);
     }
 
     /* ---- Meal picker wheel ---- */
