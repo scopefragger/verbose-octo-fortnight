@@ -3268,7 +3268,7 @@
 
         <!-- Meals -->
         <div class="card meals-card">
-          <div class="card-title"><span class="icon">&#x1F37D;&#xFE0F;</span> Meal Planner <button class="meal-picker-btn" onclick="openMealWheel()">&#x1F3B0; Pick for me</button></div>
+          <div class="card-title" data-expandable="meals"><span class="icon">&#x1F37D;&#xFE0F;</span> Meal Planner <button class="meal-picker-btn" onclick="event.stopPropagation(); openMealWheel()">&#x1F3B0; Pick for me</button></div>
           <div class="card-body">
             ${renderMeals(data.meals)}
             ${renderFoodExpiry(data.food_items)}
@@ -3384,6 +3384,89 @@
               `}).join('')}
             </div>
           `).join('');
+        }
+      }
+
+      if (panelType === 'meals') {
+        icon = '&#x1F37D;&#xFE0F;';
+        title = 'Meal Planner';
+
+        const todayStr = getTodayStr();
+        const todayMeals = data.meals?.today || [];
+        const weekMeals = data.meals?.week || [];
+        const foodItems = data.food_items || [];
+        const mealEmojis = { breakfast: '🥐', lunch: '🥪', dinner: '🍝', snack: '🍪' };
+
+        // Stats
+        const todayCount = todayMeals.length;
+        const weekCount = weekMeals.length;
+        const expiringCount = foodItems.filter(f => f.days_left <= 2).length;
+
+        statsHtml = `
+          <div class="fullscreen-stat"><strong>${todayCount}</strong> today</div>
+          <div class="fullscreen-stat"><strong>${weekCount}</strong> this week</div>
+          ${expiringCount > 0 ? `<div class="fullscreen-stat" style="background:#fefcbf;"><strong>${expiringCount}</strong> expiring soon</div>` : ''}
+        `;
+
+        // Today's meals
+        let todayHTML = '';
+        if (todayMeals.length > 0) {
+          todayHTML = `<div class="day-group"><div class="day-label">Today</div>` +
+            todayMeals.map(m => `
+              <div class="day-event">
+                <span style="font-size:16px">${mealEmojis[m.type] || '🍽️'}</span>
+                <span class="time" style="text-transform:capitalize">${esc(m.type)}</span>
+                <span><strong>${esc(m.title)}</strong>${m.notes ? ` <span style="color:var(--text-light);font-size:11px">— ${esc(m.notes)}</span>` : ''}</span>
+              </div>
+            `).join('') + `</div>`;
+        }
+
+        // Week meals grouped by day
+        const weekByDay = {};
+        weekMeals.forEach(m => {
+          if (m.date === todayStr || m.date < todayStr) return;
+          if (!weekByDay[m.date]) weekByDay[m.date] = { label: m.day_label, meals: [] };
+          weekByDay[m.date].meals.push(m);
+        });
+
+        let weekHTML = Object.entries(weekByDay).map(([date, info]) => `
+          <div class="day-group">
+            <div class="day-label">${esc(info.label)}</div>
+            ${info.meals.map(m => `
+              <div class="day-event">
+                <span style="font-size:16px">${mealEmojis[m.type] || '🍽️'}</span>
+                <span class="time" style="text-transform:capitalize">${esc(m.type)}</span>
+                <span><strong>${esc(m.title)}</strong>${m.notes ? ` <span style="color:var(--text-light);font-size:11px">— ${esc(m.notes)}</span>` : ''}</span>
+              </div>
+            `).join('')}
+          </div>
+        `).join('');
+
+        // Food expiry items
+        let foodHTML = '';
+        if (foodItems.length > 0) {
+          foodHTML = `<div class="day-group" style="margin-top:12px;"><div class="day-label">🧊 Use It Up</div>` +
+            foodItems.map(f => {
+              let badgeClass = 'ok', label = f.days_left + 'd left';
+              if (f.days_left < 0) { badgeClass = 'expired'; label = 'Expired'; }
+              else if (f.days_left === 0) { badgeClass = 'urgent'; label = 'Today!'; }
+              else if (f.days_left <= 2) { badgeClass = 'urgent'; }
+              else if (f.days_left <= 5) { badgeClass = 'soon'; }
+              return `
+                <div class="day-event food-item" data-food-id="${f.id}">
+                  <span class="food-name">${esc(f.name)}</span>
+                  ${f.quantity ? `<span class="food-qty">${esc(f.quantity)}</span>` : ''}
+                  <span class="food-expiry-badge ${badgeClass}">${label}</span>
+                  <button class="food-del-btn" data-food-id="${f.id}" title="Remove">&times;</button>
+                </div>
+              `;
+            }).join('') + `</div>`;
+        }
+
+        if (!todayHTML && !weekHTML && !foodHTML) {
+          bodyHtml = '<div class="empty-state"><div class="icon">&#x1F37D;&#xFE0F;</div>No meals planned</div>';
+        } else {
+          bodyHtml = todayHTML + weekHTML + foodHTML;
         }
       }
 
