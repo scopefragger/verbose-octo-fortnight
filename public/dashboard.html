@@ -2388,6 +2388,7 @@
 
     /* Settings panel */
     .settings-btn {
+      display: none; /* Hidden — accessed via Apps drawer */
       position: fixed;
       bottom: 16px;
       right: 16px;
@@ -2874,11 +2875,15 @@
         <div class="app-name">Things to Watch</div>
         <div class="app-desc">Movies, TV & more</div>
       </div>
+      <div class="app-tile" onclick="toggleAppsDrawer(); toggleSettings();">
+        <div class="app-icon">&#x2699;&#xFE0F;</div>
+        <div class="app-name">Settings</div>
+        <div class="app-desc">Theme & preferences</div>
+      </div>
     </div>
   </div>
 
-  <!-- Settings button + panel -->
-  <button class="settings-btn" onclick="toggleSettings()" title="Settings">&#x2699;&#xFE0F;</button>
+  <!-- Settings panel (no longer has its own button) -->
   <div class="settings-backdrop" id="settingsBackdrop" onclick="toggleSettings()"></div>
   <div class="settings-panel" id="settingsPanel">
     <button class="settings-close" onclick="toggleSettings()">&times;</button>
