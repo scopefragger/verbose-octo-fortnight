@@ -2939,6 +2939,11 @@
         <div class="app-name">Meal Planner</div>
         <div class="app-desc">Plan & browse meals</div>
       </div>
+      <div class="app-tile" onclick="toggleAppsDrawer(); openChatHistoryApp();">
+        <div class="app-icon">&#x1F4AC;</div>
+        <div class="app-name">Chat Log</div>
+        <div class="app-desc">AI bot messages</div>
+      </div>
       <div class="app-tile" onclick="toggleAppsDrawer(); openBirthdayManager();">
         <div class="app-icon">&#x1F382;</div>
         <div class="app-name">Birthdays</div>
@@ -4874,6 +4879,82 @@
         setTimeout(() => { openWatchlist(); refreshDashboard(); }, 300);
       };
       modal.querySelector('#wl-title').focus();
+    }
+
+    /* ---- Chat History App ---- */
+    async function openChatHistoryApp() {
+      const overlay = document.createElement('div');
+      overlay.className = 'birthday-overlay';
+      overlay.innerHTML = `
+        <div class="birthday-panel" style="max-width:650px;max-height:90vh">
+          <div class="birthday-header">
+            <span style="font-size:24px">&#x1F4AC;</span>
+            <h2>Chat Log</h2>
+            <button onclick="this.closest('.birthday-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 8px;">&#x2715;</button>
+          </div>
+          <div class="birthday-body" id="chat-app-body" style="padding:0">
+            <div style="text-align:center;padding:40px;color:#888">Loading messages...</div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+      try {
+        const res = await fetch(`/api/chat-history?secret=${getSecret()}&limit=200`);
+        const json = await res.json();
+        const messages = (json.messages || []).reverse(); // oldest first
+        overlay.querySelector('#chat-app-body').innerHTML = renderChatHistory(messages);
+        // Scroll to bottom
+        const body = overlay.querySelector('#chat-app-body');
+        body.scrollTop = body.scrollHeight;
+      } catch (e) {
+        overlay.querySelector('#chat-app-body').innerHTML = '<div style="text-align:center;padding:40px;color:#e74c3c">Failed to load messages</div>';
+      }
+    }
+
+    function renderChatHistory(messages) {
+      if (!messages || messages.length === 0) {
+        return '<div class="watchlist-empty"><div class="icon">&#x1F4AC;</div>No messages yet</div>';
+      }
+
+      let lastDate = '';
+      let html = '';
+
+      messages.forEach(m => {
+        const dt = new Date(m.created_at);
+        const dateStr = dt.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+        if (dateStr !== lastDate) {
+          lastDate = dateStr;
+          html += `<div style="text-align:center;padding:12px 0 4px;font-size:0.7rem;color:#888;font-weight:600">${dateStr}</div>`;
+        }
+
+        const timeStr = dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        const isUser = m.role === 'user';
+        const isSystem = m.role === 'system' || m.role === 'tool';
+        if (isSystem) return; // skip tool/system messages
+
+        const align = isUser ? 'flex-end' : 'flex-start';
+        const bg = isUser ? 'var(--accent)' : 'var(--bg)';
+        const color = isUser ? '#fff' : 'var(--text)';
+        const name = isUser ? m.user : '&#x1F916; Assistant';
+        const maxW = '80%';
+
+        // Truncate very long messages
+        let content = m.content || '';
+        if (content.length > 500) content = content.substring(0, 500) + '...';
+
+        html += `
+          <div style="display:flex;justify-content:${align};padding:3px 16px">
+            <div style="max-width:${maxW};background:${bg};color:${color};border-radius:12px;padding:8px 12px;font-size:0.85rem;line-height:1.4">
+              <div style="font-size:0.65rem;font-weight:600;opacity:0.7;margin-bottom:2px">${name} &middot; ${timeStr}</div>
+              ${esc(content).replace(/\n/g, '<br>')}
+            </div>
+          </div>
+        `;
+      });
+
+      return html;
     }
 
     /* ---- Food Expiry (Use It Up) App ---- */

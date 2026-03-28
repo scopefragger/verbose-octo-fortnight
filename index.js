@@ -554,6 +554,45 @@ app.delete('/api/watchlist/:id', async (req, res) => {
   }
 });
 
+// ── Chat History ──
+app.get('/api/chat-history', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { data: members } = await supabase.from('users').select('id, display_name').eq('family_id', familyId);
+    const userIds = (members || []).map(m => m.id);
+    const userMap = {};
+    (members || []).forEach(m => { userMap[m.id] = m.display_name; });
+
+    const limit = parseInt(req.query.limit) || 100;
+    const offset = parseInt(req.query.offset) || 0;
+
+    const { data, error } = await supabase
+      .from('conversations')
+      .select('id, user_id, role, content, created_at')
+      .in('user_id', userIds)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (error) throw error;
+
+    const messages = (data || []).map(m => ({
+      id: m.id,
+      user: userMap[m.user_id] || 'Unknown',
+      role: m.role,
+      content: m.content,
+      created_at: m.created_at,
+    }));
+
+    res.json({ messages });
+  } catch (err) {
+    console.error('Chat history error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Birthdays ──
 app.get('/api/birthdays', async (req, res) => {
   if (req.query.secret !== process.env.CRON_SECRET) {
