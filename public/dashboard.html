@@ -2944,6 +2944,11 @@
         <div class="app-name">Birthdays</div>
         <div class="app-desc">Never forget a birthday</div>
       </div>
+      <div class="app-tile" onclick="toggleAppsDrawer(); openRemindersApp();">
+        <div class="app-icon">&#x23F0;</div>
+        <div class="app-name">Reminders</div>
+        <div class="app-desc">Pending & recurring</div>
+      </div>
       <div class="app-tile" onclick="toggleAppsDrawer(); toggleSettings();">
         <div class="app-icon">&#x2699;&#xFE0F;</div>
         <div class="app-name">Settings</div>
@@ -4859,6 +4864,82 @@
         setTimeout(() => { openWatchlist(); refreshDashboard(); }, 300);
       };
       modal.querySelector('#wl-title').focus();
+    }
+
+    /* ---- Reminders App ---- */
+    function openRemindersApp() {
+      const reminders = window._dashData?.reminders || [];
+
+      const overlay = document.createElement('div');
+      overlay.className = 'birthday-overlay'; // reuse same overlay style
+      overlay.innerHTML = `
+        <div class="birthday-panel" style="max-width:600px">
+          <div class="birthday-header">
+            <span style="font-size:24px">&#x23F0;</span>
+            <h2>Reminders</h2>
+            <button class="card-add-btn" id="rem-app-add-btn">+ Add</button>
+            <button onclick="this.closest('.birthday-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 8px;">&#x2715;</button>
+          </div>
+          <div class="birthday-body" id="rem-app-body">
+            ${renderRemindersApp(reminders)}
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+      overlay.querySelector('#rem-app-add-btn').addEventListener('click', () => {
+        overlay.remove();
+        openReminderModal();
+      });
+
+      // Delegate done + delete
+      overlay.querySelector('#rem-app-body').addEventListener('click', async (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        if (!id) return;
+
+        if (btn.classList.contains('rem-done-btn')) {
+          btn.disabled = true;
+          btn.textContent = '...';
+          await fetch(`/api/reminders?secret=${getSecret()}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reminder_id: id }),
+          });
+          // Animate out
+          const item = btn.closest('.birthday-item');
+          if (item) {
+            item.style.transition = 'opacity 0.3s, transform 0.3s';
+            item.style.opacity = '0';
+            item.style.transform = 'translateX(30px)';
+            setTimeout(() => item.remove(), 300);
+          }
+          setTimeout(() => refreshDashboard(), 500);
+        }
+      });
+    }
+
+    function renderRemindersApp(reminders) {
+      if (!reminders || reminders.length === 0) {
+        return '<div class="watchlist-empty"><div class="icon">&#x2705;</div>No pending reminders</div>';
+      }
+      return reminders.map(r => {
+        return `
+          <div class="birthday-item">
+            <div class="birthday-item-icon">&#x1F514;</div>
+            <div class="birthday-item-info">
+              <div class="birthday-item-name">${esc(r.message)}</div>
+              <div class="birthday-item-meta">${esc(r.remind_at_display)}${r.recurrence ? ' &middot; ' + esc(r.recurrence) : ''}</div>
+            </div>
+            <div class="birthday-item-actions">
+              <button class="rem-done-btn" data-id="${r.id}" style="color:#27ae60;border-color:#27ae60">&#x2713; Done</button>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
     /* ---- Birthday Manager ---- */
