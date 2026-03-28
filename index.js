@@ -12,6 +12,7 @@ import { seedUKHolidays } from './services/holidays.js';
 import { setTheme, listThemes } from './services/themes.js';
 import { adjustPoints, getPointHistory } from './services/points.js';
 import { addFoodItem, getFoodItems, removeFoodItemById } from './services/foodExpiry.js';
+import { createCountdown, updateCountdown, deleteCountdown } from './services/countdowns.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import fs from 'fs';
@@ -227,6 +228,57 @@ app.delete('/api/food-items', async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     console.error('Remove food item error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Countdown API
+app.post('/api/countdowns', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { title, target_date, background } = req.body;
+    if (!title || !target_date) return res.status(400).json({ error: 'title and target_date required' });
+    const countdown = await createCountdown(familyId, { title, target_date, background });
+    invalidateCache();
+    res.json(countdown);
+  } catch (err) {
+    console.error('Create countdown error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/countdowns/:id', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const countdown = await updateCountdown(req.params.id, familyId, req.body);
+    invalidateCache();
+    res.json(countdown);
+  } catch (err) {
+    console.error('Update countdown error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/countdowns/:id', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const deleted = await deleteCountdown(req.params.id, familyId);
+    invalidateCache();
+    res.json({ deleted: true, title: deleted?.title });
+  } catch (err) {
+    console.error('Delete countdown error:', err);
     res.status(500).json({ error: err.message });
   }
 });

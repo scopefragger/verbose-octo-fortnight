@@ -108,6 +108,7 @@ export async function getDashboardData(familyId) {
         target_date: c.target_date,
         background: c.background,
         days_until: Math.max(0, daysUntil),
+        created_at: c.created_at,
       };
     }),
     kid_points: kidPoints,

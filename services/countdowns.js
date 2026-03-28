@@ -24,6 +24,25 @@ export async function listCountdowns(familyId) {
   return data || [];
 }
 
+export async function updateCountdown(countdownId, familyId, { title, target_date, background }) {
+  const updates = {};
+  if (title) updates.title = title;
+  if (target_date) updates.target_date = target_date;
+  if (background) updates.background = BACKGROUNDS.includes(background) ? background : undefined;
+  // Remove undefined values
+  Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);
+
+  const { data, error } = await supabase
+    .from('countdowns')
+    .update(updates)
+    .eq('id', countdownId)
+    .eq('family_id', familyId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function deleteCountdown(countdownId, familyId) {
   const { data, error } = await supabase
     .from('countdowns')
