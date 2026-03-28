@@ -7,6 +7,7 @@ import { getAllPoints } from '../services/points.js';
 import { getMealsForDate, getMealsForWeek } from '../services/meals.js';
 import { getTheme } from '../services/themes.js';
 import { getFoodItems } from '../services/foodExpiry.js';
+import { getWatchlist } from '../services/watchlist.js';
 import { formatForUser } from '../utils/time.js';
 
 /**
@@ -40,7 +41,7 @@ export async function getDashboardData(familyId) {
 
   // Fetch all data in a single parallel batch
   const reminderPromises = members.map((m) => listReminders(m.id));
-  const [todayEvents, weekEvents, listsWithItems, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme, foodItems, ...reminderResults] = await Promise.all([
+  const [todayEvents, weekEvents, listsWithItems, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme, foodItems, watchlistItems, ...reminderResults] = await Promise.all([
     listEvents(familyId, todayStart, todayEnd),
     listEvents(familyId, tomorrowStart, weekEndBound),
     getAllListsWithItems(familyId),
@@ -50,6 +51,7 @@ export async function getDashboardData(familyId) {
     getMealsForWeek(familyId, todayStr, weekEndStr),
     getTheme(familyId),
     getFoodItems(familyId),
+    getWatchlist(familyId),
     ...reminderPromises,
   ]);
   const allReminders = reminderResults.flat();
@@ -138,6 +140,7 @@ export async function getDashboardData(familyId) {
       expires_at: f.expires_at,
       days_left: Math.ceil((new Date(f.expires_at + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24)),
     })),
+    watchlist: watchlistItems || [],
     theme: dashboardTheme,
     updated_at: new Date().toISOString(),
   };

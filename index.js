@@ -13,6 +13,7 @@ import { setTheme, listThemes } from './services/themes.js';
 import { adjustPoints, getPointHistory } from './services/points.js';
 import { addFoodItem, getFoodItems, removeFoodItemById } from './services/foodExpiry.js';
 import { createCountdown, updateCountdown, deleteCountdown } from './services/countdowns.js';
+import { getWatchlist, addToWatchlist, markWatched, removeFromWatchlist } from './services/watchlist.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import fs from 'fs';
@@ -483,6 +484,71 @@ app.post('/api/seed-holidays', async (req, res) => {
     res.json({ year, holidays: results });
   } catch (err) {
     console.error('Seed holidays error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Watchlist ──
+app.get('/api/watchlist', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const includeWatched = req.query.watched === 'true';
+    const items = await getWatchlist(familyId, includeWatched);
+    res.json({ items });
+  } catch (err) {
+    console.error('Watchlist fetch error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/watchlist', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const item = await addToWatchlist(familyId, req.body, null);
+    invalidateCache();
+    res.json(item);
+  } catch (err) {
+    console.error('Watchlist add error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/watchlist/:id/watched', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const item = await markWatched(req.params.id, familyId, req.body.rating);
+    invalidateCache();
+    res.json(item);
+  } catch (err) {
+    console.error('Watchlist mark watched error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/watchlist/:id', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    await removeFromWatchlist(req.params.id, familyId);
+    invalidateCache();
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error('Watchlist remove error:', err);
     res.status(500).json({ error: err.message });
   }
 });
