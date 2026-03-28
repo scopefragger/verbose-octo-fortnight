@@ -14,6 +14,7 @@ import { adjustPoints, getPointHistory } from './services/points.js';
 import { addFoodItem, getFoodItems, removeFoodItemById } from './services/foodExpiry.js';
 import { createCountdown, updateCountdown, deleteCountdown } from './services/countdowns.js';
 import { getWatchlist, addToWatchlist, markWatched, removeFromWatchlist } from './services/watchlist.js';
+import { getBirthdays, addBirthday, updateBirthday, removeBirthday } from './services/birthdays.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import fs from 'fs';
@@ -549,6 +550,70 @@ app.delete('/api/watchlist/:id', async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     console.error('Watchlist remove error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Birthdays ──
+app.get('/api/birthdays', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const items = await getBirthdays(familyId);
+    res.json({ birthdays: items });
+  } catch (err) {
+    console.error('Birthdays fetch error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/birthdays', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const item = await addBirthday(familyId, req.body);
+    invalidateCache();
+    res.json(item);
+  } catch (err) {
+    console.error('Birthday add error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/birthdays/:id', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const item = await updateBirthday(req.params.id, familyId, req.body);
+    invalidateCache();
+    res.json(item);
+  } catch (err) {
+    console.error('Birthday update error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/birthdays/:id', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    await removeBirthday(req.params.id, familyId);
+    invalidateCache();
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error('Birthday remove error:', err);
     res.status(500).json({ error: err.message });
   }
 });

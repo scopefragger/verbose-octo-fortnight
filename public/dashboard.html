@@ -1910,6 +1910,60 @@
     .watchlist-empty .icon { font-size: 48px; margin-bottom: 8px; }
     .watchlist-stars { color: #f39c12; letter-spacing: 2px; }
 
+    /* Birthday manager */
+    .birthday-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 9990;
+      display: flex; align-items: center; justify-content: center;
+      animation: fadeIn 0.2s ease;
+    }
+    .birthday-panel {
+      background: var(--card);
+      border-radius: 16px;
+      width: 90vw; max-width: 550px;
+      max-height: 85vh;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      animation: slideUp 0.3s ease;
+    }
+    .birthday-header {
+      padding: 20px 24px 12px;
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .birthday-header h2 { flex: 1; margin: 0; font-size: 1.2rem; }
+    .birthday-body {
+      flex: 1; overflow-y: auto;
+      padding: 16px 24px;
+    }
+    .birthday-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .birthday-item:last-child { border-bottom: none; }
+    .birthday-item-icon { font-size: 28px; }
+    .birthday-item-info { flex: 1; }
+    .birthday-item-name { font-weight: 600; font-size: 0.95rem; }
+    .birthday-item-meta { font-size: 0.75rem; color: #888; margin-top: 2px; }
+    .birthday-item-countdown {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-align: right;
+      min-width: 70px;
+    }
+    .birthday-item-countdown.today { color: #e74c3c; }
+    .birthday-item-actions button {
+      background: none; border: 1px solid var(--border);
+      border-radius: 6px; padding: 4px 8px;
+      cursor: pointer; font-size: 0.75rem; color: #e74c3c;
+      transition: background 0.15s;
+    }
+    .birthday-item-actions button:hover { background: var(--border); }
+
     .meal-slot {
       display: flex;
       align-items: center;
@@ -2874,6 +2928,11 @@
         <div class="app-icon">&#x1F3AC;</div>
         <div class="app-name">Things to Watch</div>
         <div class="app-desc">Movies, TV & more</div>
+      </div>
+      <div class="app-tile" onclick="toggleAppsDrawer(); openBirthdayManager();">
+        <div class="app-icon">&#x1F382;</div>
+        <div class="app-name">Birthdays</div>
+        <div class="app-desc">Never forget a birthday</div>
       </div>
       <div class="app-tile" onclick="toggleAppsDrawer(); toggleSettings();">
         <div class="app-icon">&#x2699;&#xFE0F;</div>
@@ -4790,6 +4849,115 @@
         setTimeout(() => { openWatchlist(); refreshDashboard(); }, 300);
       };
       modal.querySelector('#wl-title').focus();
+    }
+
+    /* ---- Birthday Manager ---- */
+    async function openBirthdayManager() {
+      let birthdays = window._dashData?.birthdays || [];
+
+      const overlay = document.createElement('div');
+      overlay.className = 'birthday-overlay';
+      overlay.innerHTML = `
+        <div class="birthday-panel">
+          <div class="birthday-header">
+            <span style="font-size:24px">&#x1F382;</span>
+            <h2>Birthdays</h2>
+            <button class="card-add-btn" id="bday-add-btn">+ Add</button>
+            <button onclick="this.closest('.birthday-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 8px;">&#x2715;</button>
+          </div>
+          <div class="birthday-body" id="bday-body">
+            ${renderBirthdayList(birthdays)}
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+      overlay.querySelector('#bday-add-btn').addEventListener('click', () => {
+        openBirthdayAddModal(overlay);
+      });
+
+      // Delegate delete
+      overlay.querySelector('#bday-body').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.bday-delete-btn');
+        if (!btn) return;
+        if (!confirm('Remove this birthday?')) return;
+        btn.disabled = true;
+        await fetch(`/api/birthdays/${btn.dataset.id}?secret=${getSecret()}`, { method: 'DELETE' });
+        overlay.remove();
+        setTimeout(() => { openBirthdayManager(); refreshDashboard(); }, 300);
+      });
+    }
+
+    function renderBirthdayList(birthdays) {
+      if (!birthdays || birthdays.length === 0) {
+        return '<div class="watchlist-empty"><div class="icon">&#x1F382;</div>No birthdays added yet</div>';
+      }
+      return birthdays.map(b => {
+        const bdate = new Date(b.birth_date + 'T12:00:00');
+        const dateStr = bdate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+        const countdownStr = b.days_until === 0 ? 'Today! &#x1F389;' : b.days_until === 1 ? 'Tomorrow!' : `${b.days_until} days`;
+        const isToday = b.days_until === 0;
+        return `
+          <div class="birthday-item">
+            <div class="birthday-item-icon">${isToday ? '&#x1F389;' : '&#x1F382;'}</div>
+            <div class="birthday-item-info">
+              <div class="birthday-item-name">${esc(b.name)}</div>
+              <div class="birthday-item-meta">${dateStr} &middot; Turning ${b.age}${b.notes ? ' &middot; ' + esc(b.notes) : ''}</div>
+            </div>
+            <div class="birthday-item-countdown ${isToday ? 'today' : ''}">${countdownStr}</div>
+            <div class="birthday-item-actions">
+              <button class="bday-delete-btn" data-id="${b.id}">&#x1F5D1;</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openBirthdayAddModal(parentOverlay) {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.style.zIndex = '9995';
+      modal.innerHTML = `
+        <div class="modal" style="width:380px">
+          <h3>&#x1F382; Add Birthday</h3>
+          <label>Name</label>
+          <input type="text" id="bday-name" placeholder="e.g. Mum, Uncle Dave" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;background:var(--card);color:var(--text)">
+          <label>Date of Birth</label>
+          <input type="date" id="bday-date" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;background:var(--card);color:var(--text)">
+          <label>Notes (optional)</label>
+          <input type="text" id="bday-notes" placeholder="e.g. Likes chocolate" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:16px;background:var(--card);color:var(--text)">
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn-cancel" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:none;cursor:pointer;color:var(--text)">Cancel</button>
+            <button class="btn-save" style="padding:8px 16px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">Add</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+      modal.querySelector('.btn-cancel').onclick = () => modal.remove();
+      modal.querySelector('.btn-save').onclick = async () => {
+        const name = modal.querySelector('#bday-name').value.trim();
+        const date = modal.querySelector('#bday-date').value;
+        if (!name) { modal.querySelector('#bday-name').style.borderColor = '#e74c3c'; return; }
+        if (!date) { modal.querySelector('#bday-date').style.borderColor = '#e74c3c'; return; }
+        modal.querySelector('.btn-save').disabled = true;
+        modal.querySelector('.btn-save').textContent = 'Adding...';
+        await fetch(`/api/birthdays?secret=${getSecret()}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            birth_date: date,
+            notes: modal.querySelector('#bday-notes').value.trim() || null,
+          }),
+        });
+        modal.remove();
+        if (parentOverlay) parentOverlay.remove();
+        setTimeout(() => { openBirthdayManager(); refreshDashboard(); }, 300);
+      };
+      modal.querySelector('#bday-name').focus();
     }
 
     /* ---- Meal picker wheel ---- */

@@ -8,6 +8,7 @@ import { getMealsForDate, getMealsForWeek } from '../services/meals.js';
 import { getTheme } from '../services/themes.js';
 import { getFoodItems } from '../services/foodExpiry.js';
 import { getWatchlist } from '../services/watchlist.js';
+import { getBirthdays, getUpcomingBirthdayEvents } from '../services/birthdays.js';
 import { formatForUser } from '../utils/time.js';
 
 /**
@@ -41,7 +42,7 @@ export async function getDashboardData(familyId) {
 
   // Fetch all data in a single parallel batch
   const reminderPromises = members.map((m) => listReminders(m.id));
-  const [todayEvents, weekEvents, listsWithItems, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme, foodItems, watchlistItems, ...reminderResults] = await Promise.all([
+  const [todayEvents, weekEvents, listsWithItems, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme, foodItems, watchlistItems, allBirthdays, ...reminderResults] = await Promise.all([
     listEvents(familyId, todayStart, todayEnd),
     listEvents(familyId, tomorrowStart, weekEndBound),
     getAllListsWithItems(familyId),
@@ -52,9 +53,13 @@ export async function getDashboardData(familyId) {
     getTheme(familyId),
     getFoodItems(familyId),
     getWatchlist(familyId),
+    getBirthdays(familyId),
     ...reminderPromises,
   ]);
   const allReminders = reminderResults.flat();
+
+  // Generate virtual birthday events and merge into today/week events
+  const birthdayEvents = getUpcomingBirthdayEvents(allBirthdays || []);
 
   // Format events for display
   const formatEvent = (e) => ({
@@ -89,10 +94,16 @@ export async function getDashboardData(familyId) {
         month: 'long',
         day: 'numeric',
       }),
-      events: todayEvents.map(formatEvent),
+      events: [
+        ...todayEvents.map(formatEvent),
+        ...birthdayEvents.filter(b => b.starts_at.startsWith(todayStr)).map(formatEvent),
+      ],
     },
     week: {
-      events: weekEvents.map(formatEvent),
+      events: [
+        ...weekEvents.map(formatEvent),
+        ...birthdayEvents.filter(b => !b.starts_at.startsWith(todayStr)).map(formatEvent),
+      ].sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
     },
     reminders: allReminders.map((r) => ({
       id: r.id,
@@ -141,6 +152,15 @@ export async function getDashboardData(familyId) {
       days_left: Math.ceil((new Date(f.expires_at + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24)),
     })),
     watchlist: watchlistItems || [],
+    birthdays: (allBirthdays || []).map(b => {
+      const [y, m, d] = b.birth_date.split('-').map(Number);
+      const now = new Date();
+      let nextBday = new Date(now.getFullYear(), m - 1, d);
+      if (nextBday < now) nextBday = new Date(now.getFullYear() + 1, m - 1, d);
+      const daysUntil = Math.ceil((nextBday - now) / (1000 * 60 * 60 * 24));
+      const age = nextBday.getFullYear() - y;
+      return { ...b, age, days_until: daysUntil };
+    }).sort((a, b) => a.days_until - b.days_until),
     theme: dashboardTheme,
     updated_at: new Date().toISOString(),
   };
