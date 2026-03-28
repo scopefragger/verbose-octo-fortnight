@@ -940,6 +940,26 @@
       opacity: 0.5;
       font-size: 14px;
     }
+    .ph-day-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      opacity: 0.5;
+      padding: 14px 0 6px;
+      border-bottom: 1px solid rgba(128,128,128,0.12);
+    }
+    .ph-day-header:first-child { padding-top: 0; }
+    .ph-change-inline {
+      font-weight: 700;
+      font-size: 13px;
+      opacity: 1;
+    }
+    .ph-change-inline.positive { color: #2ecc71; }
+    .ph-change-inline.negative { color: #e74c3c; }
 
     .points-progress {
       margin-top: 8px;
@@ -3108,22 +3128,46 @@
           return;
         }
 
-        listEl.innerHTML = data.history.map(h => {
-          const isPositive = h.change > 0;
-          const changeStr = isPositive ? `+${h.change}` : `${h.change}`;
-          const cls = isPositive ? 'positive' : 'negative';
-          const date = new Date(h.created_at);
-          const dateStr = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-          return `
-            <div class="points-history-item">
-              <div class="ph-change ${cls}">${changeStr}</div>
-              <div class="ph-details">
-                <div class="ph-reason">${esc(h.reason || 'No reason')}</div>
-                <div class="ph-date">${dateStr}</div>
+        // Group history by day
+        const byDay = {};
+        const today = new Date().toLocaleDateString('en-CA');
+        const yesterday = new Date(Date.now() - 86400000).toLocaleDateString('en-CA');
+        data.history.forEach(h => {
+          const d = new Date(h.created_at);
+          const dayKey = d.toLocaleDateString('en-CA');
+          if (!byDay[dayKey]) byDay[dayKey] = [];
+          byDay[dayKey].push(h);
+        });
+
+        let html = '';
+        for (const [dayKey, items] of Object.entries(byDay)) {
+          let dayLabel;
+          if (dayKey === today) dayLabel = 'Today';
+          else if (dayKey === yesterday) dayLabel = 'Yesterday';
+          else dayLabel = new Date(dayKey + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+
+          const dayTotal = items.reduce((sum, h) => sum + h.change, 0);
+          const dayTotalStr = dayTotal > 0 ? `+${dayTotal}` : `${dayTotal}`;
+          const dayTotalCls = dayTotal >= 0 ? 'positive' : 'negative';
+
+          html += `<div class="ph-day-header"><span>${dayLabel}</span><span class="ph-change-inline ${dayTotalCls}">${dayTotalStr}</span></div>`;
+          html += items.map(h => {
+            const isPositive = h.change > 0;
+            const changeStr = isPositive ? `+${h.change}` : `${h.change}`;
+            const cls = isPositive ? 'positive' : 'negative';
+            const time = new Date(h.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            return `
+              <div class="points-history-item">
+                <div class="ph-change ${cls}">${changeStr}</div>
+                <div class="ph-details">
+                  <div class="ph-reason">${esc(h.reason || 'No reason')}</div>
+                  <div class="ph-date">${time}</div>
+                </div>
               </div>
-            </div>
-          `;
-        }).join('');
+            `;
+          }).join('');
+        }
+        listEl.innerHTML = html;
       } catch (err) {
         console.error('Points history error:', err);
         const listEl = overlay.querySelector('.points-history-list');
