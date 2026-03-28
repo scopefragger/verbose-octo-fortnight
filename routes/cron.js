@@ -121,6 +121,39 @@ export async function sendDailyDigest(bot) {
       }
     }
 
+    // Fetch weather (non-critical)
+    try {
+      const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=53.39&longitude=-3.02'
+        + '&current=temperature_2m,weathercode,wind_speed_10m'
+        + '&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum'
+        + '&forecast_days=3&timezone=Europe%2FLondon';
+      const weatherRes = await fetch(weatherUrl);
+      if (weatherRes.ok) {
+        const wd = await weatherRes.json();
+        const wEmoji = (code) => {
+          if (code === 0) return '☀️'; if (code <= 3) return '⛅'; if (code <= 48) return '🌫️';
+          if (code <= 57) return '🌦️'; if (code <= 65) return '🌧️'; if (code <= 77) return '🌨️';
+          if (code <= 82) return '🌧️'; if (code <= 86) return '❄️'; if (code <= 99) return '⛈️';
+          return '🌤️';
+        };
+        const wDesc = (code) => {
+          if (code === 0) return 'Clear'; if (code <= 3) return 'Partly cloudy'; if (code <= 48) return 'Foggy';
+          if (code <= 57) return 'Drizzle'; if (code <= 65) return 'Rainy'; if (code <= 77) return 'Snowy';
+          if (code <= 82) return 'Showers'; if (code <= 86) return 'Snow showers'; return 'Stormy';
+        };
+        const cur = wd.current;
+        message += `\n🌤️ Weather: ${wEmoji(cur.weathercode)} ${Math.round(cur.temperature_2m)}°C — ${wDesc(cur.weathercode)}, wind ${Math.round(cur.wind_speed_10m)}km/h\n`;
+        if (wd.daily && wd.daily.time.length > 1) {
+          message += `  Tomorrow: ${wEmoji(wd.daily.weathercode[1])} ${Math.round(wd.daily.temperature_2m_max[1])}°/${Math.round(wd.daily.temperature_2m_min[1])}°`;
+          const rain = wd.daily.precipitation_sum[1];
+          if (rain > 0) message += ` 💧${rain.toFixed(1)}mm`;
+          message += `\n`;
+        }
+      }
+    } catch (weatherErr) {
+      // Weather is non-critical, skip silently
+    }
+
     message += `\nHave a great day! 🎉`;
 
     // Send DM to user
