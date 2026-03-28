@@ -2944,6 +2944,16 @@
         <div class="app-name">Birthdays</div>
         <div class="app-desc">Never forget a birthday</div>
       </div>
+      <div class="app-tile" onclick="toggleAppsDrawer(); openListsApp();">
+        <div class="app-icon">&#x1F4CB;</div>
+        <div class="app-name">Lists</div>
+        <div class="app-desc">Shopping & to-dos</div>
+      </div>
+      <div class="app-tile" onclick="toggleAppsDrawer(); openFoodExpiryApp();">
+        <div class="app-icon">&#x1F9CA;</div>
+        <div class="app-name">Use It Up</div>
+        <div class="app-desc">Food expiry tracker</div>
+      </div>
       <div class="app-tile" onclick="toggleAppsDrawer(); openRemindersApp();">
         <div class="app-icon">&#x23F0;</div>
         <div class="app-name">Reminders</div>
@@ -4864,6 +4874,252 @@
         setTimeout(() => { openWatchlist(); refreshDashboard(); }, 300);
       };
       modal.querySelector('#wl-title').focus();
+    }
+
+    /* ---- Food Expiry (Use It Up) App ---- */
+    function openFoodExpiryApp() {
+      const items = window._dashData?.food_items || [];
+
+      const overlay = document.createElement('div');
+      overlay.className = 'birthday-overlay';
+      overlay.innerHTML = `
+        <div class="birthday-panel" style="max-width:550px">
+          <div class="birthday-header">
+            <span style="font-size:24px">&#x1F9CA;</span>
+            <h2>Use It Up</h2>
+            <button class="card-add-btn" id="food-app-add-btn">+ Add</button>
+            <button onclick="this.closest('.birthday-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 8px;">&#x2715;</button>
+          </div>
+          <div class="birthday-body" id="food-app-body">
+            ${renderFoodExpiryApp(items)}
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+      overlay.querySelector('#food-app-add-btn').addEventListener('click', () => {
+        openFoodExpiryAddModal(overlay);
+      });
+
+      // Delegate delete
+      overlay.querySelector('#food-app-body').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.food-app-delete');
+        if (!btn) return;
+        btn.disabled = true;
+        const item = btn.closest('.birthday-item');
+        await fetch(`/api/food-items?secret=${getSecret()}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: btn.dataset.id }),
+        });
+        if (item) {
+          item.style.transition = 'opacity 0.3s, transform 0.3s';
+          item.style.opacity = '0';
+          item.style.transform = 'translateX(30px)';
+          setTimeout(() => item.remove(), 300);
+        }
+        setTimeout(() => refreshDashboard(), 500);
+      });
+    }
+
+    function renderFoodExpiryApp(items) {
+      if (!items || items.length === 0) {
+        return '<div class="watchlist-empty"><div class="icon">&#x1F9CA;</div>Nothing tracked — all clear!</div>';
+      }
+      // Sort by days left (most urgent first)
+      const sorted = [...items].sort((a, b) => a.days_left - b.days_left);
+      return sorted.map(item => {
+        const urgent = item.days_left <= 1;
+        const warning = item.days_left <= 3;
+        const icon = urgent ? '&#x1F6A8;' : warning ? '&#x26A0;&#xFE0F;' : '&#x1F9CA;';
+        const countdownColor = urgent ? '#e74c3c' : warning ? '#f39c12' : 'var(--accent)';
+        const daysStr = item.days_left <= 0 ? 'Expired!' : item.days_left === 1 ? 'Tomorrow!' : `${item.days_left} days`;
+        const expDate = new Date(item.expires_at + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        return `
+          <div class="birthday-item">
+            <div class="birthday-item-icon">${icon}</div>
+            <div class="birthday-item-info">
+              <div class="birthday-item-name">${esc(item.name)}${item.quantity ? ' <span style="color:#888;font-weight:400">(' + esc(item.quantity) + ')</span>' : ''}</div>
+              <div class="birthday-item-meta">Expires ${expDate}</div>
+            </div>
+            <div class="birthday-item-countdown" style="color:${countdownColor}">${daysStr}</div>
+            <div class="birthday-item-actions">
+              <button class="food-app-delete" data-id="${item.id}" style="color:#e74c3c;border-color:#e74c3c;background:none;border:1px solid;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem">&#x1F5D1;</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openFoodExpiryAddModal(parentOverlay) {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.style.zIndex = '9995';
+      modal.innerHTML = `
+        <div class="modal" style="width:380px">
+          <h3>&#x1F9CA; Add Food Item</h3>
+          <label>Item Name</label>
+          <input type="text" id="food-app-name" placeholder="e.g. Chicken breast" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;background:var(--card);color:var(--text)">
+          <label>Quantity (optional)</label>
+          <input type="text" id="food-app-qty" placeholder="e.g. 500g, 2 packs" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;background:var(--card);color:var(--text)">
+          <label>Expires</label>
+          <input type="date" id="food-app-exp" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:16px;background:var(--card);color:var(--text)">
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn-cancel" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:none;cursor:pointer;color:var(--text)">Cancel</button>
+            <button class="btn-save" style="padding:8px 16px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">Add</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+      modal.querySelector('.btn-cancel').onclick = () => modal.remove();
+      modal.querySelector('.btn-save').onclick = async () => {
+        const name = modal.querySelector('#food-app-name').value.trim();
+        const exp = modal.querySelector('#food-app-exp').value;
+        if (!name) { modal.querySelector('#food-app-name').style.borderColor = '#e74c3c'; return; }
+        if (!exp) { modal.querySelector('#food-app-exp').style.borderColor = '#e74c3c'; return; }
+        modal.querySelector('.btn-save').disabled = true;
+        modal.querySelector('.btn-save').textContent = 'Adding...';
+        await fetch(`/api/food-items?secret=${getSecret()}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            quantity: modal.querySelector('#food-app-qty').value.trim() || null,
+            expires_at: exp,
+          }),
+        });
+        modal.remove();
+        if (parentOverlay) parentOverlay.remove();
+        setTimeout(() => { openFoodExpiryApp(); refreshDashboard(); }, 300);
+      };
+      modal.querySelector('#food-app-name').focus();
+    }
+
+    /* ---- Lists App ---- */
+    function openListsApp() {
+      const lists = window._dashData?.lists || [];
+
+      const overlay = document.createElement('div');
+      overlay.className = 'birthday-overlay';
+      overlay.innerHTML = `
+        <div class="birthday-panel" style="max-width:600px">
+          <div class="birthday-header">
+            <span style="font-size:24px">&#x1F4CB;</span>
+            <h2>Lists</h2>
+            <button class="card-add-btn" id="lists-app-add-btn">+ New List</button>
+            <button onclick="this.closest('.birthday-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 8px;">&#x2715;</button>
+          </div>
+          <div class="birthday-body" id="lists-app-body" style="padding:0">
+            ${renderListsApp(lists)}
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+      // New list button
+      overlay.querySelector('#lists-app-add-btn').addEventListener('click', () => {
+        openListsAddItemModal(overlay, null);
+      });
+
+      // Delegate actions
+      overlay.querySelector('#lists-app-body').addEventListener('click', async (e) => {
+        // Add item to list
+        const addBtn = e.target.closest('.list-app-add-btn');
+        if (addBtn) {
+          openListsAddItemModal(overlay, addBtn.dataset.list);
+          return;
+        }
+
+        // Check off item
+        const item = e.target.closest('.list-app-item');
+        if (item && !item.classList.contains('done')) {
+          const id = item.dataset.itemId;
+          if (!id) return;
+          item.style.transition = 'opacity 0.3s, transform 0.3s';
+          item.style.opacity = '0.4';
+          item.style.textDecoration = 'line-through';
+          await fetch(`/api/list-items/${id}?secret=${getSecret()}`, { method: 'DELETE' });
+          setTimeout(() => {
+            item.style.transform = 'translateX(30px)';
+            item.style.opacity = '0';
+            setTimeout(() => item.remove(), 300);
+          }, 200);
+          setTimeout(() => refreshDashboard(), 500);
+        }
+      });
+    }
+
+    function renderListsApp(lists) {
+      if (!lists || lists.length === 0) {
+        return '<div class="watchlist-empty" style="padding:40px"><div class="icon">&#x1F4CB;</div>No lists yet</div>';
+      }
+      return lists.map(list => {
+        const unchecked = (list.items || []).filter(i => !i.checked);
+        const total = (list.items || []).length;
+        return `
+          <div style="padding:16px 24px; border-bottom:1px solid var(--border)">
+            <div style="display:flex; align-items:center; margin-bottom:8px">
+              <strong style="flex:1; text-transform:capitalize; font-size:1rem">${esc(list.name)}</strong>
+              <span style="font-size:0.75rem; color:#888; margin-right:8px">${unchecked.length} item${unchecked.length !== 1 ? 's' : ''}</span>
+              <button class="list-app-add-btn card-add-btn" data-list="${esc(list.name)}">+ Add</button>
+            </div>
+            ${unchecked.length === 0
+              ? '<div style="color:#999; font-size:0.85rem; padding:4px 0">No items</div>'
+              : unchecked.map(item => `
+                <div class="list-app-item" data-item-id="${item.id}" style="display:flex; align-items:center; gap:10px; padding:8px 0; cursor:pointer; border-bottom:1px solid var(--border)">
+                  <div style="width:20px; height:20px; border:2px solid var(--border); border-radius:50%; flex-shrink:0"></div>
+                  <span style="flex:1">${esc(item.text)}</span>
+                </div>
+              `).join('')}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openListsAddItemModal(parentOverlay, listName) {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.style.zIndex = '9995';
+      modal.innerHTML = `
+        <div class="modal" style="width:380px">
+          <h3>&#x1F4CB; Add Item</h3>
+          ${!listName ? `
+            <label>List Name</label>
+            <input type="text" id="list-app-name" placeholder="e.g. Shopping, To-do" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;background:var(--card);color:var(--text)">
+          ` : ''}
+          <label>Item</label>
+          <input type="text" id="list-app-item" placeholder="e.g. Milk, eggs" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:16px;background:var(--card);color:var(--text)">
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn-cancel" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:none;cursor:pointer;color:var(--text)">Cancel</button>
+            <button class="btn-save" style="padding:8px 16px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">Add</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+      modal.querySelector('.btn-cancel').onclick = () => modal.remove();
+      modal.querySelector('.btn-save').onclick = async () => {
+        const name = listName || modal.querySelector('#list-app-name')?.value?.trim();
+        const text = modal.querySelector('#list-app-item').value.trim();
+        if (!name) { modal.querySelector('#list-app-name').style.borderColor = '#e74c3c'; return; }
+        if (!text) { modal.querySelector('#list-app-item').style.borderColor = '#e74c3c'; return; }
+        modal.querySelector('.btn-save').disabled = true;
+        modal.querySelector('.btn-save').textContent = 'Adding...';
+        await fetch(`/api/list-items?secret=${getSecret()}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ list_name: name, text }),
+        });
+        modal.remove();
+        if (parentOverlay) parentOverlay.remove();
+        setTimeout(() => { openListsApp(); refreshDashboard(); }, 300);
+      };
+      (modal.querySelector('#list-app-item') || modal.querySelector('#list-app-name')).focus();
     }
 
     /* ---- Reminders App ---- */
