@@ -12,7 +12,7 @@ CREATE TABLE users (
   telegram_username TEXT,
   display_name TEXT NOT NULL,
   family_id UUID REFERENCES families(id),
-  timezone TEXT NOT NULL DEFAULT 'America/New_York',
+  timezone TEXT NOT NULL DEFAULT 'Europe/London',
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

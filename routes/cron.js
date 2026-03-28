@@ -201,7 +201,7 @@ export async function sendWeeklyDigest(bot) {
   for (const user of users) {
     if (!user.family_id) continue;
 
-    const tz = user.timezone || 'America/New_York';
+    const tz = user.timezone || 'Europe/London';
     const now = new Date();
     const weekStart = startOfDayInTz(now, tz);
     const weekEnd = endOfDayInTz(addDays(now, 6), tz);

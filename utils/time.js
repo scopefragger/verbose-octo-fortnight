@@ -1,14 +1,14 @@
 /**
  * Get the current date/time formatted for a given timezone.
  */
-export function nowInTimezone(timezone = 'America/New_York') {
+export function nowInTimezone(timezone = 'Europe/London') {
   return new Date().toLocaleString('en-US', { timeZone: timezone });
 }
 
 /**
  * Get today's date as YYYY-MM-DD in the user's timezone.
  */
-export function todayInTimezone(timezone = 'America/New_York') {
+export function todayInTimezone(timezone = 'Europe/London') {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
     year: 'numeric',
@@ -25,7 +25,7 @@ export function todayInTimezone(timezone = 'America/New_York') {
 /**
  * Format a TIMESTAMPTZ for display in a user's timezone.
  */
-export function formatForUser(isoString, timezone = 'America/New_York') {
+export function formatForUser(isoString, timezone = 'Europe/London') {
   const date = new Date(isoString);
   return date.toLocaleString('en-US', {
     timeZone: timezone,

@@ -20,7 +20,7 @@ export async function getDashboardData(familyId) {
     .select('id, display_name, telegram_username, timezone')
     .eq('family_id', familyId);
 
-  const tz = members?.[0]?.timezone || 'America/New_York';
+  const tz = members?.[0]?.timezone || 'Europe/London';
   const now = new Date();
 
   // Today's date boundaries
