@@ -559,14 +559,13 @@
       padding: 12px;
       display: grid;
       grid-template-columns: 220px 1fr 1fr 1fr;
-      grid-template-rows: auto auto 1fr 1fr auto;
+      grid-template-rows: auto auto 1fr 1fr;
       gap: 12px;
       grid-template-areas:
         "sidebar header    header    header"
         "sidebar countdown countdown countdown"
         "sidebar today     upcoming  lists"
-        "sidebar meals     foodexp   reminders"
-        "sidebar apps      apps      apps";
+        "sidebar meals     foodexp   reminders";
     }
 
     /* Cards */
@@ -1734,43 +1733,102 @@
     /* === MEALS === */
     .meals-card { grid-area: meals; }
     .foodexp-card { grid-area: foodexp; }
-    .apps-card { grid-area: apps; }
-
-    /* Apps strip */
-    .apps-strip {
+    /* Apps button (bottom-left, next to settings) */
+    .apps-btn {
+      position: fixed;
+      bottom: 18px;
+      left: 18px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 9000;
       display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .apps-btn:hover { transform: scale(1.1); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+    .apps-btn-badge {
+      position: absolute;
+      top: -4px; right: -4px;
+      background: #e74c3c;
+      color: #fff;
+      font-size: 0.6rem;
+      font-weight: 700;
+      min-width: 16px;
+      height: 16px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+    }
+
+    /* Apps drawer overlay */
+    .apps-drawer-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(3px);
+      z-index: 9500;
+      display: none;
+      animation: fadeIn 0.2s ease;
+    }
+    .apps-drawer-backdrop.open { display: block; }
+    .apps-drawer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--card);
+      border-radius: 20px 20px 0 0;
+      z-index: 9501;
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+      max-height: 70vh;
+      overflow-y: auto;
+      padding: 20px 24px 30px;
+    }
+    .apps-drawer.open { transform: translateY(0); }
+    .apps-drawer-handle {
+      width: 40px; height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 0 auto 16px;
+    }
+    .apps-drawer h3 { margin: 0 0 16px; font-size: 1.1rem; }
+    .apps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
       gap: 12px;
-      overflow-x: auto;
-      padding: 4px 0;
     }
     .app-tile {
-      flex: 0 0 auto;
-      min-width: 200px;
-      max-width: 320px;
-      background: var(--card);
+      background: var(--bg);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 12px 16px;
+      padding: 16px;
       cursor: pointer;
       transition: transform 0.15s, box-shadow 0.15s;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
+      text-align: center;
     }
     .app-tile:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-    .app-tile .app-icon { font-size: 28px; }
-    .app-tile .app-info { flex: 1; }
-    .app-tile .app-name { font-weight: 600; font-size: 0.95rem; }
-    .app-tile .app-desc { font-size: 0.75rem; color: #888; margin-top: 2px; }
+    .app-tile .app-icon { font-size: 36px; }
+    .app-tile .app-name { font-weight: 600; font-size: 0.9rem; }
+    .app-tile .app-desc { font-size: 0.7rem; color: #888; }
     .app-tile .app-badge {
       background: var(--accent);
       color: #fff;
-      font-size: 0.7rem;
+      font-size: 0.65rem;
       font-weight: 700;
       padding: 2px 7px;
       border-radius: 10px;
-      min-width: 20px;
-      text-align: center;
     }
 
     /* Watchlist fullscreen */
@@ -2743,8 +2801,7 @@
           "countdown countdown"
           "today upcoming"
           "lists meals"
-          "foodexp reminders"
-          "apps apps";
+          "foodexp reminders";
       }
       .sidebar { display: none; }
       .mobile-kids { display: block; }
@@ -2767,8 +2824,7 @@
           "lists"
           "meals"
           "foodexp"
-          "reminders"
-          "apps";
+          "reminders";
       }
       .countdown-area { flex-direction: column; }
       .card { padding: 12px; }
@@ -2803,6 +2859,21 @@
     <div class="loading" id="loading">
       <div class="spinner"></div>
       Loading dashboard...
+    </div>
+  </div>
+
+  <!-- Apps button + drawer -->
+  <button class="apps-btn" onclick="toggleAppsDrawer()" title="Apps">&#x1F4F1;</button>
+  <div class="apps-drawer-backdrop" id="appsBackdrop" onclick="toggleAppsDrawer()"></div>
+  <div class="apps-drawer" id="appsDrawer">
+    <div class="apps-drawer-handle"></div>
+    <h3>&#x1F4F1; Apps</h3>
+    <div class="apps-grid">
+      <div class="app-tile" onclick="toggleAppsDrawer(); openWatchlist();">
+        <div class="app-icon">&#x1F3AC;</div>
+        <div class="app-name">Things to Watch</div>
+        <div class="app-desc">Movies, TV & more</div>
+      </div>
     </div>
   </div>
 
@@ -4286,23 +4357,23 @@
                 </div>
               `).join('')}
           </div>
-        <!-- Apps -->
-        <div class="card apps-card">
-          <div class="card-title"><span class="icon">&#x1F4F1;</span> Apps</div>
-          <div class="card-body">
-            <div class="apps-strip">
-              <div class="app-tile" onclick="openWatchlist()">
-                <div class="app-icon">&#x1F3AC;</div>
-                <div class="app-info">
-                  <div class="app-name">Things to Watch</div>
-                  <div class="app-desc">Movies, TV shows & more</div>
-                </div>
-                ${(data.watchlist || []).length > 0 ? `<div class="app-badge">${data.watchlist.length}</div>` : ''}
-              </div>
-            </div>
-          </div>
-        </div>
       `;
+
+      // Update apps badge
+      const appsBtn = document.querySelector('.apps-btn');
+      if (appsBtn) {
+        const wlCount = (data.watchlist || []).length;
+        const existingBadge = appsBtn.querySelector('.apps-btn-badge');
+        if (wlCount > 0) {
+          if (existingBadge) { existingBadge.textContent = wlCount; }
+          else {
+            const badge = document.createElement('span');
+            badge.className = 'apps-btn-badge';
+            badge.textContent = wlCount;
+            appsBtn.appendChild(badge);
+          }
+        } else if (existingBadge) { existingBadge.remove(); }
+      }
 
       updateClock();
     }
@@ -4808,6 +4879,13 @@
 
     /* ---- Settings panel ---- */
     let settingsLoaded = false;
+
+    function toggleAppsDrawer() {
+      const drawer = document.getElementById('appsDrawer');
+      const backdrop = document.getElementById('appsBackdrop');
+      drawer.classList.toggle('open');
+      backdrop.classList.toggle('open');
+    }
 
     function toggleSettings() {
       const panel = document.getElementById('settingsPanel');
