@@ -17,6 +17,7 @@ import { getWatchlist, addToWatchlist, markWatched, removeFromWatchlist } from '
 import { getBirthdays, addBirthday, updateBirthday, removeBirthday } from './services/birthdays.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
+import { logError, getErrors, clearErrors } from './utils/errorLog.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -42,7 +43,7 @@ app.get('/cron/check', async (req, res) => {
     const result = await checkReminders(bot);
     res.json(result);
   } catch (err) {
-    console.error('Cron check failed:', err);
+    logError('cron-check', err);
     res.status(500).json({ error: 'check failed' });
   }
 });
@@ -56,7 +57,7 @@ app.get('/cron/daily', async (req, res) => {
     const result = await sendDailyDigest(bot);
     res.json(result);
   } catch (err) {
-    console.error('Daily digest failed:', err);
+    logError('daily-digest', err);
     res.status(500).json({ error: 'digest failed' });
   }
 });
@@ -70,7 +71,7 @@ app.get('/cron/weekly', async (req, res) => {
     const result = await sendWeeklyDigest(bot);
     res.json(result);
   } catch (err) {
-    console.error('Weekly digest failed:', err);
+    logError('weekly-digest', err);
     res.status(500).json({ error: 'digest failed' });
   }
 });
@@ -117,7 +118,7 @@ app.get('/api/dashboard', async (req, res) => {
     dashboardCache = { data, timestamp: Date.now() };
     res.json(data);
   } catch (err) {
-    console.error('Dashboard API error:', err);
+    logError('dashboard-api', err);
     // Return stale cache if available rather than an error
     if (dashboardCache.data) {
       return res.json(dashboardCache.data);
@@ -147,7 +148,7 @@ app.post('/api/meals', async (req, res) => {
     invalidateCache();
     res.json(meal);
   } catch (err) {
-    console.error('Meal create/update error:', err);
+    logError('Meal create/update', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -165,7 +166,7 @@ app.delete('/api/meals', async (req, res) => {
     invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
-    console.error('Meal delete error:', err);
+    logError('Meal delete', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -181,7 +182,7 @@ app.get('/api/meal-titles', async (req, res) => {
     const titles = await getUniqueMealTitles(familyId);
     res.json({ titles });
   } catch (err) {
-    console.error('Meal titles error:', err);
+    logError('Meal titles', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -197,7 +198,7 @@ app.get('/api/food-items', async (req, res) => {
     const items = await getFoodItems(familyId);
     res.json({ items });
   } catch (err) {
-    console.error('Food items error:', err);
+    logError('Food items', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -214,7 +215,7 @@ app.post('/api/food-items', async (req, res) => {
     invalidateCache();
     res.json({ item });
   } catch (err) {
-    console.error('Add food item error:', err);
+    logError('Add food item', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -229,7 +230,7 @@ app.delete('/api/food-items', async (req, res) => {
     invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
-    console.error('Remove food item error:', err);
+    logError('Remove food item', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -248,7 +249,7 @@ app.post('/api/countdowns', async (req, res) => {
     invalidateCache();
     res.json(countdown);
   } catch (err) {
-    console.error('Create countdown error:', err);
+    logError('Create countdown', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -264,7 +265,7 @@ app.put('/api/countdowns/:id', async (req, res) => {
     invalidateCache();
     res.json(countdown);
   } catch (err) {
-    console.error('Update countdown error:', err);
+    logError('Update countdown', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -280,7 +281,7 @@ app.delete('/api/countdowns/:id', async (req, res) => {
     invalidateCache();
     res.json({ deleted: true, title: deleted?.title });
   } catch (err) {
-    console.error('Delete countdown error:', err);
+    logError('Delete countdown', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -298,7 +299,7 @@ app.post('/api/events', async (req, res) => {
     invalidateCache();
     res.json(event);
   } catch (err) {
-    console.error('Event create error:', err);
+    logError('Event create', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -315,7 +316,7 @@ app.delete('/api/events', async (req, res) => {
     invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
-    console.error('Event delete error:', err);
+    logError('Event delete', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -333,7 +334,7 @@ app.post('/api/list-items', async (req, res) => {
     invalidateCache();
     res.json(result);
   } catch (err) {
-    console.error('List item add error:', err);
+    logError('List item add', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -351,7 +352,7 @@ app.delete('/api/list-items', async (req, res) => {
     invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
-    console.error('List item remove error:', err);
+    logError('List item remove', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -366,7 +367,7 @@ app.delete('/api/list-items/:id', async (req, res) => {
     invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
-    console.error('List item delete error:', err);
+    logError('List item delete', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -384,7 +385,7 @@ app.post('/api/reminders', async (req, res) => {
     invalidateCache();
     res.json(reminder);
   } catch (err) {
-    console.error('Reminder create error:', err);
+    logError('Reminder create', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -401,7 +402,7 @@ app.delete('/api/reminders', async (req, res) => {
     invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
-    console.error('Reminder delete error:', err);
+    logError('Reminder delete', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -422,7 +423,7 @@ app.post('/api/points', async (req, res) => {
     invalidateCache();
     res.json(result);
   } catch (err) {
-    console.error('Points adjust error:', err);
+    logError('Points adjust', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -440,7 +441,7 @@ app.get('/api/point-history', async (req, res) => {
     const result = await getPointHistory(familyId, kid_name);
     res.json(result);
   } catch (err) {
-    console.error('Point history error:', err);
+    logError('Point history', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -465,7 +466,7 @@ app.post('/api/theme', async (req, res) => {
     invalidateCache();
     res.json(result);
   } catch (err) {
-    console.error('Theme set error:', err);
+    logError('Theme set', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -484,7 +485,7 @@ app.post('/api/seed-holidays', async (req, res) => {
     invalidateCache();
     res.json({ year, holidays: results });
   } catch (err) {
-    console.error('Seed holidays error:', err);
+    logError('Seed holidays', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -501,7 +502,7 @@ app.get('/api/watchlist', async (req, res) => {
     const items = await getWatchlist(familyId, includeWatched);
     res.json({ items });
   } catch (err) {
-    console.error('Watchlist fetch error:', err);
+    logError('Watchlist fetch', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -517,7 +518,7 @@ app.post('/api/watchlist', async (req, res) => {
     invalidateCache();
     res.json(item);
   } catch (err) {
-    console.error('Watchlist add error:', err);
+    logError('Watchlist add', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -533,7 +534,7 @@ app.put('/api/watchlist/:id/watched', async (req, res) => {
     invalidateCache();
     res.json(item);
   } catch (err) {
-    console.error('Watchlist mark watched error:', err);
+    logError('Watchlist mark watched', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -549,9 +550,26 @@ app.delete('/api/watchlist/:id', async (req, res) => {
     invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
-    console.error('Watchlist remove error:', err);
+    logError('Watchlist remove', err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── Error Log ──
+app.get('/api/errors', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  const limit = parseInt(req.query.limit) || 100;
+  res.json({ errors: getErrors(limit) });
+});
+
+app.delete('/api/errors', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  clearErrors();
+  res.json({ cleared: true });
 });
 
 // ── Chat History ──
@@ -588,7 +606,7 @@ app.get('/api/chat-history', async (req, res) => {
 
     res.json({ messages });
   } catch (err) {
-    console.error('Chat history error:', err);
+    logError('Chat history', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -604,7 +622,7 @@ app.get('/api/birthdays', async (req, res) => {
     const items = await getBirthdays(familyId);
     res.json({ birthdays: items });
   } catch (err) {
-    console.error('Birthdays fetch error:', err);
+    logError('Birthdays fetch', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -620,7 +638,7 @@ app.post('/api/birthdays', async (req, res) => {
     invalidateCache();
     res.json(item);
   } catch (err) {
-    console.error('Birthday add error:', err);
+    logError('Birthday add', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -636,7 +654,7 @@ app.put('/api/birthdays/:id', async (req, res) => {
     invalidateCache();
     res.json(item);
   } catch (err) {
-    console.error('Birthday update error:', err);
+    logError('Birthday update', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -652,7 +670,7 @@ app.delete('/api/birthdays/:id', async (req, res) => {
     invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
-    console.error('Birthday remove error:', err);
+    logError('Birthday remove', err);
     res.status(500).json({ error: err.message });
   }
 });
