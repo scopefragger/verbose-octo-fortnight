@@ -3837,20 +3837,21 @@
         return '<div class="empty-state"><div class="icon">&#x1F4CB;</div>No lists yet</div>';
       }
       return lists.map(list => {
-        const items = list.items || [];
-        if (items.length === 0) return '';
+        const items = (list.items || []).filter(i => !i.checked);
         return `
           <div class="list-group">
             <div class="list-group-name">${esc(list.name)}</div>
-            ${items.map(item => `
-              <div class="list-item ${item.checked ? 'done' : ''}" data-list-name="${esc(list.name)}" data-item-text="${esc(item.text || item.name)}" data-item-id="${item.id}">
-                <div class="list-item-check">${item.checked ? '&#x2713;' : ''}</div>
+            ${items.length === 0
+              ? '<div style="color:#999;font-size:.85rem;padding:4px 0;">No items</div>'
+              : items.map(item => `
+              <div class="list-item" data-list-name="${esc(list.name)}" data-item-text="${esc(item.text || item.name)}" data-item-id="${item.id}">
+                <div class="list-item-check"></div>
                 <span class="list-item-text">${esc(item.text || item.name)}</span>
               </div>
             `).join('')}
           </div>
         `;
-      }).filter(Boolean).join('') || '<div class="empty-state"><div class="icon">&#x1F4CB;</div>No lists yet</div>';
+      }).join('') || '<div class="empty-state"><div class="icon">&#x1F4CB;</div>No lists yet</div>';
     }
 
     function renderMeals(meals) {

@@ -129,15 +129,56 @@ export async function getAllLists(familyId) {
  * Get all lists with their items in a single efficient query (for dashboard).
  */
 export async function getAllListsWithItems(familyId) {
-  const { data, error } = await supabase
+  // Get all lists
+  const { data: lists, error } = await supabase
     .from('lists')
-    .select('id, name, list_items(id, text, checked)')
+    .select('id, name')
     .eq('family_id', familyId)
     .order('created_at');
   if (error) throw error;
-  return (data || []).map((list) => ({
+  if (!lists || lists.length === 0) return [];
+
+  // Deduplicate lists by name (keep the oldest one per name)
+  const uniqueLists = [];
+  const seenNames = new Set();
+  const allListIds = [];
+  for (const list of lists) {
+    const key = list.name.toLowerCase();
+    allListIds.push(list.id);
+    if (!seenNames.has(key)) {
+      seenNames.add(key);
+      uniqueLists.push(list);
+    }
+  }
+
+  // Fetch items in batches of 50 list IDs to avoid request size limits
+  const allItems = [];
+  for (let i = 0; i < allListIds.length; i += 50) {
+    const batch = allListIds.slice(i, i + 50);
+    const { data: items, error: itemsErr } = await supabase
+      .from('list_items')
+      .select('id, list_id, text, checked')
+      .in('list_id', batch)
+      .order('created_at');
+    if (itemsErr) throw itemsErr;
+    allItems.push(...(items || []));
+  }
+
+  // Group items by list name (merge duplicates)
+  const itemsByName = {};
+  const listIdToName = {};
+  for (const list of lists) {
+    listIdToName[list.id] = list.name.toLowerCase();
+  }
+  for (const item of allItems) {
+    const name = listIdToName[item.list_id];
+    if (!itemsByName[name]) itemsByName[name] = [];
+    itemsByName[name].push(item);
+  }
+
+  return uniqueLists.map((list) => ({
     name: list.name,
-    items: list.list_items || [],
+    items: itemsByName[list.name.toLowerCase()] || [],
   }));
 }
 
