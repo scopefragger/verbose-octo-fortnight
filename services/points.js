@@ -90,7 +90,7 @@ export async function getPointHistory(familyId, kidName) {
     .select('change, reason, created_at')
     .eq('kid_points_id', kid.id)
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(30);
   if (error) throw error;
 
   return { kid_name: kid.kid_name, points: kid.points, history: data || [] };

@@ -835,10 +835,110 @@
       text-shadow: 0 1px 4px rgba(0,0,0,0.15);
     }
 
+    .clickable-points {
+      cursor: pointer;
+      transition: transform 0.15s, opacity 0.15s;
+    }
+    .clickable-points:hover {
+      transform: scale(1.1);
+      opacity: 0.8;
+    }
+
     .points-label {
       font-size: 10px;
       opacity: 0.85;
       margin-top: 1px;
+    }
+
+    /* Points History Modal */
+    .points-history-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.2s ease;
+    }
+    .points-history-panel {
+      background: var(--card-bg, #fff);
+      color: var(--text, #1a1a2e);
+      border-radius: 16px;
+      width: 90%;
+      max-width: 420px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: slideUp 0.3s ease;
+    }
+    .points-history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 20px 12px;
+      border-bottom: 1px solid rgba(128,128,128,0.15);
+    }
+    .points-history-header h3 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .points-history-close {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: var(--text, #1a1a2e);
+      opacity: 0.6;
+      padding: 4px 8px;
+    }
+    .points-history-close:hover { opacity: 1; }
+    .points-history-list {
+      padding: 12px 20px 20px;
+    }
+    .points-history-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(128,128,128,0.1);
+    }
+    .points-history-item:last-child { border-bottom: none; }
+    .ph-change {
+      font-size: 16px;
+      font-weight: 700;
+      min-width: 44px;
+      text-align: center;
+      padding: 4px 8px;
+      border-radius: 8px;
+    }
+    .ph-change.positive {
+      color: #2ecc71;
+      background: rgba(46,204,113,0.12);
+    }
+    .ph-change.negative {
+      color: #e74c3c;
+      background: rgba(231,76,60,0.12);
+    }
+    .ph-details {
+      flex: 1;
+      min-width: 0;
+    }
+    .ph-reason {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .ph-date {
+      font-size: 11px;
+      opacity: 0.55;
+      margin-top: 2px;
+    }
+    .ph-empty {
+      text-align: center;
+      padding: 30px 0;
+      opacity: 0.5;
+      font-size: 14px;
     }
 
     .points-progress {
@@ -2504,8 +2604,8 @@
                 ? Array.from({length: mickeyCount}, () => headFn()).join('')
                 : `<span class="points-empty-msg">${emptyMsg}</span>`}
             </div>
-            <div class="points-total">${progressInCurrentMickey}</div>
-            <div class="points-label">points</div>
+            <div class="points-total clickable-points" data-kid="${esc(kid.kid_name)}" title="View history">${progressInCurrentMickey}</div>
+            <div class="points-label clickable-points" data-kid="${esc(kid.kid_name)}" style="cursor:pointer">points ▾</div>
             <div class="points-progress">
               <div class="progress-bar-track">
                 <div class="progress-bar-fill" style="width:${progressPct}%"></div>
@@ -2682,6 +2782,65 @@
       }
     }
 
+    async function showPointsHistory(kidName) {
+      // Remove any existing history overlay
+      document.querySelectorAll('.points-history-overlay').forEach(el => el.remove());
+
+      const overlay = document.createElement('div');
+      overlay.className = 'points-history-overlay';
+      overlay.innerHTML = `
+        <div class="points-history-panel">
+          <div class="points-history-header">
+            <h3>${esc(kidName)}'s Points History</h3>
+            <button class="points-history-close">&times;</button>
+          </div>
+          <div class="points-history-list">
+            <div class="ph-empty">Loading...</div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      // Close handlers
+      overlay.querySelector('.points-history-close').addEventListener('click', () => overlay.remove());
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
+      });
+
+      try {
+        const res = await fetch(`/api/point-history?secret=${getSecret()}&kid_name=${encodeURIComponent(kidName)}`);
+        if (!res.ok) throw new Error('Failed to load history');
+        const data = await res.json();
+        const listEl = overlay.querySelector('.points-history-list');
+
+        if (!data.history || data.history.length === 0) {
+          listEl.innerHTML = '<div class="ph-empty">No points history yet</div>';
+          return;
+        }
+
+        listEl.innerHTML = data.history.map(h => {
+          const isPositive = h.change > 0;
+          const changeStr = isPositive ? `+${h.change}` : `${h.change}`;
+          const cls = isPositive ? 'positive' : 'negative';
+          const date = new Date(h.created_at);
+          const dateStr = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+          return `
+            <div class="points-history-item">
+              <div class="ph-change ${cls}">${changeStr}</div>
+              <div class="ph-details">
+                <div class="ph-reason">${esc(h.reason || 'No reason')}</div>
+                <div class="ph-date">${dateStr}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Points history error:', err);
+        const listEl = overlay.querySelector('.points-history-list');
+        if (listEl) listEl.innerHTML = '<div class="ph-empty">Failed to load history</div>';
+      }
+    }
+
     function openEventModal() {
       const todayStr = getTodayStr();
       const overlay = document.createElement('div');
@@ -2831,6 +2990,11 @@
       }
       if (e.target.closest('.reminder-add-btn')) {
         openReminderModal();
+        return;
+      }
+      const clickablePoints = e.target.closest('.clickable-points');
+      if (clickablePoints) {
+        showPointsHistory(clickablePoints.dataset.kid);
         return;
       }
       const pointsBtn = e.target.closest('.points-btn');

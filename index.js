@@ -10,7 +10,7 @@ import { addItem, removeItem, removeItemById } from './services/lists.js';
 import { createReminder, deleteReminder } from './services/reminders.js';
 import { seedUKHolidays } from './services/holidays.js';
 import { setTheme, listThemes } from './services/themes.js';
-import { adjustPoints } from './services/points.js';
+import { adjustPoints, getPointHistory } from './services/points.js';
 import { addFoodItem, getFoodItems, removeFoodItemById } from './services/foodExpiry.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
@@ -369,6 +369,24 @@ app.post('/api/points', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('Points adjust error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get point history for a kid
+app.get('/api/point-history', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { kid_name } = req.query;
+    if (!kid_name) return res.status(400).json({ error: 'kid_name is required' });
+    const result = await getPointHistory(familyId, kid_name);
+    res.json(result);
+  } catch (err) {
+    console.error('Point history error:', err);
     res.status(500).json({ error: err.message });
   }
 });
