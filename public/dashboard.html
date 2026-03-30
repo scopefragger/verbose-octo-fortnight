@@ -2964,6 +2964,11 @@
         <div class="app-name">Reminders</div>
         <div class="app-desc">Pending & recurring</div>
       </div>
+      <div class="app-tile" onclick="toggleAppsDrawer(); openIdeasApp();">
+        <div class="app-icon">&#x1F4A1;</div>
+        <div class="app-name">Ideas</div>
+        <div class="app-desc">Capture & enrich ideas</div>
+      </div>
       <div class="app-tile" onclick="toggleAppsDrawer(); openErrorLogApp();">
         <div class="app-icon">&#x1F6A8;</div>
         <div class="app-name">Error Log</div>
@@ -4887,6 +4892,183 @@
     }
 
     /* ---- Error Log App ---- */
+    async function openIdeasApp() {
+      let ideas = [];
+      try {
+        const res = await fetch(`/api/ideas?secret=${getSecret()}`);
+        const json = await res.json();
+        ideas = json.ideas || [];
+      } catch (e) { console.error('Failed to load ideas', e); }
+
+      const pending = ideas.filter(i => i.status === 'pending' || i.status === 'processing');
+      const enriched = ideas.filter(i => i.status === 'enriched');
+      const failed = ideas.filter(i => i.status === 'failed');
+
+      const overlay = document.createElement('div');
+      overlay.className = 'birthday-overlay';
+      overlay.innerHTML = `
+        <div class="birthday-panel" style="max-width:800px;max-height:90vh">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <h2 style="margin:0">&#x1F4A1; Ideas</h2>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button id="ideas-process-btn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--accent,#4a90d9);background:var(--accent,#4a90d9);color:#fff;cursor:pointer;font-size:13px">&#x2699; Process Queue</button>
+              <button id="ideas-add-btn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--accent,#4a90d9);background:var(--accent,#4a90d9);color:#fff;cursor:pointer;font-size:13px">+ Add Idea</button>
+              <button onclick="this.closest('.birthday-overlay').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text,#333)">&times;</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:14px">
+            <button class="ideas-tab active" data-tab="pending" style="padding:6px 16px;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:13px">Pending (${pending.length})</button>
+            <button class="ideas-tab" data-tab="enriched" style="padding:6px 16px;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:13px">Enriched (${enriched.length})</button>
+            ${failed.length ? `<button class="ideas-tab" data-tab="failed" style="padding:6px 16px;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:13px">Failed (${failed.length})</button>` : ''}
+          </div>
+          <div id="ideas-body" style="overflow-y:auto;max-height:calc(90vh - 120px)"></div>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+      function renderIdeasTab(tab) {
+        const items = tab === 'pending' ? pending : tab === 'enriched' ? enriched : failed;
+        const body = overlay.querySelector('#ideas-body');
+        if (!items.length) {
+          body.innerHTML = `<div style="text-align:center;padding:40px;color:#999">${tab === 'pending' ? 'No pending ideas. Add one!' : tab === 'enriched' ? 'No enriched ideas yet. Process the queue!' : 'No failed items.'}</div>`;
+          return;
+        }
+        body.innerHTML = items.map(idea => {
+          const date = new Date(idea.created_at).toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+          const statusColors = { pending: '#f59e0b', processing: '#3b82f6', enriched: '#10b981', failed: '#ef4444' };
+          const statusColor = statusColors[idea.status] || '#999';
+
+          let enrichedHtml = '';
+          if (idea.status === 'enriched') {
+            enrichedHtml = `
+              <div style="margin-top:10px;padding:12px;background:rgba(0,0,0,0.03);border-radius:8px;font-size:13px">
+                ${idea.enriched_summary ? `<div style="margin-bottom:8px"><strong>Summary:</strong> ${esc(idea.enriched_summary)}</div>` : ''}
+                ${idea.enriched_implementation ? `<div style="margin-bottom:8px"><strong>Implementation:</strong><br>${esc(idea.enriched_implementation).replace(/\\n/g, '<br>')}</div>` : ''}
+                ${idea.enriched_considerations ? `<div style="margin-bottom:8px"><strong>Considerations:</strong><br>${esc(idea.enriched_considerations).replace(/\\n/g, '<br>')}</div>` : ''}
+                ${idea.enriched_effort ? `<div><strong>Effort:</strong> ${esc(idea.enriched_effort)}</div>` : ''}
+              </div>`;
+          }
+          if (idea.status === 'failed' && idea.enriched_summary) {
+            enrichedHtml = `<div style="margin-top:8px;padding:8px;background:rgba(239,68,68,0.1);border-radius:6px;font-size:12px;color:#ef4444">${esc(idea.enriched_summary)}</div>`;
+          }
+
+          return `<div style="padding:12px;border:1px solid var(--border,#e0e0e0);border-radius:10px;margin-bottom:8px;background:var(--card-bg,#fff)">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div style="flex:1">
+                <div style="font-weight:600;font-size:15px">${esc(idea.title)}</div>
+                ${idea.description ? `<div style="font-size:13px;color:#666;margin-top:4px">${esc(idea.description)}</div>` : ''}
+                <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+                  <span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${statusColor}20;color:${statusColor};font-weight:600">${idea.status}</span>
+                  ${idea.category ? `<span style="font-size:11px;color:#888">${esc(idea.category)}</span>` : ''}
+                  <span style="font-size:11px;color:#aaa">${date}</span>
+                </div>
+              </div>
+              <button data-delete-idea="${idea.id}" style="background:none;border:none;cursor:pointer;font-size:16px;color:#999" title="Delete">&#x1F5D1;</button>
+            </div>
+            ${enrichedHtml}
+          </div>`;
+        }).join('');
+      }
+
+      renderIdeasTab('pending');
+
+      // Tab switching
+      overlay.querySelectorAll('.ideas-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          overlay.querySelectorAll('.ideas-tab').forEach(b => {
+            b.classList.remove('active');
+            b.style.background = '';
+            b.style.color = '';
+          });
+          btn.classList.add('active');
+          btn.style.background = 'var(--accent,#4a90d9)';
+          btn.style.color = '#fff';
+          renderIdeasTab(btn.dataset.tab);
+        });
+        // Style active tab
+        if (btn.classList.contains('active')) {
+          btn.style.background = 'var(--accent,#4a90d9)';
+          btn.style.color = '#fff';
+        }
+      });
+
+      // Delete handler
+      overlay.addEventListener('click', async e => {
+        const del = e.target.closest('[data-delete-idea]');
+        if (!del) return;
+        del.disabled = true;
+        await fetch(`/api/ideas/${del.dataset.deleteIdea}?secret=${getSecret()}`, { method: 'DELETE' });
+        overlay.remove();
+        openIdeasApp();
+      });
+
+      // Add button
+      overlay.querySelector('#ideas-add-btn').addEventListener('click', () => {
+        openIdeasAddModal(overlay);
+      });
+
+      // Process queue button
+      overlay.querySelector('#ideas-process-btn').addEventListener('click', async function() {
+        this.disabled = true;
+        this.textContent = 'Processing...';
+        try {
+          const res = await fetch(`/api/ideas/process?secret=${getSecret()}`, { method: 'POST' });
+          const result = await res.json();
+          this.textContent = `Done! ${result.processed || 0} processed`;
+          setTimeout(() => { overlay.remove(); openIdeasApp(); }, 1000);
+        } catch (e) {
+          this.textContent = 'Error!';
+          setTimeout(() => { this.textContent = '⚙ Process Queue'; this.disabled = false; }, 2000);
+        }
+      });
+    }
+
+    function openIdeasAddModal(parentOverlay) {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9998';
+      modal.innerHTML = `
+        <div style="background:var(--card-bg,#fff);border-radius:14px;padding:24px;width:90%;max-width:450px;box-shadow:0 8px 32px rgba(0,0,0,0.2)">
+          <h3 style="margin:0 0 16px">&#x1F4A1; New Idea</h3>
+          <div style="margin-bottom:12px">
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">Title *</label>
+            <input id="idea-title" type="text" placeholder="What's the idea?" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border,#ddd);font-size:14px;box-sizing:border-box">
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">Description</label>
+            <textarea id="idea-desc" rows="3" placeholder="Any details or context..." style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border,#ddd);font-size:14px;box-sizing:border-box;resize:vertical"></textarea>
+          </div>
+          <div style="margin-bottom:16px">
+            <label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px">Category</label>
+            <input id="idea-category" type="text" placeholder="e.g. Feature, Project, Home..." style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border,#ddd);font-size:14px;box-sizing:border-box">
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button id="idea-cancel" style="padding:8px 18px;border-radius:8px;border:1px solid var(--border,#ddd);background:none;cursor:pointer;font-size:14px">Cancel</button>
+            <button id="idea-save" style="padding:8px 18px;border-radius:8px;border:none;background:var(--accent,#4a90d9);color:#fff;cursor:pointer;font-size:14px;font-weight:600">Save</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+      modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+      modal.querySelector('#idea-cancel').addEventListener('click', () => modal.remove());
+      modal.querySelector('#idea-save').addEventListener('click', async () => {
+        const title = modal.querySelector('#idea-title').value.trim();
+        if (!title) { modal.querySelector('#idea-title').style.borderColor = '#ef4444'; return; }
+        const description = modal.querySelector('#idea-desc').value.trim();
+        const category = modal.querySelector('#idea-category').value.trim();
+        modal.querySelector('#idea-save').disabled = true;
+        modal.querySelector('#idea-save').textContent = 'Saving...';
+        await fetch(`/api/ideas?secret=${getSecret()}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, description, category }),
+        });
+        modal.remove();
+        if (parentOverlay) parentOverlay.remove();
+        openIdeasApp();
+      });
+      setTimeout(() => modal.querySelector('#idea-title').focus(), 100);
+    }
+
     async function openErrorLogApp() {
       const overlay = document.createElement('div');
       overlay.className = 'birthday-overlay';

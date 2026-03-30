@@ -15,6 +15,7 @@ import { addFoodItem, getFoodItems, removeFoodItemById } from './services/foodEx
 import { createCountdown, updateCountdown, deleteCountdown } from './services/countdowns.js';
 import { getWatchlist, addToWatchlist, markWatched, removeFromWatchlist } from './services/watchlist.js';
 import { getBirthdays, addBirthday, updateBirthday, removeBirthday } from './services/birthdays.js';
+import { getIdeas, addIdea, deleteIdea, processIdeaQueue } from './services/ideas.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import { logError, getErrors, clearErrors } from './utils/errorLog.js';
@@ -671,6 +672,86 @@ app.delete('/api/birthdays/:id', async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     logError('Birthday remove', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Ideas endpoints
+app.get('/api/ideas', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const ideas = await getIdeas(familyId);
+    res.json({ ideas });
+  } catch (err) {
+    logError('Ideas list', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/ideas', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const idea = await addIdea(familyId, req.body, null);
+    invalidateCache();
+    res.json(idea);
+  } catch (err) {
+    logError('Ideas add', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/ideas/:id', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    await deleteIdea(req.params.id, familyId);
+    invalidateCache();
+    res.json({ deleted: true });
+  } catch (err) {
+    logError('Ideas delete', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/ideas/process', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const result = await processIdeaQueue(familyId);
+    invalidateCache();
+    res.json(result);
+  } catch (err) {
+    logError('Ideas process', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/cron/ideas', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const result = await processIdeaQueue(familyId);
+    invalidateCache();
+    res.json(result);
+  } catch (err) {
+    logError('Cron ideas', err);
     res.status(500).json({ error: err.message });
   }
 });
