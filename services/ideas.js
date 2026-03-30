@@ -183,3 +183,93 @@ Respond ONLY with valid JSON, no markdown fences.`,
 
   return { processed, failed };
 }
+
+/**
+ * Auto-generate new ideas by having Groq analyse the GitHub repo.
+ * Fetches project context, asks LLM to brainstorm, then inserts as enriched ideas.
+ */
+export async function generateIdeas(familyId, count = 5) {
+  const projectContext = await getProjectContext();
+
+  // Also fetch existing ideas so we don't duplicate
+  const existing = await getIdeas(familyId);
+  const existingTitles = existing.map(i => i.title.toLowerCase());
+
+  const messages = [
+    {
+      role: 'system',
+      content: `You are a senior developer and product strategist analysing a real GitHub project. Your job is to brainstorm ${count} new feature ideas, improvements, or enhancements based on the actual codebase.
+
+${projectContext}
+
+Look at what already exists and identify:
+- Missing features that would make the app more useful for a family
+- Improvements to existing features (UX, performance, reliability)
+- Integrations with external services that would add value
+- Quality of life improvements for the dashboard or Telegram bot
+- Fun or creative features that fit the family assistant theme
+
+${existingTitles.length ? `\nALREADY SUGGESTED (do NOT repeat these):\n${existingTitles.join('\n')}` : ''}
+
+Respond with a JSON array of exactly ${count} objects, each with these keys:
+- "title": Short, descriptive title (under 60 chars)
+- "description": 1-2 sentence description of the idea
+- "category": One of "Feature", "Improvement", "Integration", "Fun", "Performance"
+- "summary": A 2-3 sentence expanded description explaining how it fits this project
+- "implementation": Concrete implementation steps referencing actual files and patterns (3-5 bullet points as a single string, use \\n for line breaks)
+- "considerations": Potential challenges specific to this codebase (2-4 bullet points as a single string, use \\n for line breaks)
+- "effort": One of "Quick win (< 1 hour)", "Small (a few hours)", "Medium (a day or two)", "Large (a week+)", "Ongoing"
+
+Respond ONLY with a valid JSON array, no markdown fences.`,
+    },
+    {
+      role: 'user',
+      content: `Analyse the project and generate ${count} new ideas. Be creative and specific to this codebase.`,
+    },
+  ];
+
+  const result = await chatCompletion(messages);
+  const content = result.choices[0]?.message?.content || '';
+  console.log('Ideas generation response:', content.substring(0, 200));
+
+  // Parse the JSON array
+  const cleaned = content.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+  let ideas;
+  try {
+    ideas = JSON.parse(cleaned);
+  } catch {
+    try {
+      const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+      if (arrMatch) ideas = JSON.parse(arrMatch[0]);
+    } catch { /* fall through */ }
+  }
+
+  if (!Array.isArray(ideas) || ideas.length === 0) {
+    throw new Error('Failed to parse generated ideas from LLM');
+  }
+
+  // Filter out duplicates
+  const newIdeas = ideas.filter(
+    i => i.title && !existingTitles.includes(i.title.toLowerCase())
+  );
+
+  // Insert as pre-enriched ideas
+  let inserted = 0;
+  for (const idea of newIdeas) {
+    const { error } = await supabase.from('ideas').insert({
+      family_id: familyId,
+      title: idea.title,
+      description: idea.description || null,
+      category: idea.category || null,
+      status: 'enriched',
+      enriched_summary: idea.summary || null,
+      enriched_implementation: idea.implementation || null,
+      enriched_considerations: idea.considerations || null,
+      enriched_effort: idea.effort || null,
+      processed_at: new Date().toISOString(),
+    });
+    if (!error) inserted++;
+  }
+
+  return { generated: inserted, duplicates_skipped: ideas.length - newIdeas.length };
+}

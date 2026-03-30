@@ -15,7 +15,7 @@ import { addFoodItem, getFoodItems, removeFoodItemById } from './services/foodEx
 import { createCountdown, updateCountdown, deleteCountdown } from './services/countdowns.js';
 import { getWatchlist, addToWatchlist, markWatched, removeFromWatchlist } from './services/watchlist.js';
 import { getBirthdays, addBirthday, updateBirthday, removeBirthday } from './services/birthdays.js';
-import { getIdeas, addIdea, deleteIdea, processIdeaQueue } from './services/ideas.js';
+import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas } from './services/ideas.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import { logError, getErrors, clearErrors } from './utils/errorLog.js';
@@ -736,6 +736,23 @@ app.post('/api/ideas/process', async (req, res) => {
     res.json(result);
   } catch (err) {
     logError('Ideas process', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/ideas/generate', async (req, res) => {
+  if (req.query.secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const count = parseInt(req.body?.count) || 5;
+    const result = await generateIdeas(familyId, count);
+    invalidateCache();
+    res.json(result);
+  } catch (err) {
+    logError('Ideas generate', err);
     res.status(500).json({ error: err.message });
   }
 });

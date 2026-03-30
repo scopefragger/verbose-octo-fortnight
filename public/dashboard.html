@@ -4911,6 +4911,7 @@
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
             <h2 style="margin:0">&#x1F4A1; Ideas</h2>
             <div style="display:flex;gap:8px;align-items:center">
+              <button id="ideas-generate-btn" style="padding:6px 14px;border-radius:8px;border:1px solid #10b981;background:#10b981;color:#fff;cursor:pointer;font-size:13px">&#x1F916; Generate Ideas</button>
               <button id="ideas-process-btn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--accent,#4a90d9);background:var(--accent,#4a90d9);color:#fff;cursor:pointer;font-size:13px">&#x2699; Process Queue</button>
               <button id="ideas-add-btn" style="padding:6px 14px;border-radius:8px;border:1px solid var(--accent,#4a90d9);background:var(--accent,#4a90d9);color:#fff;cursor:pointer;font-size:13px">+ Add Idea</button>
               <button onclick="this.closest('.birthday-overlay').remove()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text,#333)">&times;</button>
@@ -5019,6 +5020,25 @@
         } catch (e) {
           this.textContent = 'Error!';
           setTimeout(() => { this.textContent = '⚙ Process Queue'; this.disabled = false; }, 2000);
+        }
+      });
+
+      // Generate Ideas button - AI analyses the GitHub repo and brainstorms new ideas
+      overlay.querySelector('#ideas-generate-btn').addEventListener('click', async function() {
+        this.disabled = true;
+        this.textContent = 'Analysing repo...';
+        try {
+          const res = await fetch(`/api/ideas/generate?secret=${getSecret()}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ count: 5 }),
+          });
+          const result = await res.json();
+          this.textContent = `Generated ${result.generated || 0} ideas!`;
+          setTimeout(() => { overlay.remove(); openIdeasApp(); }, 1200);
+        } catch (e) {
+          this.textContent = 'Error!';
+          setTimeout(() => { this.textContent = '🤖 Generate Ideas'; this.disabled = false; }, 2000);
         }
       });
     }
