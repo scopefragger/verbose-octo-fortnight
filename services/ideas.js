@@ -77,10 +77,23 @@ Respond ONLY with valid JSON, no markdown fences.`,
 
       const result = await chatCompletion(messages);
       const content = result.choices[0]?.message?.content || '';
+      console.log('Ideas LLM response:', content.substring(0, 200));
 
-      // Try to parse JSON response
+      // Parse JSON response with multiple fallbacks
       const cleaned = content.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
-      const enriched = JSON.parse(cleaned);
+      let enriched;
+      try {
+        enriched = JSON.parse(cleaned);
+      } catch {
+        try {
+          const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+          if (jsonMatch) enriched = JSON.parse(jsonMatch[0]);
+        } catch { /* fall through */ }
+      }
+      if (!enriched) {
+        // Fallback: use the raw text as summary
+        enriched = { summary: cleaned, implementation: null, considerations: null, effort: null };
+      }
 
       await supabase
         .from('ideas')
