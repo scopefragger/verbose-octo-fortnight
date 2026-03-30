@@ -230,22 +230,47 @@ Respond ONLY with a valid JSON array, no markdown fences.`,
 
   const result = await chatCompletion(messages);
   const content = result.choices[0]?.message?.content || '';
-  console.log('Ideas generation response:', content.substring(0, 200));
+  console.log('Ideas generation raw response:', content.substring(0, 500));
 
-  // Parse the JSON array
+  // Parse the JSON array with multiple fallbacks
   const cleaned = content.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
   let ideas;
-  try {
-    ideas = JSON.parse(cleaned);
-  } catch {
+
+  // Attempt 1: parse whole response as JSON
+  try { ideas = JSON.parse(cleaned); } catch { /* continue */ }
+
+  // Attempt 2: extract array from response
+  if (!ideas) {
     try {
       const arrMatch = cleaned.match(/\[[\s\S]*\]/);
       if (arrMatch) ideas = JSON.parse(arrMatch[0]);
-    } catch { /* fall through */ }
+    } catch { /* continue */ }
+  }
+
+  // Attempt 3: if it's a single object, wrap it
+  if (!ideas) {
+    try {
+      const objMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (objMatch) {
+        const obj = JSON.parse(objMatch[0]);
+        if (obj.title) ideas = [obj];
+      }
+    } catch { /* continue */ }
+  }
+
+  // Attempt 4: try fixing common JSON issues (trailing commas, unescaped newlines)
+  if (!ideas) {
+    try {
+      const fixed = cleaned
+        .replace(/,\s*([}\]])/g, '$1')  // trailing commas
+        .replace(/\n/g, '\\n');           // unescaped newlines in strings
+      ideas = JSON.parse(fixed);
+    } catch { /* continue */ }
   }
 
   if (!Array.isArray(ideas) || ideas.length === 0) {
-    throw new Error('Failed to parse generated ideas from LLM');
+    console.error('Failed to parse ideas. Raw content:', content);
+    throw new Error(`Failed to parse generated ideas from LLM. Response started with: ${content.substring(0, 100)}`);
   }
 
   // Filter out duplicates
