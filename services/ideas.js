@@ -1,6 +1,60 @@
 import { supabase } from '../db/supabase.js';
 import { chatCompletion } from '../llm/groq.js';
 
+const REPO = 'scopefragger/verbose-octo-fortnight';
+
+// Fetch project context from GitHub to give the LLM real codebase awareness
+let _projectContext = null;
+let _contextFetchedAt = 0;
+const CONTEXT_TTL = 60 * 60 * 1000; // 1 hour cache
+
+async function getProjectContext() {
+  if (_projectContext && Date.now() - _contextFetchedAt < CONTEXT_TTL) return _projectContext;
+
+  try {
+    // Fetch key files in parallel for project understanding
+    const [pkgRes, indexRes, servicesRes, migrationsRes, ideasMdRes] = await Promise.all([
+      fetch(`https://raw.githubusercontent.com/${REPO}/main/package.json`),
+      fetch(`https://api.github.com/repos/${REPO}/contents/services`),
+      fetch(`https://api.github.com/repos/${REPO}/contents/db/migrations`),
+      fetch(`https://api.github.com/repos/${REPO}/contents/llm`),
+      fetch(`https://raw.githubusercontent.com/${REPO}/main/PRODUCT_IDEAS.MD`),
+    ]);
+
+    const pkg = await pkgRes.json().catch(() => ({}));
+    const services = await servicesRes.json().catch(() => []);
+    const migrations = await migrationsRes.json().catch(() => []);
+    const llmFiles = await indexRes.json().catch(() => []);
+    const productIdeas = await ideasMdRes.text().catch(() => '');
+
+    const serviceNames = Array.isArray(services) ? services.map(f => f.name).join(', ') : 'unknown';
+    const migrationNames = Array.isArray(migrations) ? migrations.map(f => f.name).join(', ') : 'unknown';
+    const llmFileNames = Array.isArray(llmFiles) ? llmFiles.map(f => f.name).join(', ') : 'unknown';
+    const deps = Object.keys(pkg.dependencies || {}).join(', ');
+
+    _projectContext = `
+PROJECT CONTEXT (from GitHub repo ${REPO}):
+Tech Stack: Node.js/Express, Supabase (PostgreSQL), Grammy (Telegram bot), Groq LLM (llama-3.3-70b), single-page dashboard HTML
+Dependencies: ${deps}
+Services: ${serviceNames}
+DB Migrations: ${migrationNames}
+LLM modules: ${llmFileNames}
+${productIdeas ? `\nExisting Product Ideas:\n${productIdeas.substring(0, 1500)}` : ''}
+
+The app is a family assistant with: Telegram bot (natural language), TV dashboard, meal planner, calendar, reminders, points system, watchlist, birthdays, food expiry tracker, countdown timers, and an ideas queue.
+API uses Express with secret-based auth. Dashboard is a single HTML file with inline CSS/JS. All data is per-family via family_id FK.
+`.trim();
+
+    _contextFetchedAt = Date.now();
+  } catch (err) {
+    console.error('Failed to fetch project context:', err.message);
+    _projectContext = 'PROJECT: Family assistant app with Telegram bot, TV dashboard, Supabase DB, Groq LLM. Features: meals, calendar, reminders, points, watchlist, birthdays, food expiry, countdowns, ideas.';
+    _contextFetchedAt = Date.now();
+  }
+
+  return _projectContext;
+}
+
 export async function getIdeas(familyId) {
   const { data, error } = await supabase
     .from('ideas')
@@ -59,13 +113,18 @@ export async function processIdeaQueue(familyId) {
     await supabase.from('ideas').update({ status: 'processing' }).eq('id', idea.id);
 
     try {
+      const projectContext = await getProjectContext();
       const messages = [
         {
           role: 'system',
-          content: `You are a helpful product/project advisor for a family assistant app. When given an idea or concept, flesh it out with practical details. Respond in JSON with exactly these keys:
-- "summary": A 2-3 sentence expanded description of the idea
-- "implementation": Concrete steps or approach to make this happen (3-5 bullet points as a single string, use \\n for line breaks)
-- "considerations": Potential challenges, risks, or things to think about (2-4 bullet points as a single string, use \\n for line breaks)
+          content: `You are a senior developer and product advisor for this project. Use the project context below to give implementation-specific advice grounded in the actual codebase — reference real files, services, tables, and patterns.
+
+${projectContext}
+
+When given an idea, flesh it out with practical, project-specific details. Respond in JSON with exactly these keys:
+- "summary": A 2-3 sentence expanded description of the idea, explaining how it fits into this project
+- "implementation": Concrete implementation steps referencing actual files, services, and DB patterns in this project (3-5 bullet points as a single string, use \\n for line breaks)
+- "considerations": Potential challenges specific to this codebase and architecture (2-4 bullet points as a single string, use \\n for line breaks)
 - "effort": An effort estimate using one of: "Quick win (< 1 hour)", "Small (a few hours)", "Medium (a day or two)", "Large (a week+)", "Ongoing"
 Respond ONLY with valid JSON, no markdown fences.`,
         },
