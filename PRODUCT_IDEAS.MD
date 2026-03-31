@@ -251,6 +251,170 @@ This is a Telegram-based AI family assistant bot with shared calendar, reminders
 
 ---
 
+### 11. Gift Ideas & Secret Wish Lists
+
+**Problem:** Birthdays and Christmas trigger a familiar family panic: nobody knows what anyone wants, gifts get duplicated, and last-minute purchases happen without coordination. The bot already tracks birthdays but has no way to capture wishes or coordinate who is buying what.
+
+**Idea:** A private wish list system where each family member can maintain their own list of gift ideas. Other family members can view each other's lists and secretly "claim" an item (the claimant sees it marked; the wish list owner does not). This prevents duplicate gifts and takes the guesswork out of present shopping. Works perfectly alongside the existing birthday tracker.
+
+**Value:** Eliminates duplicate gifts, reduces last-minute panic buying, and gives children a structured way to communicate what they want without spoiling surprises. Especially high value around Christmas and birthdays.
+
+**Use cases:**
+- "Add a LEGO Technic set to my wish list" — adds to personal wish list
+- "What's on Jake's wish list?" — parent views child's list (claims shown)
+- "Claim the LEGO set on Jake's list" — marks as claimed for that family member only; Jake cannot see the claim
+- "Show me unclaimed items on Maya's birthday list" — filters to help with purchasing
+- "Remove the bike from my wish list — I got it already" — owner manages their own list
+- Morning digest in the week before a birthday: "Maya's birthday is in 5 days — 3 unclaimed items on her wish list"
+
+**Integration points:**
+- Hooks into existing `birthdays` table to trigger pre-birthday digest nudges
+- New LLM tools: `add_wish`, `list_wishes`, `claim_wish`, `unclaim_wish`, `delete_wish`
+- New DB tables: `wish_lists` (id, family_id, owner_name, item, notes, url, price_approx, created_at), `wish_claims` (wish_id, claimed_by_user_id, claimed_at)
+- Dashboard widget: per-person wish list cards with claim status visible to all except the owner
+- No external APIs required
+
+**Implementation notes for next agent:**
+- Ownership is stored as `owner_name` (free-text, matching pattern used in `kid_points` and `health_records`) — no foreign key complexity
+- Claim privacy is enforced at the query layer: when the requesting user is the owner, `JOIN wish_claims` is omitted from the response
+- LLM tool `list_wishes` must accept an optional `for_person` param so parents can query a child's list
+- Dashboard API endpoint should return claim status based on the authenticated viewer — simplest MVP: show all claims server-side on the dashboard (dashboard is password-protected, not per-user)
+- Pre-birthday digest hook: in `/cron/daily`, check if any birthday is within 7 days and include a wish list summary if unclaimed items exist
+
+---
+
+### 12. Family Recipe Book
+
+**Problem:** The meal planner lets families plan what they will cook, but there is nowhere to store how they cook it. Favourite family recipes live in bookmarks, screenshot folders, or the cook's head. When someone else needs to make a dish, they have to ask — or wing it.
+
+**Idea:** A shared family recipe collection built into the bot. Recipes can be saved from a URL, typed in freeform, or captured from a Telegram message. Each recipe has a name, ingredients list, and method. The recipe book bridges directly to the meal planner: when a meal is planned for a day, the bot can pull the matching recipe on request. Recipes can also auto-populate the shopping list with their ingredients.
+
+**Value:** Creates a shared culinary knowledge base for the family. Reduces the "how do you make it?" question. Deepens the value of the existing meal planner and shopping list features by connecting all three into one coherent cooking workflow.
+
+**Use cases:**
+- "Save this recipe: Spaghetti Bolognese — [method typed out]" — freeform capture
+- "Save recipe from this URL: [link]" — LLM extracts recipe from fetched page content
+- "What's the recipe for the chicken stir-fry?" — retrieval by name
+- "Show me the ingredients for tonight's dinner" — pulls recipe matched to meal plan entry
+- "Add ingredients for Friday's lasagne to the shopping list" — one-step recipe-to-shopping flow
+- "List all our pasta recipes" — browse by ingredient or keyword
+
+**Integration points:**
+- Reads from `meal_plans` table to match planned meals to stored recipes by name similarity
+- Writes to `lists` / `list_items` (existing) when generating ingredient shopping lists
+- New LLM tools: `save_recipe`, `get_recipe`, `list_recipes`, `search_recipes`, `recipe_to_shopping_list`
+- New DB tables: `recipes` (id, family_id, name, description, ingredients jsonb, method text, source_url, tags text[], created_by, created_at)
+- Dashboard widget: recipe browser with search, showing name, tags, and ingredient count
+- URL fetch: use Node's built-in `fetch` to retrieve page HTML; pass to LLM with prompt "extract recipe name, ingredients, and method from this page"
+
+**Implementation notes for next agent:**
+- `ingredients` stored as JSONB array of `{name, quantity, unit}` objects — enables structured shopping list generation
+- Recipe-to-meal-plan matching uses fuzzy name comparison (LLM can handle this in the tool call rather than requiring exact string match)
+- For URL-based saving, fetch the URL server-side (not client-side) to avoid CORS; pass first 8000 chars of body text to LLM for extraction — sufficient for most recipe pages
+- `tags` array enables filtering: "pasta", "quick", "vegetarian", "kids-favourite" — populated by LLM at save time
+- MVP scope: skip image storage; text-only recipes are sufficient and avoid Telegram file_id complexity
+
+---
+
+### 13. Car & Home Maintenance Tracker
+
+**Problem:** Households accumulate a portfolio of assets that require periodic maintenance — cars needing MOTs and services, a boiler due for its annual check, a roof gutter that needs clearing in autumn. These are forgotten until they become urgent (or illegal). There is no centralised place to track them with proactive reminders.
+
+**Idea:** A structured maintenance log for the household's physical assets. Users register assets (e.g. "Blue Honda Civic", "Boiler", "Garden Shed") and attach maintenance tasks with due dates and recurrence (annual, 6-monthly, mileage-based). The bot sends advance reminders and logs completed work. Works like a household service history in the family's pocket.
+
+**Value:** Prevents costly oversights (driving with an expired MOT, missing a boiler service that voids a warranty). Creates a shared household maintenance record useful when selling a property or car. Removes the mental overhead of remembering irregular-but-important tasks.
+
+**Use cases:**
+- "Add our car: Blue Honda Civic, reg AB12 CDE, MOT due 15 June" — registers asset with upcoming task
+- "Log that the boiler service was done today — next one due in 12 months" — updates maintenance record
+- "What maintenance is due in the next 3 months?" — upcoming task overview
+- "Add a task to the Honda: tyre check every 6 months" — recurring maintenance task
+- "When was the last time the boiler was serviced?" — history lookup
+- Weekly digest includes: "Upcoming maintenance: Honda MOT in 18 days"
+
+**Integration points:**
+- Advance reminders hook into existing `/cron/daily` and `/cron/weekly` cron logic (check tasks due within N days)
+- New LLM tools: `add_asset`, `list_assets`, `add_maintenance_task`, `log_maintenance_done`, `get_upcoming_maintenance`
+- New DB tables: `assets` (id, family_id, name, type, identifier, notes, created_at), `maintenance_tasks` (id, asset_id, family_id, title, last_done_at, next_due_at, recurrence_days, notes), `maintenance_log` (id, task_id, done_by, done_at, notes, cost)
+- Dashboard widget: asset list with next-due maintenance highlighted in amber/red by proximity
+- No external APIs required (MOT history API is a future enhancement)
+
+**Implementation notes for next agent:**
+- `asset.type` enum suggestions: `car`, `appliance`, `property`, `bike`, `other` — used for dashboard icons
+- `next_due_at` is recalculated on each `log_maintenance_done` call as `done_at + recurrence_days`
+- Cron reminder logic: query `maintenance_tasks WHERE next_due_at <= now() + interval '30 days'` and include in digest; send Telegram alert at 7 days
+- `maintenance_log.cost` is optional — enables basic spend tracking per asset over time (future: link to budget tracker)
+- MOT due date for cars: store as a specific `next_due_at` with `recurrence_days = 365`; no need for DVLA API in MVP
+
+---
+
+### 14. Homework & Study Tracker
+
+**Problem:** Parents of school-age children often don't know what homework has been set, when it is due, or whether it has been done. Children manage (or mismanage) this themselves. The result is last-minute Sunday-evening panic, missed deadlines, and arguments. The existing school activity tracker (idea #6) handles schedules and clubs but does not address academic workload.
+
+**Idea:** A homework and assignment tracker where children or parents can log homework tasks with a subject, description, and due date. The bot sends reminder nudges in the days before a deadline and marks tasks complete when done. Parents get visibility; children get a personal to-do list they can interact with conversationally. Integrates with the kid rewards system — children can earn points for completing homework on time.
+
+**Value:** Gives parents visibility into academic workload without hovering. Helps children develop self-organisation habits with gentle bot nudges. Connects to the rewards system to motivate timely completion.
+
+**Use cases:**
+- "Jake has maths homework due Friday — fractions worksheet" — parent or child logs it
+- "What homework does Maya have this week?" — filtered view per child
+- "Mark Jake's science project as done" — completion tracking
+- "What's overdue?" — surfaces missed deadlines for the whole family
+- "Jake earned 5 points for finishing his homework early" — manual reward trigger (or auto-award on completion)
+- Daily digest Tuesday–Friday includes: "Homework due this week: Jake — maths (Fri), Maya — history essay (Thu)"
+
+**Integration points:**
+- Completion can trigger `addKidPoints` in the existing `kid_points` service — configurable points per completed task
+- Due-date reminders hook into `/cron/daily` (day-before alert) and `/cron/weekly` (week's homework summary)
+- New LLM tools: `add_homework`, `list_homework`, `complete_homework`, `delete_homework`, `list_overdue_homework`
+- New DB tables: `homework` (id, family_id, child_name, subject, description, due_date, completed_at, points_awarded, created_by, created_at)
+- Dashboard widget: per-child homework timeline sorted by due date, with overdue items highlighted
+- No external APIs required
+
+**Implementation notes for next agent:**
+- `child_name` is free-text matching the pattern used in `kid_points` — no foreign key to a children table; keep it simple
+- Overdue detection: `due_date < now() AND completed_at IS NULL` — surface in digest with urgency flag
+- Points on completion: when `complete_homework` is called, optionally call `addKidPoints(familyId, childName, points, reason)` from the existing `services/kidPoints.js` service — make points amount configurable per task or use a fixed default (e.g. 3 points)
+- LLM tool `list_homework` should accept optional `child_name` and `due_before` params for filtered queries
+- Keep scope tight: this is a tracker, not a learning platform — no file attachments, no grade recording in MVP
+
+---
+
+### 15. Family Mood & Wellbeing Check-ins
+
+**Problem:** Family life is busy and emotionally complex. Parents and children often don't verbalise stress, tiredness, or low moods until they boil over. There is no lightweight, low-friction way to regularly gauge how everyone is feeling and spot patterns before they become problems.
+
+**Idea:** A daily or weekly opt-in wellbeing check-in system. The bot sends each registered family member a gentle prompt ("How are you feeling today? Rate 1–5 or describe in a word"). Responses are logged privately. The bot surfaces aggregate family mood trends (without exposing individual responses) and, when moods are consistently low, suggests family activities or simply acknowledges the tough period. Parents can optionally see their children's check-ins.
+
+**Value:** Builds emotional awareness into the family routine without requiring vulnerable conversations to happen spontaneously. Leverages the LLM's conversational strengths. Creates a longitudinal mood record that can reveal patterns (stress spikes before school exams, post-holiday dips). Unique to AI-native assistants — no conventional family app does this well.
+
+**Use cases:**
+- Daily prompt at 7pm: "Hey Jake, quick check-in — how are you feeling today? (1 = rough, 5 = great, or just tell me)" — low-friction response
+- "Show me the family mood this week" — aggregate trend (average scores, any notes)
+- "How has Jake been feeling this month?" — parent view of child's check-in history
+- "We've noticed a few tough days this week — how about a family movie night tonight?" — LLM-generated suggestion based on low scores
+- "Skip check-ins this week" — family member can pause without friction
+- Dashboard widget: weekly mood graph per family member (with privacy controls)
+
+**Integration points:**
+- Check-in prompts sent via existing Telegram bot DM mechanism — one message per registered user at configured time
+- New cron endpoint `/cron/checkin` (or hook into `/cron/daily`) to dispatch prompts
+- Groq LLM interprets free-text responses into a numeric score (1–5) + optional sentiment note — reuses existing `groq.js` infrastructure
+- New LLM tools: `log_mood_checkin`, `get_mood_history`, `get_family_mood_summary`
+- New DB tables: `mood_checkins` (id, family_id, user_id, score int, note text, checked_in_at), `checkin_settings` (family_id, enabled bool, prompt_time time, prompt_days text[])
+- Dashboard widget: sparkline mood chart per family member, last-7-days, colour-coded by score
+- No external APIs required
+
+**Implementation notes for next agent:**
+- Check-in prompt is sent as a Telegram message; response is captured by the standard `messageHandler` — detect check-in response via a pending-state flag stored in `checkin_settings` or a simple `pending_checkins` table (user_id, expires_at)
+- LLM scoring prompt: "The user was asked how they're feeling and responded: '[response]'. Rate their mood 1–5 where 1=very low, 5=very positive. Reply with just the number and optionally a one-word sentiment label."
+- Privacy model for MVP: parents see children's check-ins; adults' check-ins are private by default (only visible to themselves unless they choose to share)
+- Aggregate family summary omits individual breakdowns — LLM narrates the trend: "This week the family mood averaged 3.5/5 — a bit mixed. Wednesday and Thursday were tougher days."
+- Opt-in only: check-ins are disabled by default; a family admin enables them via "set up daily check-ins at 7pm"
+
+---
+
 ## Prioritisation Notes
 
 | Idea | Effort | Impact | Recommended Priority |
@@ -265,3 +429,8 @@ This is a Telegram-based AI family assistant bot with shared calendar, reminders
 | Pet Care Tracker (#8) | Medium | Medium | 8 — niche but high value for pet owners |
 | Photo Memory Log (#3) | Medium | Medium | 9 — delightful but non-essential |
 | Health Records Hub (#10) | High | High | 10 — high value but sensitive data adds complexity |
+| Gift Wish Lists (#11) | Low | High | 11 — zero-friction, pairs with existing birthdays |
+| Recipe Book (#12) | Medium | High | 12 — completes the cooking workflow triangle |
+| Homework Tracker (#14) | Low | High | 13 — high utility for school-age families, easy build |
+| Car & Home Maintenance (#13) | Medium | Medium | 14 — practical, underserved niche |
+| Mood Check-ins (#15) | Medium | High | 15 — unique AI-native feature, opt-in reduces risk |
