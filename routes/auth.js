@@ -84,122 +84,305 @@ router.post('/api/auth/refresh', async (req, res) => {
   res.json({ ok: true });
 });
 
-// Login page HTML
+// Login page HTML — Disney castle themed
 const LOGIN_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Family Dashboard — Login</title>
+  <title>Family Dashboard</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Quicksand:wght@400;500;600&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: 'Quicksand', sans-serif;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
+      overflow: hidden;
+      background: #0a0a2e;
     }
-    .login-card {
+
+    /* Starry night sky background */
+    .sky {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(180deg, #0a0a2e 0%, #1a1a4e 40%, #2d1b69 70%, #4a2c8a 100%);
+      z-index: 0;
+    }
+    .stars {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+    }
+    .star {
+      position: absolute;
+      width: 2px;
+      height: 2px;
       background: #fff;
-      border-radius: 20px;
-      padding: 40px;
+      border-radius: 50%;
+      animation: twinkle var(--dur, 3s) ease-in-out infinite;
+    }
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
+    /* Shooting star */
+    .shooting-star {
+      position: fixed;
+      width: 100px;
+      height: 2px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.8), transparent);
+      border-radius: 2px;
+      z-index: 2;
+      opacity: 0;
+      animation: shoot 6s ease-in-out infinite;
+      animation-delay: 3s;
+      top: 15%;
+      left: -100px;
+      transform: rotate(-15deg);
+    }
+    @keyframes shoot {
+      0% { left: -100px; opacity: 0; }
+      5% { opacity: 1; }
+      15% { left: 110%; opacity: 0; }
+      100% { opacity: 0; }
+    }
+
+    /* Castle silhouette */
+    .castle-scene {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      width: 600px;
+      max-width: 90vw;
+      opacity: 0.15;
+    }
+    .castle-svg {
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(0 0 20px rgba(100,150,255,0.3));
+    }
+
+    /* Fireflies */
+    .firefly {
+      position: fixed;
+      width: 4px;
+      height: 4px;
+      background: #ffd700;
+      border-radius: 50%;
+      box-shadow: 0 0 8px 2px rgba(255,215,0,0.6);
+      z-index: 4;
+      animation: float var(--dur, 8s) ease-in-out infinite;
+      opacity: 0;
+    }
+    @keyframes float {
+      0%, 100% { opacity: 0; transform: translate(0, 0); }
+      25% { opacity: 0.8; transform: translate(30px, -20px); }
+      50% { opacity: 0.4; transform: translate(-10px, -40px); }
+      75% { opacity: 0.9; transform: translate(20px, -10px); }
+    }
+
+    /* Login card */
+    .login-container {
+      position: relative;
+      z-index: 10;
       width: 90%;
       max-width: 400px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .login-card {
+      background: rgba(255,255,255,0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 24px;
+      padding: 44px 36px 36px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+    }
+    .castle-icon {
+      text-align: center;
+      font-size: 52px;
+      margin-bottom: 8px;
+      filter: drop-shadow(0 2px 8px rgba(255,215,0,0.4));
     }
     .login-card h1 {
       text-align: center;
-      margin-bottom: 8px;
-      font-size: 28px;
-      color: #333;
+      font-family: 'Cinzel Decorative', cursive;
+      font-size: 22px;
+      color: #fff;
+      margin-bottom: 4px;
+      letter-spacing: 1px;
+      text-shadow: 0 2px 12px rgba(100,150,255,0.4);
     }
     .login-card .subtitle {
       text-align: center;
-      color: #888;
-      margin-bottom: 30px;
-      font-size: 14px;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 28px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .sparkle-divider {
+      text-align: center;
+      margin-bottom: 24px;
+      font-size: 11px;
+      letter-spacing: 8px;
+      color: rgba(255,215,0,0.4);
     }
     .form-group {
       margin-bottom: 18px;
     }
     .form-group label {
       display: block;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
-      color: #555;
+      color: rgba(255,255,255,0.7);
       margin-bottom: 6px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
     }
     .form-group input {
       width: 100%;
-      padding: 12px 16px;
-      border: 2px solid #e0e0e0;
-      border-radius: 10px;
+      padding: 13px 16px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
       font-size: 15px;
-      transition: border-color 0.2s;
+      font-family: 'Quicksand', sans-serif;
+      color: #fff;
+      transition: all 0.3s;
       outline: none;
     }
+    .form-group input::placeholder {
+      color: rgba(255,255,255,0.3);
+    }
     .form-group input:focus {
-      border-color: #667eea;
+      border-color: rgba(100,150,255,0.6);
+      background: rgba(255,255,255,0.12);
+      box-shadow: 0 0 20px rgba(100,150,255,0.15);
     }
     .login-btn {
       width: 100%;
       padding: 14px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #4a6cf7 0%, #7b5ea7 50%, #c77dba 100%);
       color: #fff;
       border: none;
-      border-radius: 10px;
-      font-size: 16px;
+      border-radius: 12px;
+      font-size: 15px;
       font-weight: 600;
+      font-family: 'Quicksand', sans-serif;
       cursor: pointer;
-      transition: opacity 0.2s;
+      transition: all 0.3s;
       margin-top: 8px;
+      letter-spacing: 0.5px;
+      position: relative;
+      overflow: hidden;
     }
-    .login-btn:hover { opacity: 0.9; }
-    .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .login-btn::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .login-btn:hover::before { opacity: 1; }
+    .login-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 25px rgba(74,108,247,0.4);
+    }
+    .login-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
     .error-msg {
-      background: #fef2f2;
-      color: #dc2626;
+      background: rgba(220,38,38,0.15);
+      border: 1px solid rgba(220,38,38,0.3);
+      color: #fca5a5;
       padding: 10px 14px;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 13px;
       margin-bottom: 16px;
       display: none;
     }
-    .logo {
-      text-align: center;
-      font-size: 48px;
-      margin-bottom: 12px;
+
+    /* Magic sparkle on successful login */
+    @keyframes magicBurst {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(3); opacity: 0; }
+    }
+    .magic-burst {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(255,215,0,0.3), transparent 60%);
+      z-index: 100;
+      animation: magicBurst 0.8s ease-out forwards;
     }
   </style>
 </head>
 <body>
-  <div class="login-card">
-    <div class="logo">&#x1F3E0;</div>
-    <h1>Family Dashboard</h1>
-    <p class="subtitle">Sign in to continue</p>
-    <div class="error-msg" id="errorMsg"></div>
-    <form id="loginForm">
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" id="email" required autocomplete="email" placeholder="you@example.com">
-      </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" id="password" required autocomplete="current-password" placeholder="Your password">
-      </div>
-      <button type="submit" class="login-btn" id="loginBtn">Sign In</button>
-    </form>
+  <div class="sky"></div>
+  <div class="stars" id="stars"></div>
+  <div class="shooting-star"></div>
+
+  <div class="login-container">
+    <div class="login-card">
+      <div class="castle-icon">&#x1F3F0;</div>
+      <h1>Family Kingdom</h1>
+      <p class="subtitle">Where the magic happens</p>
+      <div class="sparkle-divider">&#x2728; &#x2728; &#x2728;</div>
+      <div class="error-msg" id="errorMsg"></div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="email" required autocomplete="email" placeholder="your@email.com">
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="password" required autocomplete="current-password" placeholder="Enter your password">
+        </div>
+        <button type="submit" class="login-btn" id="loginBtn">&#x2728; Enter the Kingdom</button>
+      </form>
+    </div>
   </div>
+
   <script>
+    // Generate stars
+    const starsContainer = document.getElementById('stars');
+    for (let i = 0; i < 120; i++) {
+      const star = document.createElement('div');
+      star.className = 'star';
+      star.style.left = Math.random() * 100 + '%';
+      star.style.top = Math.random() * 70 + '%';
+      star.style.width = (Math.random() * 2.5 + 0.5) + 'px';
+      star.style.height = star.style.width;
+      star.style.setProperty('--dur', (Math.random() * 4 + 2) + 's');
+      star.style.animationDelay = (Math.random() * 5) + 's';
+      starsContainer.appendChild(star);
+    }
+
+    // Generate fireflies
+    for (let i = 0; i < 8; i++) {
+      const ff = document.createElement('div');
+      ff.className = 'firefly';
+      ff.style.left = (20 + Math.random() * 60) + '%';
+      ff.style.top = (40 + Math.random() * 40) + '%';
+      ff.style.setProperty('--dur', (6 + Math.random() * 6) + 's');
+      ff.style.animationDelay = (Math.random() * 8) + 's';
+      document.body.appendChild(ff);
+    }
+
+    // Login form
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('loginBtn');
       const errEl = document.getElementById('errorMsg');
       errEl.style.display = 'none';
       btn.disabled = true;
-      btn.textContent = 'Signing in...';
+      btn.textContent = 'Opening the gates...';
 
       try {
         const res = await fetch('/api/auth/login', {
@@ -214,12 +397,16 @@ const LOGIN_HTML = `<!DOCTYPE html>
         if (!res.ok) {
           throw new Error(data.error || 'Login failed');
         }
-        window.location.href = '/dashboard';
+        // Magic burst animation then redirect
+        const burst = document.createElement('div');
+        burst.className = 'magic-burst';
+        document.body.appendChild(burst);
+        setTimeout(() => { window.location.href = '/dashboard'; }, 600);
       } catch (err) {
         errEl.textContent = err.message;
         errEl.style.display = 'block';
         btn.disabled = false;
-        btn.textContent = 'Sign In';
+        btn.innerHTML = '&#x2728; Enter the Kingdom';
       }
     });
   </script>
