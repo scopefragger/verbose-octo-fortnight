@@ -251,6 +251,323 @@ This is a Telegram-based AI family assistant bot with shared calendar, reminders
 
 ---
 
+### 11. Gift Ideas & Secret Wish Lists
+
+**Problem:** Birthdays and Christmas trigger a familiar family panic: nobody knows what anyone wants, gifts get duplicated, and last-minute purchases happen without coordination. The bot already tracks birthdays but has no way to capture wishes or coordinate who is buying what.
+
+**Idea:** A private wish list system where each family member can maintain their own list of gift ideas. Other family members can view each other's lists and secretly "claim" an item (the claimant sees it marked; the wish list owner does not). This prevents duplicate gifts and takes the guesswork out of present shopping. Works perfectly alongside the existing birthday tracker.
+
+**Value:** Eliminates duplicate gifts, reduces last-minute panic buying, and gives children a structured way to communicate what they want without spoiling surprises. Especially high value around Christmas and birthdays.
+
+**Use cases:**
+- "Add a LEGO Technic set to my wish list" — adds to personal wish list
+- "What's on Jake's wish list?" — parent views child's list (claims shown)
+- "Claim the LEGO set on Jake's list" — marks as claimed for that family member only; Jake cannot see the claim
+- "Show me unclaimed items on Maya's birthday list" — filters to help with purchasing
+- "Remove the bike from my wish list — I got it already" — owner manages their own list
+- Morning digest in the week before a birthday: "Maya's birthday is in 5 days — 3 unclaimed items on her wish list"
+
+**Integration points:**
+- Hooks into existing `birthdays` table to trigger pre-birthday digest nudges
+- New LLM tools: `add_wish`, `list_wishes`, `claim_wish`, `unclaim_wish`, `delete_wish`
+- New DB tables: `wish_lists` (id, family_id, owner_name, item, notes, url, price_approx, created_at), `wish_claims` (wish_id, claimed_by_user_id, claimed_at)
+- Dashboard widget: per-person wish list cards with claim status visible to all except the owner
+- No external APIs required
+
+**Implementation notes for next agent:**
+- Ownership is stored as `owner_name` (free-text, matching pattern used in `kid_points` and `health_records`) — no foreign key complexity
+- Claim privacy is enforced at the query layer: when the requesting user is the owner, `JOIN wish_claims` is omitted from the response
+- LLM tool `list_wishes` must accept an optional `for_person` param so parents can query a child's list
+- Dashboard API endpoint should return claim status based on the authenticated viewer — simplest MVP: show all claims server-side on the dashboard (dashboard is password-protected, not per-user)
+- Pre-birthday digest hook: in `/cron/daily`, check if any birthday is within 7 days and include a wish list summary if unclaimed items exist
+
+---
+
+### 12. Family Recipe Book
+
+**Problem:** The meal planner lets families plan what they will cook, but there is nowhere to store how they cook it. Favourite family recipes live in bookmarks, screenshot folders, or the cook's head. When someone else needs to make a dish, they have to ask — or wing it.
+
+**Idea:** A shared family recipe collection built into the bot. Recipes can be saved from a URL, typed in freeform, or captured from a Telegram message. Each recipe has a name, ingredients list, and method. The recipe book bridges directly to the meal planner: when a meal is planned for a day, the bot can pull the matching recipe on request. Recipes can also auto-populate the shopping list with their ingredients.
+
+**Value:** Creates a shared culinary knowledge base for the family. Reduces the "how do you make it?" question. Deepens the value of the existing meal planner and shopping list features by connecting all three into one coherent cooking workflow.
+
+**Use cases:**
+- "Save this recipe: Spaghetti Bolognese — [method typed out]" — freeform capture
+- "Save recipe from this URL: [link]" — LLM extracts recipe from fetched page content
+- "What's the recipe for the chicken stir-fry?" — retrieval by name
+- "Show me the ingredients for tonight's dinner" — pulls recipe matched to meal plan entry
+- "Add ingredients for Friday's lasagne to the shopping list" — one-step recipe-to-shopping flow
+- "List all our pasta recipes" — browse by ingredient or keyword
+
+**Integration points:**
+- Reads from `meal_plans` table to match planned meals to stored recipes by name similarity
+- Writes to `lists` / `list_items` (existing) when generating ingredient shopping lists
+- New LLM tools: `save_recipe`, `get_recipe`, `list_recipes`, `search_recipes`, `recipe_to_shopping_list`
+- New DB tables: `recipes` (id, family_id, name, description, ingredients jsonb, method text, source_url, tags text[], created_by, created_at)
+- Dashboard widget: recipe browser with search, showing name, tags, and ingredient count
+- URL fetch: use Node's built-in `fetch` to retrieve page HTML; pass to LLM with prompt "extract recipe name, ingredients, and method from this page"
+
+**Implementation notes for next agent:**
+- `ingredients` stored as JSONB array of `{name, quantity, unit}` objects — enables structured shopping list generation
+- Recipe-to-meal-plan matching uses fuzzy name comparison (LLM can handle this in the tool call rather than requiring exact string match)
+- For URL-based saving, fetch the URL server-side (not client-side) to avoid CORS; pass first 8000 chars of body text to LLM for extraction — sufficient for most recipe pages
+- `tags` array enables filtering: "pasta", "quick", "vegetarian", "kids-favourite" — populated by LLM at save time
+- MVP scope: skip image storage; text-only recipes are sufficient and avoid Telegram file_id complexity
+
+---
+
+### 13. Car & Home Maintenance Tracker
+
+**Problem:** Households accumulate a portfolio of assets that require periodic maintenance — cars needing MOTs and services, a boiler due for its annual check, a roof gutter that needs clearing in autumn. These are forgotten until they become urgent (or illegal). There is no centralised place to track them with proactive reminders.
+
+**Idea:** A structured maintenance log for the household's physical assets. Users register assets (e.g. "Blue Honda Civic", "Boiler", "Garden Shed") and attach maintenance tasks with due dates and recurrence (annual, 6-monthly, mileage-based). The bot sends advance reminders and logs completed work. Works like a household service history in the family's pocket.
+
+**Value:** Prevents costly oversights (driving with an expired MOT, missing a boiler service that voids a warranty). Creates a shared household maintenance record useful when selling a property or car. Removes the mental overhead of remembering irregular-but-important tasks.
+
+**Use cases:**
+- "Add our car: Blue Honda Civic, reg AB12 CDE, MOT due 15 June" — registers asset with upcoming task
+- "Log that the boiler service was done today — next one due in 12 months" — updates maintenance record
+- "What maintenance is due in the next 3 months?" — upcoming task overview
+- "Add a task to the Honda: tyre check every 6 months" — recurring maintenance task
+- "When was the last time the boiler was serviced?" — history lookup
+- Weekly digest includes: "Upcoming maintenance: Honda MOT in 18 days"
+
+**Integration points:**
+- Advance reminders hook into existing `/cron/daily` and `/cron/weekly` cron logic (check tasks due within N days)
+- New LLM tools: `add_asset`, `list_assets`, `add_maintenance_task`, `log_maintenance_done`, `get_upcoming_maintenance`
+- New DB tables: `assets` (id, family_id, name, type, identifier, notes, created_at), `maintenance_tasks` (id, asset_id, family_id, title, last_done_at, next_due_at, recurrence_days, notes), `maintenance_log` (id, task_id, done_by, done_at, notes, cost)
+- Dashboard widget: asset list with next-due maintenance highlighted in amber/red by proximity
+- No external APIs required (MOT history API is a future enhancement)
+
+**Implementation notes for next agent:**
+- `asset.type` enum suggestions: `car`, `appliance`, `property`, `bike`, `other` — used for dashboard icons
+- `next_due_at` is recalculated on each `log_maintenance_done` call as `done_at + recurrence_days`
+- Cron reminder logic: query `maintenance_tasks WHERE next_due_at <= now() + interval '30 days'` and include in digest; send Telegram alert at 7 days
+- `maintenance_log.cost` is optional — enables basic spend tracking per asset over time (future: link to budget tracker)
+- MOT due date for cars: store as a specific `next_due_at` with `recurrence_days = 365`; no need for DVLA API in MVP
+
+---
+
+### 14. Homework & Study Tracker
+
+**Problem:** Parents of school-age children often don't know what homework has been set, when it is due, or whether it has been done. Children manage (or mismanage) this themselves. The result is last-minute Sunday-evening panic, missed deadlines, and arguments. The existing school activity tracker (idea #6) handles schedules and clubs but does not address academic workload.
+
+**Idea:** A homework and assignment tracker where children or parents can log homework tasks with a subject, description, and due date. The bot sends reminder nudges in the days before a deadline and marks tasks complete when done. Parents get visibility; children get a personal to-do list they can interact with conversationally. Integrates with the kid rewards system — children can earn points for completing homework on time.
+
+**Value:** Gives parents visibility into academic workload without hovering. Helps children develop self-organisation habits with gentle bot nudges. Connects to the rewards system to motivate timely completion.
+
+**Use cases:**
+- "Jake has maths homework due Friday — fractions worksheet" — parent or child logs it
+- "What homework does Maya have this week?" — filtered view per child
+- "Mark Jake's science project as done" — completion tracking
+- "What's overdue?" — surfaces missed deadlines for the whole family
+- "Jake earned 5 points for finishing his homework early" — manual reward trigger (or auto-award on completion)
+- Daily digest Tuesday–Friday includes: "Homework due this week: Jake — maths (Fri), Maya — history essay (Thu)"
+
+**Integration points:**
+- Completion can trigger `addKidPoints` in the existing `kid_points` service — configurable points per completed task
+- Due-date reminders hook into `/cron/daily` (day-before alert) and `/cron/weekly` (week's homework summary)
+- New LLM tools: `add_homework`, `list_homework`, `complete_homework`, `delete_homework`, `list_overdue_homework`
+- New DB tables: `homework` (id, family_id, child_name, subject, description, due_date, completed_at, points_awarded, created_by, created_at)
+- Dashboard widget: per-child homework timeline sorted by due date, with overdue items highlighted
+- No external APIs required
+
+**Implementation notes for next agent:**
+- `child_name` is free-text matching the pattern used in `kid_points` — no foreign key to a children table; keep it simple
+- Overdue detection: `due_date < now() AND completed_at IS NULL` — surface in digest with urgency flag
+- Points on completion: when `complete_homework` is called, optionally call `addKidPoints(familyId, childName, points, reason)` from the existing `services/kidPoints.js` service — make points amount configurable per task or use a fixed default (e.g. 3 points)
+- LLM tool `list_homework` should accept optional `child_name` and `due_before` params for filtered queries
+- Keep scope tight: this is a tracker, not a learning platform — no file attachments, no grade recording in MVP
+
+---
+
+### 15. Family Mood & Wellbeing Check-ins
+
+**Problem:** Family life is busy and emotionally complex. Parents and children often don't verbalise stress, tiredness, or low moods until they boil over. There is no lightweight, low-friction way to regularly gauge how everyone is feeling and spot patterns before they become problems.
+
+**Idea:** A daily or weekly opt-in wellbeing check-in system. The bot sends each registered family member a gentle prompt ("How are you feeling today? Rate 1–5 or describe in a word"). Responses are logged privately. The bot surfaces aggregate family mood trends (without exposing individual responses) and, when moods are consistently low, suggests family activities or simply acknowledges the tough period. Parents can optionally see their children's check-ins.
+
+**Value:** Builds emotional awareness into the family routine without requiring vulnerable conversations to happen spontaneously. Leverages the LLM's conversational strengths. Creates a longitudinal mood record that can reveal patterns (stress spikes before school exams, post-holiday dips). Unique to AI-native assistants — no conventional family app does this well.
+
+**Use cases:**
+- Daily prompt at 7pm: "Hey Jake, quick check-in — how are you feeling today? (1 = rough, 5 = great, or just tell me)" — low-friction response
+- "Show me the family mood this week" — aggregate trend (average scores, any notes)
+- "How has Jake been feeling this month?" — parent view of child's check-in history
+- "We've noticed a few tough days this week — how about a family movie night tonight?" — LLM-generated suggestion based on low scores
+- "Skip check-ins this week" — family member can pause without friction
+- Dashboard widget: weekly mood graph per family member (with privacy controls)
+
+**Integration points:**
+- Check-in prompts sent via existing Telegram bot DM mechanism — one message per registered user at configured time
+- New cron endpoint `/cron/checkin` (or hook into `/cron/daily`) to dispatch prompts
+- Groq LLM interprets free-text responses into a numeric score (1–5) + optional sentiment note — reuses existing `groq.js` infrastructure
+- New LLM tools: `log_mood_checkin`, `get_mood_history`, `get_family_mood_summary`
+- New DB tables: `mood_checkins` (id, family_id, user_id, score int, note text, checked_in_at), `checkin_settings` (family_id, enabled bool, prompt_time time, prompt_days text[])
+- Dashboard widget: sparkline mood chart per family member, last-7-days, colour-coded by score
+- No external APIs required
+
+**Implementation notes for next agent:**
+- Check-in prompt is sent as a Telegram message; response is captured by the standard `messageHandler` — detect check-in response via a pending-state flag stored in `checkin_settings` or a simple `pending_checkins` table (user_id, expires_at)
+- LLM scoring prompt: "The user was asked how they're feeling and responded: '[response]'. Rate their mood 1–5 where 1=very low, 5=very positive. Reply with just the number and optionally a one-word sentiment label."
+- Privacy model for MVP: parents see children's check-ins; adults' check-ins are private by default (only visible to themselves unless they choose to share)
+- Aggregate family summary omits individual breakdowns — LLM narrates the trend: "This week the family mood averaged 3.5/5 — a bit mixed. Wednesday and Thursday were tougher days."
+- Opt-in only: check-ins are disabled by default; a family admin enables them via "set up daily check-ins at 7pm"
+
+---
+
+---
+
+### 16. Family Travel & Holiday Planner
+
+**Problem:** Planning a family holiday involves dozens of moving parts — flights, accommodation, activities, packing lists, travel documents, and booking references — scattered across email inboxes, browser bookmarks, and multiple apps. There is no single family-shared place to store, surface, and prepare for a trip.
+
+**Value:** Creates a single trip-planning hub the whole family can query and contribute to. Reduces pre-holiday stress by surfacing checklists, countdowns, and document reminders automatically. Complements the existing countdown and calendar features without duplicating them.
+
+**Use cases:**
+- "Create a trip: Tenerife, 12–19 August" — creates a trip record with auto-generated countdown in the existing `countdowns` table
+- "Add our flight booking ref: BA2841, departs 06:30 Gatwick" — stores booking detail against the trip
+- "What documents do we need for Tenerife?" — LLM generates a country-appropriate document checklist (passports, EHIC, travel insurance)
+- "Start a packing list for the Tenerife trip" — creates a named list in the existing `lists` system, pre-seeded by LLM with trip-appropriate suggestions
+- "What's our hotel address in Tenerife?" — retrieves stored booking detail
+- "When do passports expire?" — queries stored document expiry dates; alerts if a passport expires before the trip
+
+**Integration points:**
+- Countdown for each trip stored in existing `countdowns` table — no duplication
+- Packing lists stored in existing `lists`/`list_items` tables — reuses all existing list tooling
+- New LLM tools: `create_trip`, `get_trip`, `list_trips`, `add_booking_detail`, `add_document`, `get_packing_suggestions`
+- New DB tables: `trips` (id, family_id, name, destination, depart_date, return_date, notes, created_at), `trip_details` (id, trip_id, detail_type, label, value, expiry_date), where `detail_type` is one of `booking`, `document`, `accommodation`, `activity`, `note`
+- Dashboard widget: upcoming trips card with countdown, next action item, and quick-access booking refs
+
+**Implementation notes for next agent:**
+- `trip_details` uses a flexible key-value model (`label`, `value`) rather than fixed columns — accommodates the varied nature of travel information without schema changes per detail type
+- Passport/document expiry alerts: cron job queries `trip_details WHERE detail_type = 'document' AND expiry_date < trip.depart_date - interval '6 months'` (most countries require 6 months validity) and sends an alert
+- Packing list seeding: when `create_trip` is called, the LLM tool optionally calls `generate_packing_suggestions(destination, duration_days, month)` — returns a categorised list (clothing, toiletries, documents, kids' items) which the user can push to a list with one confirmation
+- Link trip countdown to `trips.depart_date` so it auto-populates without requiring a separate countdown creation step
+- MVP scope: no API integrations (no flight lookup, no Skyscanner) — all data is manually entered; the value is in the aggregation and AI-assisted checklists
+
+---
+
+### 17. Pocket Money & Allowance Manager
+
+**Problem:** The bot has a kid rewards/points system for tracking achievements, but no mechanism for real-world money. Families managing pocket money for children have no shared record of what has been paid, what children have saved, and what they have spent. This leads to "you never gave me this week's pocket money" disputes and missed savings goals.
+
+**Value:** Creates a transparent, shared record of children's finances. Builds financial literacy habits early. Directly extends the existing kid points system with a monetary dimension. Prevents disagreements with an auditable payment log.
+
+**Use cases:**
+- "Set Jake's pocket money to £5 every Friday" — configures recurring allowance with a reminder
+- "Pay pocket money to all kids" — logs this week's payment for all configured children
+- "Jake spent £3.50 at the school fair" — logs a debit against Jake's balance
+- "How much has Maya saved?" — current balance query
+- "Maya wants to save for a LEGO set that costs £35 — how many weeks until she can buy it?" — savings goal calculation
+- "Show pocket money history for Jake this month" — transaction ledger view
+
+**Integration points:**
+- Recurring payment reminders hook into existing reminder cron (`/cron/check`) — allowance day triggers a Telegram alert to the parent
+- Savings goal tracking pairs naturally with the existing `countdowns` concept — a countdown to "Maya can afford the LEGO set"
+- New LLM tools: `set_allowance`, `pay_allowance`, `log_spend`, `get_balance`, `get_transaction_history`, `set_savings_goal`, `check_savings_goal`
+- New DB tables: `allowances` (id, family_id, child_name, amount decimal, currency, frequency, next_due_date), `pocket_money_transactions` (id, family_id, child_name, amount decimal, type enum('credit','debit'), note, created_by, created_at), `savings_goals` (id, family_id, child_name, goal_name, target_amount, created_at)
+- Dashboard widget: per-child balance card with recent transactions and savings goal progress bar
+
+**Implementation notes for next agent:**
+- Balance is computed as `SUM(amount) WHERE type='credit' - SUM(amount) WHERE type='debit'` — no stored balance column, always derived to prevent drift
+- `allowances.next_due_date` is updated on each payment to `next_due_date + interval (based on frequency)` — mirrors pattern used in recurring reminders
+- Savings goal progress: `(current_balance / target_amount * 100)%` — shown as a progress bar on dashboard; LLM can answer "X weeks until goal" by dividing `(target - balance)` by weekly allowance amount
+- Currency stored as ISO code (default `GBP`) on the `allowances` table — display-only, no conversion needed
+- LLM tool `pay_allowance` called with `child_name = 'all'` should iterate over all configured allowances and create one transaction per child — reduces friction for weekly bulk payment
+
+---
+
+### 18. Bill & Subscription Tracker
+
+**Problem:** Modern households carry a growing portfolio of monthly subscriptions (Netflix, Spotify, Amazon Prime, gym memberships) alongside irregular bills (council tax, car insurance renewal, TV licence). These are often forgotten until the charge appears on a bank statement — or worse, until a service is cancelled for non-payment. The bot's budget tracker (#1) handles spending categories but has no concept of upcoming payment obligations or renewal date alerts.
+
+**Value:** Surfaces upcoming bill payments before they hit, preventing surprises. Tracks total monthly subscription spend (subscription creep is a real problem). Sends advance alerts for renewals where the family might want to cancel or renegotiate. A practical, high-frequency-value feature that most families would use daily if it were seamlessly integrated.
+
+**Use cases:**
+- "Add Netflix — £17.99/month, renews on the 14th" — registers subscription
+- "Add car insurance — £420/year, renews 3rd September" — annual bill with advance alert
+- "What bills are due this month?" — full payment calendar view
+- "How much are we spending on subscriptions per month?" — total monthly commitment
+- "Cancel the reminder for Disney+ — we cancelled it" — removes bill
+- "Car insurance is up for renewal in 2 weeks — worth shopping around" — advance alert with LLM-generated nudge
+- Weekly digest includes: "Bills due this week: Netflix (14th, £17.99), water bill (16th, £42)"
+
+**Integration points:**
+- Renewal alerts hook into existing daily digest cron — bills due within 7 days surface in the morning message
+- Optional link to budget tracker (#1): bill payments can be automatically logged as expense entries on their due date
+- New LLM tools: `add_bill`, `list_bills`, `get_bills_due`, `delete_bill`, `get_monthly_commitments`
+- New DB tables: `bills` (id, family_id, name, amount decimal, currency, frequency enum('weekly','monthly','quarterly','annual','one-off'), next_due_date, category, notes, active bool, created_at)
+- Dashboard widget: bills calendar — a month view showing each bill's due date with amount; total monthly commitment summary at the top
+
+**Implementation notes for next agent:**
+- `next_due_date` advances automatically: cron job or on-query calculation rolls forward `next_due_date` by the frequency interval each time the date passes — no manual update needed
+- Alert tiers: 30-day alert for annual bills (>£100), 7-day alert for all bills — included in digest rather than sent as a separate message to avoid notification fatigue
+- Monthly commitment calculation: sum all active bills normalised to a monthly figure — annual bills divided by 12, weekly bills multiplied by 4.33; LLM tool returns this as a single figure
+- `category` field (subscription, utility, insurance, tax, other) enables filtering and pairs with budget tracker categories for consistent labelling
+- Duplicate detection: when adding a bill, query for existing bills with a similar name (fuzzy match) and warn if a potential duplicate is found
+
+---
+
+### 19. Family Time Capsule
+
+**Problem:** Families often want to capture moments, wishes, and messages to be revisited in the future — a letter to a child on their 18th birthday, a New Year's resolution to be re-read in December, a message from the whole family to be opened on a 10th anniversary. There is no low-friction way to schedule such messages. Standard reminder apps can schedule a notification but cannot preserve a heartfelt message for delivery years away.
+
+**Value:** A deeply personal, emotionally resonant feature that is uniquely suited to a Telegram-native AI assistant. No competing family app does this well. High perceived value from minimal technical investment. Creates a lasting reason for families to keep the bot installed and active — even years later when a capsule is finally "opened".
+
+**Use cases:**
+- "Save a time capsule: open on Maya's 18th birthday — [heartfelt message from the family]" — schedules a future Telegram message
+- "Record our family wishes for 2026 — open on 31st December 2026" — New Year capsule
+- "What time capsules do we have scheduled?" — lists pending capsules with open dates
+- "Add a photo to the time capsule for Jake's 18th" — attaches a Telegram file_id to a capsule
+- On the open date, the bot sends the capsule contents to the family chat with a special intro: "🎉 A message from your past selves, sealed [date]..."
+
+**Integration points:**
+- Delivery uses the existing Telegram bot DM or group chat mechanism — no new delivery infrastructure needed
+- Cron job (`/cron/daily`) checks for capsules due today and dispatches them — same pattern as existing reminders
+- New LLM tools: `create_capsule`, `list_capsules`, `add_to_capsule`, `delete_capsule`
+- New DB tables: `time_capsules` (id, family_id, title, message text, open_date date, created_by, created_at, delivered_at), `capsule_attachments` (id, capsule_id, telegram_file_id, file_type, caption)
+- Dashboard widget: "Sealed until…" capsule list showing titles and open dates (message content hidden until open date)
+
+**Implementation notes for next agent:**
+- `delivered_at` is set when the cron dispatches the capsule — prevents duplicate delivery if cron runs multiple times on the same day; query `WHERE open_date <= today AND delivered_at IS NULL`
+- Dashboard hides `message` content for undelivered capsules — show title and open date only; content revealed after `delivered_at` is set
+- Delivery message formatting: prepend a preamble ("This message was sealed on [created_at] by [creator name]") then the message body — makes the reveal feel intentional and ceremonial
+- `capsule_attachments` stores `telegram_file_id` — same pattern as Photo Memory Log (#3); Telegram hosts the file indefinitely via the file_id reference
+- LLM tool `create_capsule` should accept natural language open dates ("Maya's 18th birthday", "New Year's Eve 2030") and resolve them via the LLM before storing as an ISO date — reuse existing date-parsing patterns from the calendar service
+- Edge case: if a capsule open date falls on a day the cron doesn't run (e.g. server downtime), check for capsules due in the last 3 days on each cron run to catch missed deliveries
+
+---
+
+### 20. Family Fitness & Activity Challenge Tracker
+
+**Problem:** Many families want to be more active together but lack a shared accountability system. Individual fitness apps are siloed — there is no way for the whole family to set a shared step challenge, track a couch-to-5K programme together, or celebrate when everyone hits their weekly exercise goal. The bot already has a mood and wellbeing check-in concept (#15) and a rewards system, but no physical activity dimension.
+
+**Value:** Brings the family together around health in a low-pressure, gamified way. Directly extends the existing kid points/rewards system — children earn points for completing activity goals. Adds a social accountability layer that individual fitness apps lack. Aligns with a growing cultural interest in family wellness without requiring any wearable integrations (log manually to keep the MVP simple).
+
+**Use cases:**
+- "Start a family step challenge this week — goal: 50,000 steps each" — creates a family-wide challenge with individual targets
+- "I walked 8,500 steps today" — logs an activity entry for the current user
+- "Jake did his 20-minute run today" — parent logs activity for a child; optionally awards points
+- "How's everyone doing on the step challenge?" — leaderboard view for the active challenge
+- "We all hit our goal this week! 🎉" — bot announces completion and awards bonus points to finishers
+- "Create a family challenge: 30 days of 10,000 steps" — longer challenge with daily tracking
+
+**Integration points:**
+- Challenge completion awards points via existing `kid_points` service — same `addKidPoints` function call
+- Weekly digest includes active challenge progress: "Step challenge — Dad: 38k/50k, Mum: 44k/50k, Jake: 29k/50k — 3 days left"
+- New LLM tools: `create_challenge`, `log_activity`, `get_challenge_progress`, `list_challenges`, `complete_challenge`
+- New DB tables: `challenges` (id, family_id, title, description, challenge_type enum('steps','exercise_minutes','custom'), target_value int, target_unit, start_date, end_date, points_reward int, status enum('active','completed','cancelled')), `challenge_participants` (id, challenge_id, user_id, participant_name, target_value, current_value, completed bool), `activity_logs` (id, family_id, user_id, participant_name, challenge_id, value int, unit, note, logged_at)
+- Dashboard widget: active challenge progress bars per participant, leaderboard ranking, days remaining
+
+**Implementation notes for next agent:**
+- `participant_name` in `challenge_participants` and `activity_logs` is free-text — matches the pattern used across `kid_points`, `homework`, and `allowances` for consistency; children who don't have a Telegram account are entered by name only
+- Challenge types: `steps` and `exercise_minutes` have defined units; `custom` type allows a user-defined metric (e.g. "glasses of water", "pages read") stored as a free-text `target_unit`
+- Progress update: `log_activity` increments `challenge_participants.current_value` and sets `completed = true` if `current_value >= target_value` — then triggers point award via `addKidPoints`
+- Auto-completion detection: cron job at end of challenge `end_date` marks incomplete participants as `completed = false`, sends a summary message to the group chat; completed participants receive their `points_reward`
+- Leaderboard calculation: `SELECT participant_name, current_value, target_value, (current_value::float / target_value * 100) as pct FROM challenge_participants WHERE challenge_id = ? ORDER BY pct DESC`
+
+---
+
 ## Prioritisation Notes
 
 | Idea | Effort | Impact | Recommended Priority |
@@ -265,3 +582,13 @@ This is a Telegram-based AI family assistant bot with shared calendar, reminders
 | Pet Care Tracker (#8) | Medium | Medium | 8 — niche but high value for pet owners |
 | Photo Memory Log (#3) | Medium | Medium | 9 — delightful but non-essential |
 | Health Records Hub (#10) | High | High | 10 — high value but sensitive data adds complexity |
+| Gift Wish Lists (#11) | Low | High | 11 — zero-friction, pairs with existing birthdays |
+| Recipe Book (#12) | Medium | High | 12 — completes the cooking workflow triangle |
+| Homework Tracker (#14) | Low | High | 13 — high utility for school-age families, easy build |
+| Car & Home Maintenance (#13) | Medium | Medium | 14 — practical, underserved niche |
+| Mood Check-ins (#15) | Medium | High | 15 — unique AI-native feature, opt-in reduces risk |
+| Bill & Subscription Tracker (#18) | Low | High | 16 — high daily relevance, zero external dependencies |
+| Pocket Money Manager (#17) | Low | High | 17 — extends existing points system, prevents family disputes |
+| Travel & Holiday Planner (#16) | Medium | High | 18 — complements countdowns and lists, strong seasonal use |
+| Fitness Challenge Tracker (#20) | Medium | Medium | 19 — gamified wellness, extends rewards system |
+| Family Time Capsule (#19) | Low | High | 20 — emotionally unique, low build cost, long-term retention driver |
