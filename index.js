@@ -1,9 +1,12 @@
 import 'dotenv/config';
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import { webhookCallback } from 'grammy';
 import { bot } from './bot/bot.js';
 import { checkReminders, sendDailyDigest, sendWeeklyDigest } from './routes/cron.js';
 import { getDashboardData } from './routes/dashboard.js';
+import authRoutes from './routes/auth.js';
+import { requireAuth } from './middleware/auth.js';
 import { setMeal, removeMeal, getUniqueMealTitles } from './services/meals.js';
 import { createEvent, deleteEvent } from './services/calendar.js';
 import { addItem, removeItem, removeItemById } from './services/lists.js';
@@ -27,8 +30,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 app.use(express.json());
+app.use(cookieParser());
 const PORT = process.env.PORT || 3000;
 const isWebhookMode = Boolean(process.env.WEBHOOK_URL);
+
+// Auth routes (login page, login/logout/refresh API — no auth required)
+app.use(authRoutes);
+
+// Root redirect → dashboard (auth middleware will redirect to /login if needed)
+app.get('/', requireAuth, (req, res) => res.redirect('/dashboard'));
 
 // Health endpoint for cron-job.org keep-alive
 app.get('/health', (_req, res) => {
@@ -36,10 +46,7 @@ app.get('/health', (_req, res) => {
 });
 
 // Cron endpoint for reminder delivery
-app.get('/cron/check', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.get('/cron/check', requireAuth, async (req, res) => {
   try {
     const result = await checkReminders(bot);
     res.json(result);
@@ -50,10 +57,7 @@ app.get('/cron/check', async (req, res) => {
 });
 
 // Daily digest — called by cron-job.org at 8am
-app.get('/cron/daily', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.get('/cron/daily', requireAuth, async (req, res) => {
   try {
     const result = await sendDailyDigest(bot);
     res.json(result);
@@ -64,10 +68,7 @@ app.get('/cron/daily', async (req, res) => {
 });
 
 // Weekly digest — called by cron-job.org every Sunday
-app.get('/cron/weekly', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.get('/cron/weekly', requireAuth, async (req, res) => {
   try {
     const result = await sendWeeklyDigest(bot);
     res.json(result);
@@ -78,10 +79,7 @@ app.get('/cron/weekly', async (req, res) => {
 });
 
 // Dashboard HTML page
-app.get('/dashboard', (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).send('Unauthorized — add ?secret=YOUR_SECRET to the URL');
-  }
+app.get('/dashboard', requireAuth, (req, res) => {
   const filePath = path.join(__dirname, 'public', 'dashboard.html');
   const html = fs.readFileSync(filePath, 'utf-8');
   res.type('html').send(html);
@@ -94,7 +92,7 @@ const CACHE_TTL = 300_000; // 5 minutes
 function invalidateCache() { dashboardCache.timestamp = 0; }
 registerInvalidator(invalidateCache);
 
-app.get('/api/dashboard', async (req, res) => {
+app.get('/api/dashboard', requireAuth, async (req, res) => {
   if (req.query.secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'unauthorized' });
   }
@@ -138,10 +136,7 @@ async function getFamilyId() {
 }
 
 // Meal API — create or update a meal
-app.post('/api/meals', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.post('/api/meals', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -155,10 +150,7 @@ app.post('/api/meals', async (req, res) => {
 });
 
 // Meal API — delete a meal
-app.delete('/api/meals', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.delete('/api/meals', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -173,10 +165,7 @@ app.delete('/api/meals', async (req, res) => {
 });
 
 // Get unique meal titles for the meal picker wheel
-app.get('/api/meal-titles', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.get('/api/meal-titles', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -189,10 +178,7 @@ app.get('/api/meal-titles', async (req, res) => {
 });
 
 // Food expiry API
-app.get('/api/food-items', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.get('/api/food-items', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -204,10 +190,7 @@ app.get('/api/food-items', async (req, res) => {
   }
 });
 
-app.post('/api/food-items', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.post('/api/food-items', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -221,10 +204,7 @@ app.post('/api/food-items', async (req, res) => {
   }
 });
 
-app.delete('/api/food-items', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.delete('/api/food-items', requireAuth, async (req, res) => {
   try {
     const { item_id } = req.body;
     await removeFoodItemById(item_id);
@@ -237,10 +217,7 @@ app.delete('/api/food-items', async (req, res) => {
 });
 
 // Countdown API
-app.post('/api/countdowns', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.post('/api/countdowns', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -255,10 +232,7 @@ app.post('/api/countdowns', async (req, res) => {
   }
 });
 
-app.put('/api/countdowns/:id', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.put('/api/countdowns/:id', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -271,10 +245,7 @@ app.put('/api/countdowns/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/countdowns/:id', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.delete('/api/countdowns/:id', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -288,10 +259,7 @@ app.delete('/api/countdowns/:id', async (req, res) => {
 });
 
 // Event API — create an event
-app.post('/api/events', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.post('/api/events', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -306,10 +274,7 @@ app.post('/api/events', async (req, res) => {
 });
 
 // Event API — delete an event
-app.delete('/api/events', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.delete('/api/events', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -323,10 +288,7 @@ app.delete('/api/events', async (req, res) => {
 });
 
 // List item API — add an item
-app.post('/api/list-items', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.post('/api/list-items', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -341,10 +303,7 @@ app.post('/api/list-items', async (req, res) => {
 });
 
 // List item API — remove an item
-app.delete('/api/list-items', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.delete('/api/list-items', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -359,10 +318,7 @@ app.delete('/api/list-items', async (req, res) => {
 });
 
 // List item delete by ID (used by dashboard checkboxes)
-app.delete('/api/list-items/:id', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.delete('/api/list-items/:id', requireAuth, async (req, res) => {
   try {
     await removeItemById(req.params.id);
     invalidateCache();
@@ -374,10 +330,7 @@ app.delete('/api/list-items/:id', async (req, res) => {
 });
 
 // Reminder API — create a reminder
-app.post('/api/reminders', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.post('/api/reminders', requireAuth, async (req, res) => {
   try {
     // Get the first user to associate the reminder with
     const { data: users } = await supabase.from('users').select('id').limit(1);
@@ -392,10 +345,7 @@ app.post('/api/reminders', async (req, res) => {
 });
 
 // Reminder API — delete a reminder
-app.delete('/api/reminders', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.delete('/api/reminders', requireAuth, async (req, res) => {
   try {
     const { data: users } = await supabase.from('users').select('id').limit(1);
     if (!users?.length) return res.status(404).json({ error: 'No user found' });
@@ -409,10 +359,7 @@ app.delete('/api/reminders', async (req, res) => {
 });
 
 // Adjust kid points
-app.post('/api/points', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.post('/api/points', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -430,10 +377,7 @@ app.post('/api/points', async (req, res) => {
 });
 
 // Get point history for a kid
-app.get('/api/point-history', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.get('/api/point-history', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -448,7 +392,7 @@ app.get('/api/point-history', async (req, res) => {
 });
 
 // Get available themes
-app.get('/api/themes', async (req, res) => {
+app.get('/api/themes', requireAuth, async (req, res) => {
   if (req.query.secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'unauthorized' });
   }
@@ -456,10 +400,7 @@ app.get('/api/themes', async (req, res) => {
 });
 
 // Set dashboard theme
-app.post('/api/theme', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.post('/api/theme', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -473,10 +414,7 @@ app.post('/api/theme', async (req, res) => {
 });
 
 // Seed UK holidays for a year
-app.post('/api/seed-holidays', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.post('/api/seed-holidays', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -492,10 +430,7 @@ app.post('/api/seed-holidays', async (req, res) => {
 });
 
 // ── Watchlist ──
-app.get('/api/watchlist', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.get('/api/watchlist', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -508,10 +443,7 @@ app.get('/api/watchlist', async (req, res) => {
   }
 });
 
-app.post('/api/watchlist', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.post('/api/watchlist', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -524,10 +456,7 @@ app.post('/api/watchlist', async (req, res) => {
   }
 });
 
-app.put('/api/watchlist/:id/watched', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.put('/api/watchlist/:id/watched', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -540,10 +469,7 @@ app.put('/api/watchlist/:id/watched', async (req, res) => {
   }
 });
 
-app.delete('/api/watchlist/:id', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.delete('/api/watchlist/:id', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -557,7 +483,7 @@ app.delete('/api/watchlist/:id', async (req, res) => {
 });
 
 // ── Error Log ──
-app.get('/api/errors', async (req, res) => {
+app.get('/api/errors', requireAuth, async (req, res) => {
   if (req.query.secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'unauthorized' });
   }
@@ -565,7 +491,7 @@ app.get('/api/errors', async (req, res) => {
   res.json({ errors: getErrors(limit) });
 });
 
-app.delete('/api/errors', async (req, res) => {
+app.delete('/api/errors', requireAuth, async (req, res) => {
   if (req.query.secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'unauthorized' });
   }
@@ -574,10 +500,7 @@ app.delete('/api/errors', async (req, res) => {
 });
 
 // ── Chat History ──
-app.get('/api/chat-history', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.get('/api/chat-history', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -613,10 +536,7 @@ app.get('/api/chat-history', async (req, res) => {
 });
 
 // ── Birthdays ──
-app.get('/api/birthdays', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.get('/api/birthdays', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -628,10 +548,7 @@ app.get('/api/birthdays', async (req, res) => {
   }
 });
 
-app.post('/api/birthdays', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.post('/api/birthdays', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -644,10 +561,7 @@ app.post('/api/birthdays', async (req, res) => {
   }
 });
 
-app.put('/api/birthdays/:id', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.put('/api/birthdays/:id', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -660,10 +574,7 @@ app.put('/api/birthdays/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/birthdays/:id', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.delete('/api/birthdays/:id', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -677,10 +588,7 @@ app.delete('/api/birthdays/:id', async (req, res) => {
 });
 
 // Ideas endpoints
-app.get('/api/ideas', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.get('/api/ideas', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -692,10 +600,7 @@ app.get('/api/ideas', async (req, res) => {
   }
 });
 
-app.post('/api/ideas', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.post('/api/ideas', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -708,10 +613,7 @@ app.post('/api/ideas', async (req, res) => {
   }
 });
 
-app.delete('/api/ideas/:id', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.delete('/api/ideas/:id', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -724,10 +626,7 @@ app.delete('/api/ideas/:id', async (req, res) => {
   }
 });
 
-app.post('/api/ideas/process', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.post('/api/ideas/process', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -740,10 +639,7 @@ app.post('/api/ideas/process', async (req, res) => {
   }
 });
 
-app.post('/api/ideas/generate', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.post('/api/ideas/generate', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
@@ -757,10 +653,7 @@ app.post('/api/ideas/generate', async (req, res) => {
   }
 });
 
-app.get('/cron/ideas', async (req, res) => {
-  if (req.query.secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
+app.get('/cron/ideas', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });

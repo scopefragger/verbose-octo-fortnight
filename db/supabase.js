@@ -11,4 +11,8 @@ if (!url || !key) {
 
 const supabase = createClient(url, key);
 
-export { supabase };
+// Auth client uses anon key (required for Supabase Auth operations)
+const anonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseAuth = anonKey ? createClient(url, anonKey) : null;
+
+export { supabase, supabaseAuth };

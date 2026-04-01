@@ -2991,6 +2991,10 @@
       <h3>Dashboard Theme</h3>
       <div class="theme-grid" id="themeGrid">Loading themes...</div>
     </div>
+    <div class="settings-section" style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border,#e0e0e0)">
+      <h3>Account</h3>
+      <button onclick="handleLogout()" style="margin-top:8px;padding:10px 20px;border-radius:8px;border:1px solid #ef4444;background:#fef2f2;color:#ef4444;cursor:pointer;font-size:14px;font-weight:600;width:100%">Sign Out</button>
+    </div>
   </div>
 
   <script>
@@ -3419,7 +3423,35 @@
     }
 
     function getSecret() {
-      return new URLSearchParams(window.location.search).get('secret');
+      return new URLSearchParams(window.location.search).get('secret') || '';
+    }
+
+    // Build URL with secret param only if we have one (cookie auth doesn't need it)
+    function apiUrl(path) {
+      const secret = getSecret();
+      return secret ? `${path}?secret=${secret}` : path;
+    }
+
+    // Wrap fetch to handle 401 → redirect to login
+    const _origFetch = window.fetch;
+    window.fetch = async function(...args) {
+      const res = await _origFetch.apply(this, args);
+      if (res.status === 401) {
+        const data = await res.clone().json().catch(() => ({}));
+        if (data.error === 'session_expired' || data.error === 'unauthorized') {
+          window.location.href = '/login';
+          return res;
+        }
+      }
+      return res;
+    };
+
+    // Refresh auth token periodically (every 50 min)
+    if (!getSecret()) {
+      setInterval(async () => {
+        try { await _origFetch('/api/auth/refresh', { method: 'POST' }); }
+        catch { /* ignore */ }
+      }, 50 * 60 * 1000);
     }
 
     function getTodayStr() {
@@ -5747,6 +5779,11 @@
       const backdrop = document.getElementById('appsBackdrop');
       drawer.classList.toggle('open');
       backdrop.classList.toggle('open');
+    }
+
+    async function handleLogout() {
+      try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+      window.location.href = '/login';
     }
 
     function toggleSettings() {
