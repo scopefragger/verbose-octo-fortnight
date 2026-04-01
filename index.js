@@ -6,7 +6,7 @@ import { bot } from './bot/bot.js';
 import { checkReminders, sendDailyDigest, sendWeeklyDigest } from './routes/cron.js';
 import { getDashboardData } from './routes/dashboard.js';
 import authRoutes from './routes/auth.js';
-import { requireAuth } from './middleware/auth.js';
+import { requireAuth, requireCronSecret } from './middleware/auth.js';
 import { setMeal, removeMeal, getUniqueMealTitles } from './services/meals.js';
 import { createEvent, deleteEvent } from './services/calendar.js';
 import { addItem, removeItem, removeItemById } from './services/lists.js';
@@ -46,7 +46,7 @@ app.get('/health', (_req, res) => {
 });
 
 // Cron endpoint for reminder delivery
-app.get('/cron/check', requireAuth, async (req, res) => {
+app.get('/cron/check', requireCronSecret, async (req, res) => {
   try {
     const result = await checkReminders(bot);
     res.json(result);
@@ -57,7 +57,7 @@ app.get('/cron/check', requireAuth, async (req, res) => {
 });
 
 // Daily digest — called by cron-job.org at 8am
-app.get('/cron/daily', requireAuth, async (req, res) => {
+app.get('/cron/daily', requireCronSecret, async (req, res) => {
   try {
     const result = await sendDailyDigest(bot);
     res.json(result);
@@ -68,7 +68,7 @@ app.get('/cron/daily', requireAuth, async (req, res) => {
 });
 
 // Weekly digest — called by cron-job.org every Sunday
-app.get('/cron/weekly', requireAuth, async (req, res) => {
+app.get('/cron/weekly', requireCronSecret, async (req, res) => {
   try {
     const result = await sendWeeklyDigest(bot);
     res.json(result);
@@ -653,7 +653,7 @@ app.post('/api/ideas/generate', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/cron/ideas', requireAuth, async (req, res) => {
+app.get('/cron/ideas', requireCronSecret, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
