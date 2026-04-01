@@ -331,8 +331,8 @@ const LOGIN_HTML = `<!DOCTYPE html>
   <div class="login-container">
     <div class="login-card">
       <div class="castle-icon">&#x1F3F0;</div>
-      <h1>Family Kingdom</h1>
-      <p class="subtitle">Where the magic happens</p>
+      <h1>Family Dashboard</h1>
+      <p class="subtitle">Sign in to continue</p>
       <div class="sparkle-divider">&#x2728; &#x2728; &#x2728;</div>
       <div class="error-msg" id="errorMsg"></div>
       <form id="loginForm">
@@ -350,9 +350,9 @@ const LOGIN_HTML = `<!DOCTYPE html>
   </div>
 
   <script>
-    // Generate stars
+    // Generate random stars
     const starsContainer = document.getElementById('stars');
-    for (let i = 0; i < 120; i++) {
+    for (let i = 0; i < 100; i++) {
       const star = document.createElement('div');
       star.className = 'star';
       star.style.left = Math.random() * 100 + '%';
@@ -363,6 +363,62 @@ const LOGIN_HTML = `<!DOCTYPE html>
       star.style.animationDelay = (Math.random() * 5) + 's';
       starsContainer.appendChild(star);
     }
+
+    // Hidden Disney character constellations made of brighter stars
+    // Each constellation is a set of [x%, y%] points that trace a character
+    const constellations = [
+      // Mickey Mouse head (top-left area) — three circles
+      { points: [
+        [12,8],[14,6],[16,5],[18,6],[20,8], // left ear
+        [26,8],[28,6],[30,5],[32,6],[34,8], // right ear
+        [15,12],[17,15],[19,18],[23,18],[25,15],[27,12], // head outline
+        [20,14],[22,14],[21,16], // face dots
+      ], color: 'rgba(255,255,255,0.6)' },
+      // Tinkerbell flying (right side) — wand trail + wings
+      { points: [
+        [82,12],[83,14],[84,16],[83,18],[82,20], // body
+        [80,14],[78,13],[79,11], // left wing
+        [86,14],[88,13],[87,11], // right wing
+        [84,10],[86,8],[88,7],[90,6],[92,5],[94,5], // wand trail sparkles
+      ], color: 'rgba(255,215,0,0.5)' },
+      // Nemo fish (bottom-left) — small clownfish shape
+      { points: [
+        [8,42],[10,40],[12,38],[14,38],[16,40],[17,42],[16,44],[14,44],[12,44],[10,44], // body
+        [17,41],[19,39],[19,43], // tail
+        [11,41], // eye
+      ], color: 'rgba(255,140,50,0.45)' },
+      // Magic wand with star (top-right)
+      { points: [
+        [72,22],[73,20],[74,18],[75,16],[76,14], // wand line
+        [76,11],[78,12],[77,14],[75,13],[76,11], // star shape
+        [74,10],[78,10],[76,8], // star points
+      ], color: 'rgba(200,180,255,0.5)' },
+      // Simba sitting (far right)
+      { points: [
+        [92,30],[93,28],[94,26],[95,28],[96,30], // head
+        [93,31],[92,34],[92,37],[93,38],[95,38],[96,37],[96,34],[95,31], // body
+        [91,38],[90,39], // front paw
+        [97,38],[98,39], // back paw
+        [97,35],[99,34],[100,33], // tail
+      ], color: 'rgba(255,200,100,0.4)' },
+    ];
+
+    constellations.forEach(c => {
+      c.points.forEach(([x, y], i) => {
+        const star = document.createElement('div');
+        star.className = 'star';
+        star.style.left = x + '%';
+        star.style.top = y + '%';
+        const size = (Math.random() * 1.5 + 2) + 'px';
+        star.style.width = size;
+        star.style.height = size;
+        star.style.background = c.color;
+        star.style.boxShadow = '0 0 4px ' + c.color;
+        star.style.setProperty('--dur', (3 + Math.random() * 2) + 's');
+        star.style.animationDelay = (i * 0.15) + 's';
+        starsContainer.appendChild(star);
+      });
+    });
 
     // Generate fireflies
     for (let i = 0; i < 8; i++) {
