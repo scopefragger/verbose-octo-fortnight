@@ -20,6 +20,10 @@ export function requireAuth(req, res, next) {
 
   supabaseAuth.auth.getUser(accessToken).then(({ data, error }) => {
     if (error || !data?.user) {
+      console.error('Auth verification failed:', error?.message || 'no user returned');
+      // Clear bad cookies
+      res.clearCookie('sb_access_token', { path: '/' });
+      res.clearCookie('sb_refresh_token', { path: '/' });
       if (req.accepts('html') && !req.path.startsWith('/api/')) {
         return res.redirect('/login');
       }
@@ -28,7 +32,10 @@ export function requireAuth(req, res, next) {
     req.authMode = 'session';
     req.authUser = data.user;
     next();
-  }).catch(() => {
+  }).catch((err) => {
+    console.error('Auth middleware error:', err.message);
+    res.clearCookie('sb_access_token', { path: '/' });
+    res.clearCookie('sb_refresh_token', { path: '/' });
     return res.status(401).json({ error: 'unauthorized' });
   });
 }
