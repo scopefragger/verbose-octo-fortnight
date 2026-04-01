@@ -3307,13 +3307,18 @@
       return 'default-kid';
     }
 
+    let _authRedirecting = false;
     async function fetchData() {
       const res = await fetch('/api/dashboard', { credentials: 'same-origin' });
       console.log('Dashboard API response:', res.status);
-      if (res.status === 401) {
+      if (res.status === 401 && !_authRedirecting) {
+        _authRedirecting = true;
         console.log('Unauthorized — redirecting to login');
+        // Force clear cookies client-side too
+        document.cookie = 'sb_access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        document.cookie = 'sb_refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         window.location.href = '/login';
-        return new Promise(() => {}); // never resolves — page will redirect
+        return new Promise(() => {});
       }
       if (!res.ok) throw new Error('Failed to load');
       return res.json();

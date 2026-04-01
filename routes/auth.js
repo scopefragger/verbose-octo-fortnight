@@ -14,10 +14,19 @@ const COOKIE_OPTS = {
 };
 
 // GET /login — serve login page
-router.get('/login', (req, res) => {
-  // If already logged in, redirect to dashboard
-  if (req.cookies?.sb_access_token) {
-    return res.redirect('/dashboard');
+router.get('/login', async (req, res) => {
+  // If already logged in with a valid token, redirect to dashboard
+  const token = req.cookies?.sb_access_token;
+  if (token && supabaseAuth) {
+    try {
+      const { data, error } = await supabaseAuth.auth.getUser(token);
+      if (!error && data?.user) {
+        return res.redirect('/dashboard');
+      }
+    } catch { /* token invalid, show login */ }
+    // Token is bad — clear it
+    res.clearCookie('sb_access_token', { path: '/' });
+    res.clearCookie('sb_refresh_token', { path: '/' });
   }
 
   res.send(LOGIN_HTML);
