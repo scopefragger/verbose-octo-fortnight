@@ -3308,8 +3308,10 @@
     }
 
     async function fetchData() {
-      const res = await fetch('/api/dashboard');
+      const res = await fetch('/api/dashboard', { credentials: 'same-origin' });
+      console.log('Dashboard API response:', res.status);
       if (res.status === 401) {
+        console.log('Unauthorized — redirecting to login');
         window.location.href = '/login';
         return new Promise(() => {}); // never resolves — page will redirect
       }

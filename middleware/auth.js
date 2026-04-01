@@ -7,6 +7,11 @@ import { supabaseAuth } from '../db/supabase.js';
  */
 export function requireAuth(req, res, next) {
   const accessToken = req.cookies?.sb_access_token;
+  if (accessToken) {
+    console.log(`Auth: ${req.method} ${req.path} — cookie present (${accessToken.substring(0, 20)}...)`);
+  } else {
+    console.log(`Auth: ${req.method} ${req.path} — no cookie`);
+  }
   if (!accessToken) {
     if (req.accepts('html') && !req.path.startsWith('/api/') && !req.path.startsWith('/cron/')) {
       return res.redirect('/login');
