@@ -3309,15 +3309,27 @@
 
     let _authRedirecting = false;
     async function fetchData() {
+      // Try token refresh first if we get a 401
       const res = await fetch('/api/dashboard', { credentials: 'same-origin' });
       console.log('Dashboard API response:', res.status);
       if (res.status === 401 && !_authRedirecting) {
+        // Try refreshing the token first
+        console.log('Got 401 — attempting token refresh...');
+        try {
+          const refreshRes = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin' });
+          if (refreshRes.ok) {
+            console.log('Token refreshed — retrying...');
+            const retry = await fetch('/api/dashboard', { credentials: 'same-origin' });
+            if (retry.ok) return retry.json();
+          }
+        } catch { /* refresh failed */ }
+
+        // Refresh failed — redirect to login
         _authRedirecting = true;
-        console.log('Unauthorized — redirecting to login');
-        // Force clear cookies client-side too
+        console.log('Token refresh failed — redirecting to login');
         document.cookie = 'sb_access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         document.cookie = 'sb_refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        window.location.href = '/login';
+        window.location.replace('/login');
         return new Promise(() => {});
       }
       if (!res.ok) throw new Error('Failed to load');
