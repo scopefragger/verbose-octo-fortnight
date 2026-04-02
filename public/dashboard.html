@@ -2964,9 +2964,9 @@
         <div class="app-name">Reminders</div>
         <div class="app-desc">Pending & recurring</div>
       </div>
-      <div class="app-tile" onclick="toggleAppsDrawer(); openIdeasApp();">
+      <div class="app-tile" onclick="toggleAppsDrawer(); window.location.href='/ideas' + (window._urlSecret ? '?secret=' + window._urlSecret : '');">
         <div class="app-icon">&#x1F4A1;</div>
-        <div class="app-name">Ideas</div>
+        <div class="app-name">Ideas Lab</div>
         <div class="app-desc">Capture & enrich ideas</div>
       </div>
       <div class="app-tile" onclick="toggleAppsDrawer(); openErrorLogApp();">
@@ -3444,6 +3444,7 @@
 
     // If ?secret= is in the URL, pass it to all API calls (backward compat)
     const _urlSecret = new URLSearchParams(window.location.search).get('secret');
+    window._urlSecret = _urlSecret;
 
     // Wrap fetch to auto-append secret and handle 401
     const _origFetch = window.fetch;

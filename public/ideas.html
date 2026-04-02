@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ideas Lab</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f1a;
+      --surface: #1a1a2e;
+      --surface-2: #222240;
+      --surface-3: #2a2a4a;
+      --accent: #6c5ce7;
+      --accent-light: #a29bfe;
+      --accent-glow: rgba(108, 92, 231, 0.3);
+      --green: #00b894;
+      --green-glow: rgba(0, 184, 148, 0.2);
+      --amber: #fdcb6e;
+      --amber-glow: rgba(253, 203, 110, 0.2);
+      --red: #e17055;
+      --red-glow: rgba(225, 112, 85, 0.2);
+      --blue: #74b9ff;
+      --text: #dfe6e9;
+      --text-dim: #636e72;
+      --text-muted: #4a5568;
+      --border: rgba(255,255,255,0.06);
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated gradient background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(108,92,231,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(0,184,148,0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(116,185,255,0.05) 0%, transparent 50%);
+      z-index: 0;
+      animation: bgShift 20s ease-in-out infinite;
+    }
+    @keyframes bgShift {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    /* Top nav */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 28px;
+      background: rgba(15,15,26,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+    .back-btn:hover { color: var(--text); background: var(--surface); }
+    .topbar h1 {
+      font-size: 20px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-light), var(--green));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.3px;
+    }
+    .topbar-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 9px 18px;
+      border-radius: var(--radius-sm);
+      border: none;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      color: #fff;
+      box-shadow: 0 2px 12px var(--accent-glow);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px var(--accent-glow); }
+    .btn-generate {
+      background: linear-gradient(135deg, var(--green), #00cec9);
+      color: #fff;
+      box-shadow: 0 2px 12px var(--green-glow);
+    }
+    .btn-generate:hover { transform: translateY(-1px); box-shadow: 0 4px 20px var(--green-glow); }
+    .btn-secondary {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: var(--surface-3); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+
+    /* Stats bar */
+    .stats-bar {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      gap: 16px;
+      padding: 20px 28px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 22px;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .stat-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    .stat-icon.pending { background: var(--amber-glow); }
+    .stat-icon.enriched { background: var(--green-glow); }
+    .stat-icon.failed { background: var(--red-glow); }
+    .stat-icon.total { background: var(--accent-glow); }
+    .stat-number { font-size: 28px; font-weight: 700; }
+    .stat-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Tabs */
+    .tabs {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      gap: 4px;
+      padding: 0 28px;
+      margin-bottom: 20px;
+    }
+    .tab {
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab:hover { color: var(--text); background: var(--surface); }
+    .tab.active { color: #fff; background: var(--accent); }
+
+    /* Ideas grid */
+    .ideas-container {
+      position: relative;
+      z-index: 1;
+      padding: 0 28px 40px;
+    }
+    .ideas-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 16px;
+    }
+    .idea-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      transition: all 0.25s;
+      position: relative;
+      overflow: hidden;
+    }
+    .idea-card:hover {
+      border-color: rgba(108,92,231,0.3);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+      transform: translateY(-2px);
+    }
+    .idea-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+    }
+    .idea-card.status-pending::before { background: linear-gradient(90deg, var(--amber), #e17055); }
+    .idea-card.status-enriched::before { background: linear-gradient(90deg, var(--green), var(--blue)); }
+    .idea-card.status-failed::before { background: var(--red); }
+    .idea-card.status-processing::before { background: linear-gradient(90deg, var(--blue), var(--accent)); animation: shimmer 1.5s infinite; }
+    @keyframes shimmer { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+    .idea-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+    .idea-title {
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.3;
+      flex: 1;
+    }
+    .idea-delete {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 16px;
+      padding: 4px 6px;
+      border-radius: 6px;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .idea-delete:hover { color: var(--red); background: var(--red-glow); }
+    .idea-desc {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+    .idea-meta {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .badge-pending { background: var(--amber-glow); color: var(--amber); }
+    .badge-processing { background: rgba(116,185,255,0.2); color: var(--blue); }
+    .badge-enriched { background: var(--green-glow); color: var(--green); }
+    .badge-failed { background: var(--red-glow); color: var(--red); }
+    .badge-category { background: var(--surface-3); color: var(--text-dim); }
+    .badge-date { background: transparent; color: var(--text-muted); font-weight: 400; }
+    .badge-effort { background: var(--accent-glow); color: var(--accent-light); }
+
+    /* Enriched content */
+    .enriched-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .enriched-block {
+      margin-bottom: 14px;
+    }
+    .enriched-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--accent-light);
+      margin-bottom: 6px;
+    }
+    .enriched-text {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text);
+    }
+    .enriched-text br + br { display: none; }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 80px 20px;
+      color: var(--text-muted);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+    .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: var(--text-dim); }
+    .empty-state p { font-size: 14px; }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.2s;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      width: 90%;
+      max-width: 480px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+      animation: slideUp 0.3s ease-out;
+    }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } }
+    .modal-card h2 {
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+    .field {
+      margin-bottom: 16px;
+    }
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .field input, .field textarea {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .field input:focus, .field textarea:focus {
+      border-color: var(--accent);
+    }
+    .field input::placeholder, .field textarea::placeholder {
+      color: var(--text-muted);
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .stats-bar { flex-wrap: wrap; padding: 12px 16px; gap: 10px; }
+      .stat-card { min-width: calc(50% - 8px); flex: unset; padding: 12px 16px; }
+      .ideas-grid { grid-template-columns: 1fr; }
+      .topbar { padding: 12px 16px; }
+      .tabs { padding: 0 16px; }
+      .ideas-container { padding: 0 16px 30px; }
+      .topbar-actions { gap: 6px; }
+      .btn { padding: 7px 12px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <a href="/dashboard" class="back-btn">&larr; Dashboard</a>
+      <h1>Ideas Lab</h1>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-generate" id="generateBtn" onclick="handleGenerate()">
+        <span>&#x1F916;</span> Generate
+      </button>
+      <button class="btn btn-secondary" id="processBtn" onclick="handleProcess()">
+        <span>&#x2699;&#xFE0F;</span> Process Queue
+      </button>
+      <button class="btn btn-primary" onclick="openAddModal()">
+        <span>+</span> New Idea
+      </button>
+    </div>
+  </div>
+
+  <div class="stats-bar" id="statsBar"></div>
+
+  <div class="tabs" id="tabsBar"></div>
+
+  <div class="ideas-container">
+    <div class="ideas-grid" id="ideasGrid"></div>
+  </div>
+
+  <script>
+    // Secret passthrough from dashboard URL
+    const _secret = new URLSearchParams(window.location.search).get('secret') || '';
+    function api(path) {
+      return _secret ? `${path}${path.includes('?') ? '&' : '?'}secret=${encodeURIComponent(_secret)}` : path;
+    }
+
+    function esc(str) {
+      if (!str) return '';
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    let allIdeas = [];
+    let currentTab = 'all';
+
+    async function loadIdeas() {
+      try {
+        const res = await fetch(api('/api/ideas'), { credentials: 'same-origin' });
+        if (res.status === 401) { window.location.replace('/login'); return; }
+        const json = await res.json();
+        allIdeas = json.ideas || [];
+      } catch (e) {
+        console.error('Failed to load ideas:', e);
+        allIdeas = [];
+      }
+      renderStats();
+      renderTabs();
+      renderIdeas();
+    }
+
+    function renderStats() {
+      const pending = allIdeas.filter(i => i.status === 'pending' || i.status === 'processing').length;
+      const enriched = allIdeas.filter(i => i.status === 'enriched').length;
+      const failed = allIdeas.filter(i => i.status === 'failed').length;
+      document.getElementById('statsBar').innerHTML = `
+        <div class="stat-card">
+          <div class="stat-icon total">&#x1F4A1;</div>
+          <div><div class="stat-number">${allIdeas.length}</div><div class="stat-label">Total Ideas</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon pending">&#x23F3;</div>
+          <div><div class="stat-number">${pending}</div><div class="stat-label">Pending</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon enriched">&#x2728;</div>
+          <div><div class="stat-number">${enriched}</div><div class="stat-label">Enriched</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon failed">&#x26A0;</div>
+          <div><div class="stat-number">${failed}</div><div class="stat-label">Failed</div></div>
+        </div>
+      `;
+    }
+
+    function renderTabs() {
+      const counts = {
+        all: allIdeas.length,
+        pending: allIdeas.filter(i => i.status === 'pending' || i.status === 'processing').length,
+        enriched: allIdeas.filter(i => i.status === 'enriched').length,
+        failed: allIdeas.filter(i => i.status === 'failed').length,
+      };
+      document.getElementById('tabsBar').innerHTML = ['all', 'pending', 'enriched', 'failed']
+        .filter(t => t === 'all' || counts[t] > 0)
+        .map(t => `<button class="tab ${currentTab === t ? 'active' : ''}" onclick="switchTab('${t}')">${t.charAt(0).toUpperCase() + t.slice(1)} (${counts[t]})</button>`)
+        .join('');
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      renderTabs();
+      renderIdeas();
+    }
+
+    function renderIdeas() {
+      let filtered = allIdeas;
+      if (currentTab === 'pending') filtered = allIdeas.filter(i => i.status === 'pending' || i.status === 'processing');
+      else if (currentTab !== 'all') filtered = allIdeas.filter(i => i.status === currentTab);
+
+      const grid = document.getElementById('ideasGrid');
+      if (!filtered.length) {
+        grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+          <div class="icon">&#x1F4A1;</div>
+          <h3>${currentTab === 'all' ? 'No ideas yet' : 'No ' + currentTab + ' ideas'}</h3>
+          <p>${currentTab === 'all' ? 'Click "New Idea" or "Generate" to get started' : ''}</p>
+        </div>`;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(idea => {
+        const date = new Date(idea.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+        let enrichedHtml = '';
+        if (idea.status === 'enriched') {
+          enrichedHtml = `<div class="enriched-section">
+            ${idea.enriched_summary ? `<div class="enriched-block"><div class="enriched-label">Summary</div><div class="enriched-text">${esc(idea.enriched_summary)}</div></div>` : ''}
+            ${idea.enriched_implementation ? `<div class="enriched-block"><div class="enriched-label">Implementation</div><div class="enriched-text">${esc(idea.enriched_implementation).replace(/\\n/g, '<br>').replace(/\n/g, '<br>')}</div></div>` : ''}
+            ${idea.enriched_considerations ? `<div class="enriched-block"><div class="enriched-label">Considerations</div><div class="enriched-text">${esc(idea.enriched_considerations).replace(/\\n/g, '<br>').replace(/\n/g, '<br>')}</div></div>` : ''}
+            ${idea.enriched_effort ? `<div class="idea-meta" style="margin-top:8px"><span class="badge badge-effort">${esc(idea.enriched_effort)}</span></div>` : ''}
+          </div>`;
+        }
+        if (idea.status === 'failed' && idea.enriched_summary) {
+          enrichedHtml = `<div class="enriched-section"><div class="enriched-text" style="color:var(--red)">${esc(idea.enriched_summary)}</div></div>`;
+        }
+
+        return `<div class="idea-card status-${idea.status}">
+          <div class="idea-header">
+            <div class="idea-title">${esc(idea.title)}</div>
+            <button class="idea-delete" onclick="deleteIdea('${idea.id}')" title="Delete">&#x1F5D1;</button>
+          </div>
+          ${idea.description ? `<div class="idea-desc">${esc(idea.description)}</div>` : ''}
+          <div class="idea-meta">
+            <span class="badge badge-${idea.status}">${idea.status}</span>
+            ${idea.category ? `<span class="badge badge-category">${esc(idea.category)}</span>` : ''}
+            <span class="badge badge-date">${date}</span>
+          </div>
+          ${enrichedHtml}
+        </div>`;
+      }).join('');
+    }
+
+    async function deleteIdea(id) {
+      await fetch(api(`/api/ideas/${id}`), { method: 'DELETE', credentials: 'same-origin' });
+      loadIdeas();
+    }
+
+    async function handleGenerate() {
+      const btn = document.getElementById('generateBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span>&#x1F916;</span> Analysing repo...';
+      try {
+        const res = await fetch(api('/api/ideas/generate'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ count: 5 }),
+          credentials: 'same-origin',
+        });
+        const result = await res.json();
+        btn.innerHTML = `<span>&#x2728;</span> Generated ${result.generated || 0}!`;
+        setTimeout(() => { btn.innerHTML = '<span>&#x1F916;</span> Generate'; btn.disabled = false; }, 2000);
+        loadIdeas();
+      } catch {
+        btn.innerHTML = '<span>&#x26A0;</span> Error';
+        setTimeout(() => { btn.innerHTML = '<span>&#x1F916;</span> Generate'; btn.disabled = false; }, 2000);
+      }
+    }
+
+    async function handleProcess() {
+      const btn = document.getElementById('processBtn');
+      btn.disabled = true;
+      btn.innerHTML = '<span>&#x2699;&#xFE0F;</span> Processing...';
+      try {
+        const res = await fetch(api('/api/ideas/process'), { method: 'POST', credentials: 'same-origin' });
+        const result = await res.json();
+        btn.innerHTML = `<span>&#x2728;</span> Done! ${result.processed || 0} processed`;
+        setTimeout(() => { btn.innerHTML = '<span>&#x2699;&#xFE0F;</span> Process Queue'; btn.disabled = false; }, 2000);
+        loadIdeas();
+      } catch {
+        btn.innerHTML = '<span>&#x26A0;</span> Error';
+        setTimeout(() => { btn.innerHTML = '<span>&#x2699;&#xFE0F;</span> Process Queue'; btn.disabled = false; }, 2000);
+      }
+    }
+
+    function openAddModal() {
+      const modal = document.createElement('div');
+      modal.className = 'modal-backdrop';
+      modal.innerHTML = `
+        <div class="modal-card">
+          <h2>&#x1F4A1; New Idea</h2>
+          <div class="field">
+            <label>Title</label>
+            <input type="text" id="newTitle" placeholder="What's the idea?" autofocus>
+          </div>
+          <div class="field">
+            <label>Description</label>
+            <textarea id="newDesc" rows="3" placeholder="Any details or context..."></textarea>
+          </div>
+          <div class="field">
+            <label>Category</label>
+            <input type="text" id="newCategory" placeholder="e.g. Feature, Improvement, Fun...">
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="this.closest('.modal-backdrop').remove()">Cancel</button>
+            <button class="btn btn-primary" id="saveBtn" onclick="saveIdea()">Save Idea</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+      modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+      setTimeout(() => document.getElementById('newTitle').focus(), 100);
+    }
+
+    async function saveIdea() {
+      const title = document.getElementById('newTitle').value.trim();
+      if (!title) { document.getElementById('newTitle').style.borderColor = 'var(--red)'; return; }
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      await fetch(api('/api/ideas'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description: document.getElementById('newDesc').value.trim(),
+          category: document.getElementById('newCategory').value.trim(),
+        }),
+        credentials: 'same-origin',
+      });
+      document.querySelector('.modal-backdrop').remove();
+      loadIdeas();
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', e => {
+      if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !document.querySelector('.modal-backdrop') && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        openAddModal();
+      }
+    });
+
+    // Init
+    loadIdeas();
+  </script>
+</body>
+</html>

@@ -85,6 +85,13 @@ app.get('/dashboard', requireAuth, (req, res) => {
   res.type('html').send(html);
 });
 
+// Ideas Lab page
+app.get('/ideas', requireAuth, (req, res) => {
+  const filePath = path.join(__dirname, 'public', 'ideas.html');
+  const html = fs.readFileSync(filePath, 'utf-8');
+  res.type('html').send(html);
+});
+
 // Dashboard API — returns JSON data for the dashboard (cached to reduce Supabase load)
 let dashboardCache = { data: null, timestamp: 0 };
 const CACHE_TTL = 300_000; // 5 minutes
