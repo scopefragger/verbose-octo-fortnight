@@ -568,6 +568,163 @@ This is a Telegram-based AI family assistant bot with shared calendar, reminders
 
 ---
 
+### 21. Emergency Information Hub
+
+**Problem:** In a genuine emergency — a burst pipe, a medical incident, a house fire — families fumble for critical information scattered across scraps of paper, old emails, and individual memory. Where is the stopcock? What is the home alarm code? What is Grandma's GP number? Who is the family's NHS blood type? The bot's shared notes feature (#4) can store freeform text but provides no structured, instantly-retrievable emergency layer optimised for high-stress, low-time situations.
+
+**Description:** A dedicated emergency quick-reference system that stores the family's critical safety and household information in a structured, instantly accessible format. Think of it as a digital laminated card behind the front door — but always in your pocket. The bot responds to natural-language panic queries like "where's the stopcock?" or "what's the home alarm code?" with immediate, zero-friction answers. Data is organised into categories: home utilities, emergency contacts, medical essentials, and evacuation details.
+
+**Value:** Reduces dangerous fumbling during emergencies. Creates a shared household knowledge base so any adult family member can act decisively in a crisis. Particularly valuable when one parent is away and the other needs information normally held by the absent partner.
+
+**Use cases:**
+- "Add emergency info: stopcock is under the kitchen sink, red lever" — stores utility detail
+- "Where do I turn the water off?" — instant retrieval with zero-latency
+- "Add home alarm code: 1492 — disarm within 30 seconds of entry" — sensitive operational detail
+- "What's the gas emergency number?" — stored contact retrieval
+- "Add evacuation meeting point: end of the driveway by the lamp post" — fire safety detail
+- "What medical info is saved for Jake?" — retrieves Jake's blood type, allergies, and GP number
+
+**Integration points:**
+- Extends the existing `notes` table concept (#4) but with a structured `category` enum and `is_emergency` flag for priority retrieval
+- New LLM tools: `save_emergency_info`, `get_emergency_info`, `list_emergency_categories`, `delete_emergency_info`
+- New DB table: `emergency_info` (id, family_id, category enum('utilities','contacts','medical','evacuation','access_codes','other'), label, value, notes, created_by, updated_at)
+- Dashboard widget: Emergency tab with categorised accordion panels — visible at a glance without drilling into lists
+- Sensitive fields (alarm codes, safe combinations) masked on dashboard by default, revealed on click with a confirmation prompt
+
+**Implementation notes for next agent:**
+- `category` enum drives the dashboard icon/colour system: utilities (wrench icon), medical (cross icon), evacuation (exit icon), access_codes (key icon)
+- LLM intent detection: add emergency-info retrieval as a high-priority intent in `systemPrompt.js` so "where's the X" queries bypass normal tool-selection deliberation and resolve instantly
+- Access codes stored encrypted at rest: use a simple `crypto.createCipheriv` AES-256 wrapper in a new `utils/encrypt.js` — key derived from `SUPABASE_SERVICE_KEY` hash; keep it simple for MVP
+- Dashboard masking: fields in the `access_codes` category render as `••••••` by default with a "reveal" button that logs the reveal event — prevents shoulder-surfing
+- Onboarding hook: when a new family is created, the bot proactively asks "Would you like to save some emergency information? I can store your stopcock location, alarm code, and key contacts." — drives adoption of an easily-missed feature
+
+---
+
+### 22. Local Services & Trusted Contacts Directory
+
+**Problem:** Every household builds an informal mental rolodex of trusted local tradespeople, services, and contacts — the plumber who fixed the boiler last year, the babysitter the family trusts, the reliable taxi number, the neighbour who holds the spare key. This knowledge lives in individual phones, old text threads, or yellowing business cards. When the boiler breaks at 10pm, nobody can find the plumber's number. When a new family member joins, they have no access to this accumulated local knowledge.
+
+**Description:** A family-shared directory of trusted local services and contacts. Entries include name, category, phone number, website, notes (e.g. "ask for Dave, not Gary"), an optional rating, and the date last used. The bot responds to queries like "who do we use for boiler repairs?" with a structured, actionable answer. New entries are added conversationally. The directory becomes the family's shared institutional memory for the household.
+
+**Value:** Eliminates the "who do we use for X?" friction. Ensures both parents have equal access to household service contacts. Reduces time spent searching old WhatsApp threads for a number. Particularly valuable when one parent handles most household admin — the knowledge becomes shared rather than siloed.
+
+**Use cases:**
+- "Save a contact: Mike the plumber — 07700 900123 — very reliable, fixed boiler twice" — adds entry with notes
+- "Who do we use for boiler repairs?" — retrieves plumber entries with number and notes
+- "Rate Mike the plumber 5 stars after today's visit" — updates rating
+- "Add babysitter: Sarah Jones, 07711 223344, available weekends, kids love her" — adds with availability note
+- "List all our local service contacts" — full directory browse
+- "When did we last use the electrician?" — surfaces `last_used_at` date
+
+**Integration points:**
+- Distinct from the shared notes feature (#4) — contacts have structured fields (phone, category, rating) that notes do not; enables filtering, rating, and recency sorting
+- New LLM tools: `add_service_contact`, `find_service_contact`, `list_service_contacts`, `update_service_rating`, `delete_service_contact`
+- New DB table: `service_contacts` (id, family_id, name, category, phone, website, notes, rating smallint, last_used_at, created_by, created_at)
+- Dashboard widget: searchable directory panel with category filter chips (plumbers, electricians, childcare, medical, other) and star ratings displayed
+
+**Implementation notes for next agent:**
+- `category` is a free-text field — do not use a fixed enum — allow the LLM to normalise it to a sensible label at save time (e.g. "boiler repair" → "plumber") for consistent filtering without over-engineering
+- `rating` is 1–5 stored as smallint; LLM tool `update_service_rating` accepts natural language ("5 stars", "really good", "not great") and maps to a numeric value
+- `last_used_at` is updated when a user says "we used X today" — add a simple `log_service_use` tool that sets this field and optionally appends a note
+- Dashboard search: client-side filter on the directory panel — no server-side search endpoint needed for MVP given the small dataset size
+- Phone number formatting: store raw digits/text as provided; display formatting is cosmetic only — avoid normalisation that would break international numbers
+
+---
+
+### 23. Family Meeting Agenda & Minutes
+
+**Problem:** Regular family check-ins — weekly dinners, Sunday meetings, end-of-month reviews — tend to be unstructured, repeat the same topics without resolution, and leave no record of what was decided. Important decisions (holiday dates agreed, a new household rule, a commitment made) evaporate within days. There is no lightweight way to maintain a family agenda, capture what was discussed, and track action items to completion.
+
+**Description:** A structured family meeting system built into the bot. Before a meeting, any family member can add agenda items conversationally. During or after the meeting, minutes are captured as bullet points and action items are assigned to named people with optional due dates. Action items are tracked until closed and surface in the daily digest until completed. A running log of past meetings is searchable — "what did we decide about the holiday in March?" gets a real answer.
+
+**Value:** Transforms informal family discussions into decisions with accountability. Creates an institutional memory for the household. Action items with named owners and due dates mean commitments are honoured rather than forgotten. The meeting log becomes genuinely useful over months and years.
+
+**Use cases:**
+- "Add to this Sunday's family meeting agenda: decide on summer holiday destination" — appends agenda item
+- "What's on the agenda for Sunday?" — lists current items
+- "Record minutes: we agreed to go to Cornwall in August, Mum to book accommodation by next Friday" — captures decision and action item
+- "Mark Mum's Cornwall booking action as done" — closes action item
+- "What actions are still open from last month's meetings?" — surfaces unresolved items
+- Daily digest includes open action items assigned to the current user: "Reminder: book Cornwall accommodation (from family meeting, due Friday)"
+
+**Integration points:**
+- Action item due-date reminders hook directly into `/cron/daily` — same pattern as homework and chore reminders
+- New LLM tools: `create_meeting`, `add_agenda_item`, `list_agenda`, `record_minutes`, `add_action_item`, `close_action_item`, `list_open_actions`, `get_meeting_history`
+- New DB tables: `family_meetings` (id, family_id, title, scheduled_at, status enum('upcoming','done'), created_at), `agenda_items` (id, meeting_id, family_id, item_text, added_by, created_at), `meeting_minutes` (id, meeting_id, family_id, content text, recorded_by, recorded_at), `action_items` (id, meeting_id, family_id, description, assigned_to, due_date, completed_at, created_by, created_at)
+- Dashboard widget: two-panel section — upcoming meeting agenda (editable) + open action items with assignee and due date, sorted by urgency
+
+**Implementation notes for next agent:**
+- A meeting does not need to be formally "created" before items are added — if no upcoming meeting exists when an agenda item is added, auto-create a meeting record scheduled for the next logical Sunday (or ask the user for the date)
+- `action_items.assigned_to` is free-text matching the established pattern — no foreign key required
+- Minutes content is stored as plain text (LLM-generated or freeform user input); do not attempt to parse structure from minutes — store verbatim and let the LLM answer questions about it via context
+- Digest hook: query `action_items WHERE completed_at IS NULL AND due_date <= now() + interval '3 days'` — include in daily digest grouped by `assigned_to` so each family member sees their own open tasks
+- `get_meeting_history` tool uses LLM-powered semantic search over `meeting_minutes.content` — pass the last N meetings' minutes as context and ask the LLM to find the relevant decision; simpler than embedding-based search for MVP given the small corpus
+
+---
+
+### 24. Guest & Visitor Planner
+
+**Problem:** When guests are coming to stay — grandparents visiting for a week, a friend staying the weekend — there is a cluster of preparation tasks that fall entirely on the host family's mental load: is the guest room ready, do they have dietary requirements, what meals are planned, are there activities booked? This coordination currently happens ad-hoc, with important details (Grandma is lactose intolerant, pick-up from the station at 3pm) easily lost between conversations.
+
+**Description:** A lightweight guest management system where the family can create a visit record for each incoming guest or group. The visit includes arrival/departure dates, the guest's name, their dietary requirements, notes on preferences, and a linked preparation checklist. The bot surfaces upcoming visits in digests, prompts prep tasks as the visit approaches, and keeps everything in one place so both parents are equally prepared.
+
+**Value:** Reduces host-family anxiety and last-minute scrambling. Ensures both parents know who is arriving, when, and what they need. Dietary requirements and preferences are never forgotten mid-shop. The preparation checklist ensures the guest room is ready and the fridge is stocked. Particularly valuable for families who host regularly (grandparents, school-friend sleepovers, travelling relatives).
+
+**Use cases:**
+- "Add a visit: Grandma and Grandpa, arriving Friday 18th, leaving Monday 21st — Grandma is dairy-free" — creates visit record
+- "Who is coming to stay next month?" — lists upcoming visits
+- "Add to the Grandma visit: pick up from Birmingham New Street at 3:15pm" — appends note
+- "Generate a prep checklist for Grandma's visit" — LLM produces contextual list (guest room, dairy-free meal plan, flowers)
+- "What dietary requirements do we have for this weekend's guests?" — instant lookup
+- Daily digest on the visit arrival day: "Grandma and Grandpa arrive today at 3:15pm from Birmingham New Street — dairy-free meals needed"
+
+**Integration points:**
+- Arrival/departure events auto-created in the existing `events` (calendar) table — no separate calendar logic required
+- Meal planning prompt: when a visit is created, the bot suggests "Would you like to plan meals for the visit? I know Grandma is dairy-free" — links naturally to the existing meal planner
+- New LLM tools: `create_visit`, `list_visits`, `add_visit_note`, `get_visit_details`, `generate_visit_checklist`, `delete_visit`
+- New DB table: `visits` (id, family_id, guest_names, arrival_date, departure_date, dietary_requirements text, notes text, checklist_list_id int references lists, created_by, created_at)
+- Dashboard widget: upcoming visits card with guest name, date range, dietary flags, and checklist completion percentage
+
+**Implementation notes for next agent:**
+- `checklist_list_id` FK references the existing `lists` table — prep checklist is stored as a standard named list and managed with all existing list tooling; no new list infrastructure needed
+- `generate_visit_checklist` LLM tool builds the checklist prompt from visit data: "A guest named [names] is visiting from [arrival] to [departure]. Dietary requirements: [requirements]. Notes: [notes]. Generate a practical host preparation checklist." — then calls `addListItem` for each item
+- Calendar events: `create_visit` should call `createEvent` from the existing `calendar.js` service for both arrival ("Grandma arrives") and departure ("Grandma leaves") dates — keeps the shared calendar accurate without duplication
+- Dietary requirements stored as free-text for MVP — avoid a fixed enum (dairy-free, nut-free, vegan, etc.) since combinations are common and edge cases are infinite; let the LLM surface requirements in context
+- Daily digest hook: in `/cron/daily`, query `visits WHERE arrival_date = today` and append a visit briefing to the morning message including guest names and any key notes
+
+---
+
+### 25. Home Inventory & Insurance Log
+
+**Problem:** Most households have no structured record of their valuable possessions. When something is stolen, damaged, or needs replacing, families struggle to recall purchase dates, model numbers, and estimated values — the exact information insurance claims require. High-value items (electronics, jewellery, appliances, bikes) are bought and forgotten until they are needed for a claim. Serial numbers are buried in email receipts. When a policy renewal comes around, there is no easy way to check if cover is still adequate.
+
+**Description:** A home inventory system where the family can log valuable possessions with photos (via Telegram), purchase date, estimated value, serial number, and the item's location in the home. The total insured value can be calculated on demand. Items can be tagged by room (kitchen, garage, loft) or category (electronics, jewellery, bikes, appliances). The bot surfaces items when relevant — "we're renewing home insurance, here's a summary of high-value items" — and reminds the family to update the inventory when new purchases are logged.
+
+**Value:** Dramatically simplifies insurance claims by maintaining an always-current possession record with photos and serial numbers. Helps families check their insurance coverage is adequate at renewal time. Provides peace of mind and removes a significant post-burglary or post-fire admin burden. Unique to a family-shared AI assistant — no mainstream insurance app is this conversational.
+
+**Use cases:**
+- "Add to home inventory: Sony 65-inch TV, bought January 2023, approx £1,200, serial WA123456, living room" — logs item
+- "Add a photo of the TV receipt" — attaches Telegram file_id to the item record
+- "What's the total value of our home inventory?" — sum of all item values
+- "List all electronics over £500" — filtered view for insurance review
+- "The bike was stolen — what serial number do we have on record?" — police report detail retrieval
+- "We're renewing contents insurance — give me a summary of high-value items" — formatted list with values for the insurer
+
+**Integration points:**
+- Photo attachments use Telegram `file_id` — same pattern as Photo Memory Log (#3) and Time Capsule (#19); no external storage needed
+- New LLM tools: `add_inventory_item`, `list_inventory`, `get_inventory_item`, `update_inventory_item`, `delete_inventory_item`, `get_inventory_summary`
+- New DB table: `inventory_items` (id, family_id, name, category, location_in_home, purchase_date, purchase_value decimal, current_value decimal, serial_number, notes, telegram_file_ids text[], created_by, updated_at)
+- Dashboard widget: inventory table with category filter, room filter, and a summary row showing total value; sortable by value; red flag if no photo is attached to high-value items
+
+**Implementation notes for next agent:**
+- `telegram_file_ids` stored as a text array to support multiple photos per item (receipt + photo of item + photo of serial number label) — same JSONB/array pattern as used elsewhere in the schema
+- `current_value` is optional — defaults to `purchase_value` if not set; enables depreciation tracking in future but is not required for MVP
+- `get_inventory_summary` tool returns: total count, total value, breakdown by category, items with no serial number recorded, items with no photo — gives actionable audit output
+- Insurance renewal prompt: add to `/cron/weekly` a check for items added or updated in the last month — include a note "Your home inventory was updated recently — worth reviewing your contents insurance cover"
+- High-value threshold for dashboard flag: items with `purchase_value > 500` that have no `telegram_file_ids` get an amber warning icon prompting the user to add a photo — proactive data quality nudge
+
+---
+
 ## Prioritisation Notes
 
 | Idea | Effort | Impact | Recommended Priority |
@@ -592,3 +749,8 @@ This is a Telegram-based AI family assistant bot with shared calendar, reminders
 | Travel & Holiday Planner (#16) | Medium | High | 18 — complements countdowns and lists, strong seasonal use |
 | Fitness Challenge Tracker (#20) | Medium | Medium | 19 — gamified wellness, extends rewards system |
 | Family Time Capsule (#19) | Low | High | 20 — emotionally unique, low build cost, long-term retention driver |
+| Emergency Info Hub (#21) | Low | High | 21 — zero tables overhead, high safety value, fast to build |
+| Local Services Directory (#22) | Low | Medium | 22 — replaces household rolodex, low complexity |
+| Family Meeting Planner (#23) | Medium | Medium | 23 — adds accountability layer, pairs with action item digests |
+| Guest & Visitor Planner (#24) | Low | Medium | 24 — targeted use case, reuses lists and calendar |
+| Home Inventory (#25) | Medium | High | 25 — strong insurance value prop, photo attachments add delight |
