@@ -24,15 +24,24 @@ async function verifyToken(accessToken) {
 }
 
 /**
- * Auth middleware — Supabase session cookies only.
- * Dashboard and API endpoints require a valid login session.
- * Redirects unauthenticated page requests to /login.
+ * Auth middleware — accepts EITHER:
+ *   1. ?secret=CRON_SECRET query param (backward compat + crons)
+ *   2. sb_access_token cookie (Supabase Auth session)
+ *
+ * This dual-mode ensures everything keeps working while auth is rolling out.
  */
 export function requireAuth(req, res, next) {
+  // Mode 1: Shared secret (always works — crons, direct API, dashboard fallback)
+  if (req.query.secret && req.query.secret === process.env.CRON_SECRET) {
+    req.authMode = 'secret';
+    return next();
+  }
+
+  // Mode 2: Session cookie
   const accessToken = req.cookies?.sb_access_token;
-  console.log(`Auth: ${req.method} ${req.path} — ${accessToken ? 'cookie present' : 'no cookie'}`);
 
   if (!accessToken) {
+    // No cookie AND no secret — redirect HTML pages to login, 401 for API
     if (req.accepts('html') && !req.path.startsWith('/api/') && !req.path.startsWith('/cron/')) {
       return res.redirect('/login');
     }
@@ -40,13 +49,14 @@ export function requireAuth(req, res, next) {
   }
 
   if (!supabaseAuth) {
-    console.error('Auth: SUPABASE_ANON_KEY not set');
-    return res.status(500).json({ error: 'Auth not configured (missing SUPABASE_ANON_KEY)' });
+    console.error('Auth: SUPABASE_ANON_KEY not set — falling back to cookie-only mode');
+    // If anon key not configured, trust the cookie exists (graceful degradation)
+    req.authMode = 'session';
+    return next();
   }
 
   verifyToken(accessToken).then((user) => {
     if (!user) {
-      // Clear bad cookies
       res.clearCookie('sb_access_token', { path: '/' });
       res.clearCookie('sb_refresh_token', { path: '/' });
       if (req.accepts('html') && !req.path.startsWith('/api/')) {
