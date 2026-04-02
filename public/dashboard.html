@@ -3309,7 +3309,6 @@
 
     let _authRedirecting = false;
     async function fetchData() {
-      // Try token refresh first if we get a 401
       const res = await fetch('/api/dashboard', { credentials: 'same-origin' });
       console.log('Dashboard API response:', res.status);
       if (res.status === 401 && !_authRedirecting) {
@@ -3443,9 +3442,17 @@
       }).join('');
     }
 
-    // Wrap fetch to handle 401 → redirect to login
+    // If ?secret= is in the URL, pass it to all API calls (backward compat)
+    const _urlSecret = new URLSearchParams(window.location.search).get('secret');
+
+    // Wrap fetch to auto-append secret and handle 401
     const _origFetch = window.fetch;
-    window.fetch = async function(...args) {
+    window.fetch = async function(url, opts) {
+      // Append secret to API URLs if we have one and the URL doesn't already have it
+      if (_urlSecret && typeof url === 'string' && url.startsWith('/api/') && !url.includes('secret=')) {
+        url += (url.includes('?') ? '&' : '?') + 'secret=' + encodeURIComponent(_urlSecret);
+      }
+      const args = [url, opts];
       const res = await _origFetch.apply(this, args);
       if (res.status === 401) {
         const data = await res.clone().json().catch(() => ({}));
