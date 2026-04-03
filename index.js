@@ -673,6 +673,22 @@ app.get('/cron/ideas', requireCronSecret, async (req, res) => {
   }
 });
 
+// Nightly cron: generate new ideas from codebase analysis, then process any pending
+app.get('/cron/ideas/generate', requireCronSecret, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const count = parseInt(req.query.count) || 3;
+    const generated = await generateIdeas(familyId, count);
+    const processed = await processIdeaQueue(familyId);
+    invalidateCache();
+    res.json({ generated: generated.generated || 0, processed: processed.processed || 0 });
+  } catch (err) {
+    logError('Cron ideas generate', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Theorize an idea — runs multi-pass deep analysis
 app.post('/api/ideas/:id/theorize', requireAuth, async (req, res) => {
   try {
