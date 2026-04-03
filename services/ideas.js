@@ -686,4 +686,340 @@ ${pass.prompt}`,
   return { passes: THEORIZE_PASSES.length, completed: passResults.length };
 }
 
+/**
+ * Generate a comprehensive handoff prompt from all theories,
+ * then use Claude to write the code and commit it to GitHub.
+ */
+export async function generateHandoff(ideaId) {
+  const { data: idea } = await supabase.from('ideas').select('*').eq('id', ideaId).single();
+  if (!idea) throw new Error('Idea not found');
+
+  const theories = await getTheories(ideaId);
+  if (!theories.length) throw new Error('No theories found — run Theorize first');
+
+  const projectContext = await getProjectContext();
+
+  // Build the comprehensive handoff prompt
+  const theoryBlocks = theories.map(t => {
+    const section = t.pass_number <= 7 ? 'Analysis'
+      : t.pass_number <= 11 ? 'Persona Test'
+      : 'Synthesis';
+    return `### ${section} — Pass ${t.pass_number}: ${t.pass_name}\n${t.content}`;
+  }).join('\n\n---\n\n');
+
+  const handoffPrompt = `# Implementation Handoff: ${idea.title}
+
+## Idea
+**Title:** ${idea.title}
+**Category:** ${idea.category || 'General'}
+**Description:** ${idea.description || 'No description'}
+${idea.enriched_summary ? `**Enriched Summary:** ${idea.enriched_summary}` : ''}
+${idea.enriched_implementation ? `**Implementation Notes:** ${idea.enriched_implementation}` : ''}
+${idea.enriched_effort ? `**Estimated Effort:** ${idea.enriched_effort}` : ''}
+
+## Project Context
+${projectContext}
+
+## Full Analysis (${theories.length} passes)
+
+${theoryBlocks}
+
+---
+
+## Implementation Instructions
+
+You are implementing this feature for an existing Node.js/Express family assistant app.
+
+**Key constraints:**
+- Express 5 with ES modules (import/export)
+- Supabase (PostgreSQL) for database — use the existing \`supabase\` client from \`db/supabase.js\`
+- Grammy for Telegram bot
+- Groq LLM (llama-3.3-70b) via \`llm/groq.js\` chatCompletion()
+- Dashboard is single HTML files with inline CSS/JS (no build step)
+- Auth via \`requireAuth\` middleware (supports both \`?secret=\` and cookie auth)
+- All data is per-family via \`family_id\` FK
+- Follow existing code patterns in the codebase
+
+**Deliverables:**
+1. SQL migration file(s) in \`db/migrations/\`
+2. Service file(s) in \`services/\`
+3. API route additions to \`index.js\`
+4. Dashboard UI updates or new page in \`public/\`
+5. Any LLM tool/function additions to \`llm/functions.js\`
+
+**Important:** Write complete, working code. No placeholders, no TODOs. Every file should be production-ready.
+`;
+
+  return { handoffPrompt, idea };
+}
+
+/**
+ * Execute the full handoff pipeline:
+ * 1. Generate handoff prompt
+ * 2. Commit the prompt to GitHub
+ * 3. Call Claude to generate implementation code
+ * 4. Commit generated code to GitHub
+ */
+export async function executeHandoff(ideaId) {
+  const githubToken = process.env.GITHUB_TOKEN;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!githubToken) throw new Error('GITHUB_TOKEN not configured');
+  if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
+
+  // Update status
+  await supabase.from('ideas').update({
+    handoff_status: 'generating_prompt',
+  }).eq('id', ideaId);
+
+  const { handoffPrompt, idea } = await generateHandoff(ideaId);
+
+  // Slugify the idea title for branch/file naming
+  const slug = idea.title.toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .substring(0, 40);
+
+  const branchName = `idea/${slug}`;
+  const promptPath = `.claude/handoffs/${slug}.md`;
+
+  try {
+    // Step 1: Create branch from main
+    await supabase.from('ideas').update({ handoff_status: 'creating_branch' }).eq('id', ideaId);
+
+    const mainRef = await githubApi(`/repos/${REPO}/git/ref/heads/main`, 'GET', null, githubToken);
+    const mainSha = mainRef.object.sha;
+
+    // Try to create branch, ignore if exists
+    try {
+      await githubApi(`/repos/${REPO}/git/refs`, 'POST', {
+        ref: `refs/heads/${branchName}`,
+        sha: mainSha,
+      }, githubToken);
+    } catch (e) {
+      if (!e.message?.includes('Reference already exists')) throw e;
+      // Branch exists — that's fine, we'll commit on top of it
+    }
+
+    // Step 2: Commit the handoff prompt
+    await supabase.from('ideas').update({ handoff_status: 'committing_prompt' }).eq('id', ideaId);
+
+    await commitFileToGithub(
+      branchName,
+      promptPath,
+      handoffPrompt,
+      `Add implementation handoff for: ${idea.title}`,
+      githubToken
+    );
+
+    // Step 3: Call Claude to generate code
+    await supabase.from('ideas').update({ handoff_status: 'generating_code' }).eq('id', ideaId);
+
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const claude = new Anthropic({ apiKey: anthropicKey });
+
+    // Fetch existing key files for Claude to understand the codebase
+    const [indexContent, functionsContent] = await Promise.all([
+      fetchGithubFile('index.js', githubToken).catch(() => '// Could not fetch'),
+      fetchGithubFile('llm/functions.js', githubToken).catch(() => '// Could not fetch'),
+    ]);
+
+    const claudeResponse = await claude.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 16000,
+      messages: [
+        {
+          role: 'user',
+          content: `${handoffPrompt}
+
+## Existing Code Reference
+
+### index.js (main server — add your routes here)
+\`\`\`javascript
+${indexContent.substring(0, 4000)}
+\`\`\`
+
+### llm/functions.js (bot tool definitions)
+\`\`\`javascript
+${functionsContent.substring(0, 2000)}
+\`\`\`
+
+Now implement this feature. Return your response as a series of FILE blocks in this exact format:
+
+FILE: path/to/file.js
+\`\`\`
+file contents here
+\`\`\`
+
+FILE: path/to/another-file.sql
+\`\`\`
+file contents here
+\`\`\`
+
+For existing files that need modifications (like index.js), include ONLY the new code to add — wrap it with a comment showing where it goes:
+FILE: index.js (APPEND)
+\`\`\`
+// Add after existing routes
+app.get('/api/new-thing', ...);
+\`\`\`
+
+Generate all necessary files for a complete, working implementation.`,
+        },
+      ],
+    });
+
+    // Step 4: Parse Claude's response into files
+    const responseText = claudeResponse.content[0]?.text || '';
+    const files = parseClaudeFiles(responseText);
+
+    if (files.length === 0) {
+      throw new Error('Claude did not generate any files');
+    }
+
+    // Step 5: Commit all generated files
+    await supabase.from('ideas').update({
+      handoff_status: 'committing_code',
+      handoff_files: files.length,
+    }).eq('id', ideaId);
+
+    for (const file of files) {
+      await commitFileToGithub(
+        branchName,
+        file.path,
+        file.content,
+        `Implement ${idea.title}: ${file.path}`,
+        githubToken
+      );
+    }
+
+    // Step 6: Create a pull request
+    await supabase.from('ideas').update({ handoff_status: 'creating_pr' }).eq('id', ideaId);
+
+    let prUrl = null;
+    try {
+      const pr = await githubApi(`/repos/${REPO}/pulls`, 'POST', {
+        title: `[Idea] ${idea.title}`,
+        body: `## Auto-generated implementation\n\nThis PR was generated from the Ideas Lab theorize pipeline.\n\n**Idea:** ${idea.title}\n**Category:** ${idea.category || 'General'}\n\n### Generated Files\n${files.map(f => `- \`${f.path}\`${f.append ? ' (append)' : ''}`).join('\n')}\n\n### Analysis\nThis implementation is based on ${theories.length} analysis passes including persona tests from all family members.\n\n---\n*Generated by Ideas Lab Handoff*`,
+        head: branchName,
+        base: 'main',
+      }, githubToken);
+      prUrl = pr.html_url;
+    } catch (e) {
+      console.error('Failed to create PR:', e.message);
+      // PR creation is nice-to-have, don't fail the whole handoff
+    }
+
+    // Done!
+    await supabase.from('ideas').update({
+      handoff_status: 'complete',
+      handoff_branch: branchName,
+      handoff_pr_url: prUrl,
+      handoff_files: files.length,
+    }).eq('id', ideaId);
+
+    return {
+      branch: branchName,
+      promptPath,
+      filesGenerated: files.length,
+      files: files.map(f => f.path),
+      prUrl,
+    };
+  } catch (err) {
+    console.error('Handoff failed:', err);
+    await supabase.from('ideas').update({
+      handoff_status: 'failed',
+      handoff_error: err.message,
+    }).eq('id', ideaId);
+    throw err;
+  }
+}
+
+/**
+ * Parse Claude's FILE: blocks into an array of { path, content, append }
+ */
+function parseClaudeFiles(text) {
+  const files = [];
+  // Match FILE: path (optional APPEND flag) followed by a code block
+  const fileRegex = /FILE:\s*([^\n]+?)(?:\s*\(APPEND\))?\s*\n```[a-z]*\n([\s\S]*?)```/gi;
+  let match;
+
+  while ((match = fileRegex.exec(text)) !== null) {
+    const rawPath = match[1].trim();
+    const content = match[2].trimEnd();
+    const append = /\(APPEND\)/i.test(match[0]);
+    const path = rawPath.replace(/\s*\(APPEND\)/i, '').trim();
+
+    if (path && content) {
+      files.push({ path, content, append });
+    }
+  }
+  return files;
+}
+
+/**
+ * GitHub API helper
+ */
+async function githubApi(endpoint, method, body, token) {
+  const url = endpoint.startsWith('http') ? endpoint : `https://api.github.com${endpoint}`;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `token ${token}`,
+      Accept: 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`GitHub API ${method} ${endpoint}: ${res.status} ${err}`);
+  }
+  return res.json();
+}
+
+/**
+ * Fetch a file from the repo
+ */
+async function fetchGithubFile(path, token) {
+  const data = await githubApi(`/repos/${REPO}/contents/${path}`, 'GET', null, token);
+  return Buffer.from(data.content, 'base64').toString('utf-8');
+}
+
+/**
+ * Commit a single file to a branch via GitHub API
+ */
+async function commitFileToGithub(branch, path, content, message, token) {
+  // Check if file already exists to get its SHA
+  let existingSha = null;
+  try {
+    const existing = await githubApi(
+      `/repos/${REPO}/contents/${path}?ref=${branch}`, 'GET', null, token
+    );
+    existingSha = existing.sha;
+  } catch {
+    // File doesn't exist yet — that's fine
+  }
+
+  const body = {
+    message,
+    content: Buffer.from(content).toString('base64'),
+    branch,
+  };
+  if (existingSha) body.sha = existingSha;
+
+  return githubApi(`/repos/${REPO}/contents/${path}`, 'PUT', body, token);
+}
+
+/**
+ * Get handoff status for an idea
+ */
+export async function getHandoffStatus(ideaId) {
+  const { data } = await supabase
+    .from('ideas')
+    .select('handoff_status, handoff_branch, handoff_pr_url, handoff_files, handoff_error')
+    .eq('id', ideaId)
+    .single();
+  return data || {};
+}
+
 export const TOTAL_PASSES = THEORIZE_PASSES.length;

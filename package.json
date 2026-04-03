@@ -11,6 +11,7 @@
   "keywords": [],
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
     "@supabase/supabase-js": "^2.99.3",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.3.1",

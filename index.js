@@ -18,7 +18,7 @@ import { addFoodItem, getFoodItems, removeFoodItemById } from './services/foodEx
 import { createCountdown, updateCountdown, deleteCountdown } from './services/countdowns.js';
 import { getWatchlist, addToWatchlist, markWatched, removeFromWatchlist } from './services/watchlist.js';
 import { getBirthdays, addBirthday, updateBirthday, removeBirthday } from './services/birthdays.js';
-import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas, theorizeIdea, getTheories, retheorizeIdea, suggestImprovements, TOTAL_PASSES } from './services/ideas.js';
+import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas, theorizeIdea, getTheories, retheorizeIdea, suggestImprovements, generateHandoff, executeHandoff, getHandoffStatus, TOTAL_PASSES } from './services/ideas.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import { logError, getErrors, clearErrors } from './utils/errorLog.js';
@@ -736,6 +736,42 @@ app.post('/api/ideas/:id/retheorize', requireAuth, async (req, res) => {
     });
   } catch (err) {
     logError('Retheorize start', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Generate handoff prompt preview (without executing)
+app.get('/api/ideas/:id/handoff', requireAuth, async (req, res) => {
+  try {
+    const { handoffPrompt } = await generateHandoff(req.params.id);
+    res.json({ prompt: handoffPrompt });
+  } catch (err) {
+    logError('Handoff preview', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Execute full handoff: generate prompt, call Claude, commit code, create PR
+app.post('/api/ideas/:id/handoff', requireAuth, async (req, res) => {
+  try {
+    const ideaId = req.params.id;
+    res.json({ started: true });
+    executeHandoff(ideaId).catch(err => {
+      logError('Handoff execute', err);
+    });
+  } catch (err) {
+    logError('Handoff start', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get handoff status
+app.get('/api/ideas/:id/handoff/status', requireAuth, async (req, res) => {
+  try {
+    const status = await getHandoffStatus(req.params.id);
+    res.json(status);
+  } catch (err) {
+    logError('Handoff status', err);
     res.status(500).json({ error: err.message });
   }
 });

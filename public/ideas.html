@@ -622,6 +622,76 @@
     }
     .selected-suggestions li { margin-bottom: 4px; }
 
+    /* Handoff button */
+    .btn-handoff {
+      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(108,92,231,0.4);
+    }
+    .btn-handoff:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(108,92,231,0.5); }
+
+    /* Handoff status panel */
+    .handoff-status {
+      margin-top: 16px;
+      padding: 16px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+    .handoff-step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+    .handoff-step.active { color: var(--accent-light); font-weight: 600; }
+    .handoff-step.done { color: var(--green); }
+    .handoff-step .step-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      background: var(--surface-3);
+      flex-shrink: 0;
+    }
+    .handoff-step.active .step-icon { background: var(--accent); color: #fff; animation: shimmer 1.5s infinite; }
+    .handoff-step.done .step-icon { background: var(--green); color: #fff; }
+
+    /* Handoff result */
+    .handoff-result {
+      margin-top: 16px;
+      padding: 20px;
+      background: rgba(0,184,148,0.06);
+      border: 1px solid rgba(0,184,148,0.2);
+      border-radius: var(--radius-sm);
+    }
+    .handoff-result a {
+      color: var(--accent-light);
+      text-decoration: underline;
+    }
+    .handoff-result a:hover { color: #fff; }
+
+    /* Prompt preview */
+    .prompt-preview {
+      max-height: 400px;
+      overflow-y: auto;
+      padding: 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      color: var(--text-dim);
+      line-height: 1.6;
+      margin-top: 12px;
+    }
+
     @media (max-width: 768px) {
       .theory-sidebar { width: 200px; }
       .theory-content { padding: 20px; }
@@ -789,10 +859,17 @@
                 <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
               </div>`;
           } else if (idea.theorize_status === 'complete') {
+            let handoffBadge = '';
+            if (idea.handoff_status === 'complete' && idea.handoff_pr_url) {
+              handoffBadge = `<a href="${esc(idea.handoff_pr_url)}" target="_blank" class="btn btn-handoff" style="font-size:12px;padding:6px 14px;text-decoration:none">&#x1F517; PR</a>`;
+            } else if (idea.handoff_status && idea.handoff_status !== 'failed' && idea.handoff_status !== 'complete') {
+              handoffBadge = `<span class="badge badge-processing" style="font-size:11px">&#x2699; Building...</span>`;
+            }
             theorizeBtn = `
-              <div style="margin-top:12px;display:flex;gap:8px">
+              <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn btn-theorize" onclick="openTheoryViewer('${idea.id}')">&#x1F4D6; View Theory</button>
                 <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="handleTheorize('${idea.id}')">&#x1F504; Re-run</button>
+                ${handoffBadge}
               </div>`;
           } else if (idea.theorize_status === 'failed') {
             theorizeBtn = `
@@ -1058,6 +1135,7 @@
           </div>
           <div class="theory-actions">
             <button class="btn btn-theorize" onclick="openRetheorizePanel('${ideaId}')">&#x1F504; Adjust & Retheorize</button>
+            <button class="btn btn-handoff" onclick="openHandoffPanel('${ideaId}')">&#x1F680; Handoff to Claude</button>
           </div>
         </div>
       `;
@@ -1316,7 +1394,204 @@
       }
     }
 
+    // === Handoff to Claude ===
+    const HANDOFF_STEPS = [
+      { key: 'generating_prompt', label: 'Generating handoff prompt' },
+      { key: 'creating_branch', label: 'Creating feature branch' },
+      { key: 'committing_prompt', label: 'Committing prompt to repo' },
+      { key: 'generating_code', label: 'Claude is writing code...' },
+      { key: 'committing_code', label: 'Committing generated files' },
+      { key: 'creating_pr', label: 'Creating pull request' },
+    ];
+
+    async function openHandoffPanel(ideaId) {
+      const contentEl = document.getElementById('theoryContent');
+      if (!contentEl) return;
+
+      // Deselect nav items
+      document.querySelectorAll('.theory-nav-item').forEach(el => el.classList.remove('active'));
+
+      // Check if handoff is already running or complete
+      try {
+        const res = await fetch(api(`/api/ideas/${ideaId}/handoff/status`), { credentials: 'same-origin' });
+        const status = await res.json();
+
+        if (status.handoff_status === 'complete') {
+          renderHandoffComplete(contentEl, status, ideaId);
+          return;
+        }
+        if (status.handoff_status && status.handoff_status !== 'failed') {
+          renderHandoffProgress(contentEl, status.handoff_status, ideaId);
+          pollHandoff(ideaId);
+          return;
+        }
+      } catch (e) {
+        // No status yet, show preview
+      }
+
+      // Show prompt preview + confirm
+      contentEl.innerHTML = `
+        <div class="pass-label">Handoff to Claude</div>
+        <h2>Generate Implementation Code</h2>
+        <p style="color:var(--text-dim);margin-bottom:16px;font-size:13px;line-height:1.6">
+          This will compile all ${document.getElementById('theoryOverlay')?._theories?.length || '?'} analysis passes into a single handoff prompt,
+          send it to Claude to write the actual implementation code, and commit everything to a new branch with a pull request.
+        </p>
+        <div style="padding:16px;background:var(--surface-2);border-radius:var(--radius-sm);margin-bottom:16px">
+          <div style="font-size:13px;margin-bottom:8px"><strong>What happens:</strong></div>
+          <div style="font-size:12px;color:var(--text-dim);line-height:1.8">
+            1. Handoff prompt generated from all theories & persona feedback<br>
+            2. New branch created: <code style="background:var(--surface-3);padding:2px 6px;border-radius:4px">idea/feature-name</code><br>
+            3. Prompt committed to <code style="background:var(--surface-3);padding:2px 6px;border-radius:4px">.claude/handoffs/</code><br>
+            4. Claude (claude-sonnet-4-20250514) writes the implementation code<br>
+            5. Generated files committed to the branch<br>
+            6. Pull request created for review
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <button class="btn btn-secondary" onclick="previewHandoff('${ideaId}')">&#x1F4CB; Preview Prompt</button>
+          <button class="btn btn-handoff" style="flex:1;justify-content:center" id="handoffBtn" onclick="startHandoff('${ideaId}')">&#x1F680; Start Handoff to Claude</button>
+        </div>
+        <div id="promptPreviewArea"></div>
+      `;
+    }
+
+    async function previewHandoff(ideaId) {
+      const area = document.getElementById('promptPreviewArea');
+      if (!area) return;
+      area.innerHTML = '<p style="color:var(--text-dim);font-size:13px">Loading prompt preview...</p>';
+
+      try {
+        const res = await fetch(api(`/api/ideas/${ideaId}/handoff`), { credentials: 'same-origin' });
+        const data = await res.json();
+        area.innerHTML = `
+          <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px">Handoff Prompt (${data.prompt.length.toLocaleString()} chars)</div>
+          <div class="prompt-preview">${esc(data.prompt)}</div>
+        `;
+      } catch (e) {
+        area.innerHTML = `<p style="color:var(--red);font-size:13px">Failed to load preview: ${esc(e.message)}</p>`;
+      }
+    }
+
+    async function startHandoff(ideaId) {
+      const btn = document.getElementById('handoffBtn');
+      if (btn) { btn.disabled = true; btn.innerHTML = '&#x23F3; Starting...'; }
+
+      try {
+        const res = await fetch(api(`/api/ideas/${ideaId}/handoff`), {
+          method: 'POST',
+          credentials: 'same-origin',
+        });
+        if (!res.ok) throw new Error('Failed to start handoff');
+
+        const contentEl = document.getElementById('theoryContent');
+        renderHandoffProgress(contentEl, 'generating_prompt', ideaId);
+        pollHandoff(ideaId);
+      } catch (e) {
+        console.error('Failed to start handoff:', e);
+        if (btn) { btn.disabled = false; btn.innerHTML = '&#x1F680; Start Handoff to Claude'; }
+      }
+    }
+
+    function renderHandoffProgress(contentEl, currentStatus, ideaId) {
+      if (!contentEl) return;
+
+      const currentIdx = HANDOFF_STEPS.findIndex(s => s.key === currentStatus);
+
+      const stepsHtml = HANDOFF_STEPS.map((step, idx) => {
+        let cls = '';
+        let icon = idx + 1;
+        if (idx < currentIdx) { cls = 'done'; icon = '&#x2713;'; }
+        else if (idx === currentIdx) { cls = 'active'; icon = '&#x25CF;'; }
+        return `<div class="handoff-step ${cls}"><div class="step-icon">${icon}</div><span>${step.label}</span></div>`;
+      }).join('');
+
+      contentEl.innerHTML = `
+        <div class="pass-label">Handoff in Progress</div>
+        <h2>Claude is Building Your Feature...</h2>
+        <p style="color:var(--text-dim);margin-bottom:20px;font-size:13px">
+          This may take a few minutes. Claude is analysing the handoff prompt and writing production-ready code.
+        </p>
+        <div class="handoff-status" id="handoffSteps">
+          ${stepsHtml}
+        </div>
+        <div class="progress-bar-bg" style="margin-top:16px">
+          <div class="progress-bar-fill" style="width:${Math.round(((currentIdx + 1) / HANDOFF_STEPS.length) * 100)}%;transition:width 1s"></div>
+        </div>
+      `;
+    }
+
+    function renderHandoffComplete(contentEl, status, ideaId) {
+      if (!contentEl) return;
+
+      contentEl.innerHTML = `
+        <div class="pass-label">Handoff Complete</div>
+        <h2>Implementation Ready for Review</h2>
+        <div class="handoff-result">
+          <div style="font-size:32px;margin-bottom:12px">&#x2705;</div>
+          <div style="margin-bottom:12px">
+            <strong>Branch:</strong> <code style="background:var(--surface-3);padding:2px 8px;border-radius:4px">${esc(status.handoff_branch || 'unknown')}</code>
+          </div>
+          <div style="margin-bottom:12px">
+            <strong>Files generated:</strong> ${status.handoff_files || 0}
+          </div>
+          ${status.handoff_pr_url ? `
+            <div style="margin-bottom:16px">
+              <a href="${esc(status.handoff_pr_url)}" target="_blank" rel="noopener" style="font-size:15px;font-weight:600">
+                &#x1F517; View Pull Request on GitHub
+              </a>
+            </div>
+          ` : ''}
+          <div style="display:flex;gap:10px;margin-top:16px">
+            ${status.handoff_pr_url ? `
+              <a href="${esc(status.handoff_pr_url)}" target="_blank" class="btn btn-generate" style="text-decoration:none">&#x1F4E5; Review PR</a>
+            ` : ''}
+            <button class="btn btn-handoff" onclick="startHandoff('${ideaId}')">&#x1F504; Re-run Handoff</button>
+          </div>
+        </div>
+      `;
+    }
+
+    let _handoffPolling = null;
+
+    function pollHandoff(ideaId) {
+      if (_handoffPolling) clearInterval(_handoffPolling);
+
+      _handoffPolling = setInterval(async () => {
+        try {
+          const res = await fetch(api(`/api/ideas/${ideaId}/handoff/status`), { credentials: 'same-origin' });
+          const status = await res.json();
+          const contentEl = document.getElementById('theoryContent');
+
+          if (status.handoff_status === 'complete') {
+            clearInterval(_handoffPolling);
+            _handoffPolling = null;
+            renderHandoffComplete(contentEl, status, ideaId);
+            // Update local idea
+            const idea = allIdeas.find(i => i.id === ideaId);
+            if (idea) Object.assign(idea, status);
+          } else if (status.handoff_status === 'failed') {
+            clearInterval(_handoffPolling);
+            _handoffPolling = null;
+            contentEl.innerHTML = `
+              <div class="pass-label">Handoff Failed</div>
+              <h2>Something went wrong</h2>
+              <div style="color:var(--red);margin:16px 0;padding:16px;background:var(--red-glow);border-radius:var(--radius-sm)">
+                ${esc(status.handoff_error || 'Unknown error')}
+              </div>
+              <button class="btn btn-handoff" onclick="startHandoff('${ideaId}')">&#x1F504; Retry Handoff</button>
+            `;
+          } else if (status.handoff_status) {
+            renderHandoffProgress(contentEl, status.handoff_status, ideaId);
+          }
+        } catch (e) {
+          console.error('Handoff poll error:', e);
+        }
+      }, 3000);
+    }
+
     function closeTheoryViewer() {
+      if (_handoffPolling) { clearInterval(_handoffPolling); _handoffPolling = null; }
       const overlay = document.getElementById('theoryOverlay');
       if (overlay) {
         if (overlay._onKey) document.removeEventListener('keydown', overlay._onKey);
