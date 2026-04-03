@@ -382,6 +382,157 @@
       margin-top: 20px;
     }
 
+    /* Theorize button */
+    .btn-theorize {
+      background: linear-gradient(135deg, #e17055, #fdcb6e);
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(225,112,85,0.3);
+      font-size: 12px;
+      padding: 6px 14px;
+    }
+    .btn-theorize:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(225,112,85,0.4); }
+    .btn-theorize:disabled { background: var(--surface-3); color: var(--text-muted); box-shadow: none; }
+
+    /* Theorize progress bar */
+    .theorize-progress {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .progress-bar-bg {
+      height: 6px;
+      background: var(--surface-3);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--green));
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+    .progress-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Theory viewer overlay */
+    .theory-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(8px);
+      z-index: 200;
+      display: flex;
+      animation: fadeIn 0.2s;
+    }
+    .theory-sidebar {
+      width: 260px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 24px 0;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+    .theory-sidebar h3 {
+      padding: 0 20px;
+      font-size: 14px;
+      margin-bottom: 16px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .theory-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border-left: 3px solid transparent;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+    .theory-nav-item:hover { background: var(--surface-2); color: var(--text); }
+    .theory-nav-item.active {
+      background: var(--surface-2);
+      border-left-color: var(--accent);
+      color: var(--text);
+      font-weight: 600;
+    }
+    .theory-nav-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--surface-3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .theory-nav-item.active .theory-nav-num {
+      background: var(--accent);
+      color: #fff;
+    }
+    .theory-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px 40px;
+    }
+    .theory-content h2 {
+      font-size: 22px;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--accent-light), var(--green));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .theory-content .pass-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 20px;
+    }
+    .theory-body {
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
+    .theory-body h1, .theory-body h2, .theory-body h3 {
+      color: var(--accent-light);
+      margin: 20px 0 10px;
+    }
+    .theory-close {
+      position: absolute;
+      top: 16px;
+      right: 20px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 210;
+      transition: all 0.2s;
+    }
+    .theory-close:hover { background: var(--red-glow); color: var(--red); }
+
+    @media (max-width: 768px) {
+      .theory-sidebar { width: 200px; }
+      .theory-content { padding: 20px; }
+    }
+
     /* Responsive */
     @media (max-width: 768px) {
       .stats-bar { flex-wrap: wrap; padding: 12px 16px; gap: 10px; }
@@ -453,6 +604,7 @@
       renderStats();
       renderTabs();
       renderIdeas();
+      checkRunningTheorize();
     }
 
     function renderStats() {
@@ -529,7 +681,37 @@
           enrichedHtml = `<div class="enriched-section"><div class="enriched-text" style="color:var(--red)">${esc(idea.enriched_summary)}</div></div>`;
         }
 
-        return `<div class="idea-card status-${idea.status}">
+        // Theorize button logic
+        let theorizeBtn = '';
+        if (idea.status === 'enriched') {
+          if (idea.theorize_status === 'running') {
+            const pct = idea.theorize_progress ? Math.round((idea.theorize_progress / 7) * 100) : 0;
+            theorizeBtn = `
+              <div class="theorize-progress" id="tp-${idea.id}">
+                <div class="progress-label">
+                  <span>Theorizing...</span>
+                  <span>Pass ${idea.theorize_progress || 0} / 7</span>
+                </div>
+                <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+              </div>`;
+          } else if (idea.theorize_status === 'complete') {
+            theorizeBtn = `
+              <div style="margin-top:12px;display:flex;gap:8px">
+                <button class="btn btn-theorize" onclick="openTheoryViewer('${idea.id}')">&#x1F4D6; View Theory</button>
+                <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="handleTheorize('${idea.id}')">&#x1F504; Re-run</button>
+              </div>`;
+          } else if (idea.theorize_status === 'failed') {
+            theorizeBtn = `
+              <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+                <button class="btn btn-theorize" onclick="handleTheorize('${idea.id}')">&#x1F9EA; Retry Theorize</button>
+                <span style="font-size:11px;color:var(--red)">Failed</span>
+              </div>`;
+          } else {
+            theorizeBtn = `<div style="margin-top:12px"><button class="btn btn-theorize" onclick="handleTheorize('${idea.id}')">&#x1F9EA; Theorize</button></div>`;
+          }
+        }
+
+        return `<div class="idea-card status-${idea.status}" id="card-${idea.id}">
           <div class="idea-header">
             <div class="idea-title">${esc(idea.title)}</div>
             <button class="idea-delete" onclick="deleteIdea('${idea.id}')" title="Delete">&#x1F5D1;</button>
@@ -541,6 +723,7 @@
             <span class="badge badge-date">${date}</span>
           </div>
           ${enrichedHtml}
+          ${theorizeBtn}
         </div>`;
       }).join('');
     }
@@ -633,6 +816,182 @@
       });
       document.querySelector('.modal-backdrop').remove();
       loadIdeas();
+    }
+
+    // === Theorize ===
+    const _pollingIds = new Set();
+
+    async function handleTheorize(ideaId) {
+      try {
+        const res = await fetch(api(`/api/ideas/${ideaId}/theorize`), {
+          method: 'POST',
+          credentials: 'same-origin',
+        });
+        if (!res.ok) throw new Error('Failed to start');
+
+        // Optimistically update the local idea
+        const idea = allIdeas.find(i => i.id === ideaId);
+        if (idea) {
+          idea.theorize_status = 'running';
+          idea.theorize_progress = 0;
+          renderIdeas();
+        }
+
+        // Start polling for progress
+        pollTheorize(ideaId);
+      } catch (e) {
+        console.error('Failed to start theorize:', e);
+      }
+    }
+
+    function pollTheorize(ideaId) {
+      if (_pollingIds.has(ideaId)) return;
+      _pollingIds.add(ideaId);
+
+      const interval = setInterval(async () => {
+        try {
+          const res = await fetch(api(`/api/ideas/${ideaId}/theories`), { credentials: 'same-origin' });
+          const data = await res.json();
+
+          // Update local idea state
+          const idea = allIdeas.find(i => i.id === ideaId);
+          if (idea) {
+            idea.theorize_status = data.status;
+            idea.theorize_progress = data.progress;
+          }
+
+          // Update card progress in-place (without re-rendering entire grid)
+          const card = document.getElementById(`card-${ideaId}`);
+          if (card && data.status === 'running') {
+            const tp = document.getElementById(`tp-${ideaId}`);
+            if (tp) {
+              const pct = Math.round((data.progress / data.total_passes) * 100);
+              tp.querySelector('.progress-label').innerHTML = `<span>Theorizing...</span><span>Pass ${data.progress} / ${data.total_passes}</span>`;
+              tp.querySelector('.progress-bar-fill').style.width = `${pct}%`;
+            }
+          }
+
+          // Done? Stop polling and re-render
+          if (data.status === 'complete' || data.status === 'failed') {
+            clearInterval(interval);
+            _pollingIds.delete(ideaId);
+            loadIdeas();
+          }
+        } catch (e) {
+          console.error('Poll error:', e);
+          clearInterval(interval);
+          _pollingIds.delete(ideaId);
+        }
+      }, 3000);
+    }
+
+    async function openTheoryViewer(ideaId) {
+      const idea = allIdeas.find(i => i.id === ideaId);
+      if (!idea) return;
+
+      // Fetch theories
+      let theories = [];
+      try {
+        const res = await fetch(api(`/api/ideas/${ideaId}/theories`), { credentials: 'same-origin' });
+        const data = await res.json();
+        theories = data.theories || [];
+      } catch (e) {
+        console.error('Failed to load theories:', e);
+        return;
+      }
+
+      if (!theories.length) {
+        alert('No theories found. Try running Theorize first.');
+        return;
+      }
+
+      // Build overlay
+      const overlay = document.createElement('div');
+      overlay.className = 'theory-overlay';
+      overlay.id = 'theoryOverlay';
+
+      const passNames = [
+        'Problem & Users',
+        'User Stories & Scenarios',
+        'Technical Architecture',
+        'UI/UX Design',
+        'Implementation Plan',
+        'Risks & Trade-offs',
+        'Final Brief',
+      ];
+
+      const navItems = theories.map((t, idx) => `
+        <div class="theory-nav-item ${idx === 0 ? 'active' : ''}" data-pass="${idx}" onclick="switchTheoryPass(${idx})">
+          <div class="theory-nav-num">${t.pass_number}</div>
+          <span>${esc(t.pass_name)}</span>
+        </div>
+      `).join('');
+
+      overlay.innerHTML = `
+        <button class="theory-close" onclick="closeTheoryViewer()">&times;</button>
+        <div class="theory-sidebar">
+          <h3>${esc(idea.title)}</h3>
+          ${navItems}
+        </div>
+        <div class="theory-content" id="theoryContent">
+          ${renderTheoryContent(theories[0])}
+        </div>
+      `;
+
+      // Store theories for tab switching
+      overlay._theories = theories;
+      document.body.appendChild(overlay);
+      document.body.style.overflow = 'hidden';
+
+      // Close on Escape
+      overlay._onKey = (e) => { if (e.key === 'Escape') closeTheoryViewer(); };
+      document.addEventListener('keydown', overlay._onKey);
+    }
+
+    function renderTheoryContent(theory) {
+      // Simple markdown-ish rendering
+      let content = esc(theory.content)
+        .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/^- (.+)$/gm, '&#x2022; $1')
+        .replace(/^\d+\.\s/gm, (m) => `<br>${m}`)
+        .replace(/`([^`]+)`/g, '<code style="background:var(--surface-3);padding:2px 6px;border-radius:4px;font-size:12px">$1</code>');
+
+      return `
+        <div class="pass-label">Pass ${theory.pass_number} of 7</div>
+        <h2>${esc(theory.pass_name)}</h2>
+        <div class="theory-body">${content}</div>
+      `;
+    }
+
+    function switchTheoryPass(idx) {
+      const overlay = document.getElementById('theoryOverlay');
+      if (!overlay || !overlay._theories[idx]) return;
+
+      // Update nav active state
+      overlay.querySelectorAll('.theory-nav-item').forEach((el, i) => {
+        el.classList.toggle('active', i === idx);
+      });
+
+      // Update content
+      document.getElementById('theoryContent').innerHTML = renderTheoryContent(overlay._theories[idx]);
+    }
+
+    function closeTheoryViewer() {
+      const overlay = document.getElementById('theoryOverlay');
+      if (overlay) {
+        if (overlay._onKey) document.removeEventListener('keydown', overlay._onKey);
+        overlay.remove();
+        document.body.style.overflow = '';
+      }
+    }
+
+    // On load, check for any running theorize jobs and start polling them
+    function checkRunningTheorize() {
+      allIdeas.filter(i => i.theorize_status === 'running').forEach(i => pollTheorize(i.id));
     }
 
     // Keyboard shortcuts

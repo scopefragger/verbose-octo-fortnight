@@ -298,3 +298,189 @@ Respond ONLY with a valid JSON array, no markdown fences.`,
 
   return { generated: inserted, duplicates_skipped: ideas.length - newIdeas.length };
 }
+
+// ─── Theorize Pipeline ───────────────────────────────────────────────
+
+const THEORIZE_PASSES = [
+  {
+    name: 'Problem & Users',
+    prompt: `Analyse this idea and define the problem space. Answer these questions:
+1. What specific problem does this solve?
+2. Who in the family benefits most? (parents, kids, both?)
+3. What's the current workaround without this feature?
+4. How often would this realistically be used? (daily, weekly, occasionally?)
+5. What's the emotional value? (reduces stress, adds fun, saves time?)
+Be specific and grounded — this is for a real family assistant app.`,
+  },
+  {
+    name: 'User Stories & Scenarios',
+    prompt: `Based on the problem analysis, write concrete user stories and scenarios:
+1. Write 3-5 user stories in the format: "As a [parent/child/family], I want to [action], so that [benefit]"
+2. Describe 2 detailed scenarios showing how someone would actually use this feature day-to-day
+3. What happens when things go wrong? (network down, bad input, edge cases)
+4. What's the "delight moment" — the thing that makes a user smile?`,
+  },
+  {
+    name: 'Technical Architecture',
+    prompt: `Design the technical implementation for this codebase. Be specific about actual files:
+1. Which existing services (services/*.js) need changes and what changes?
+2. What new database table(s) or columns are needed? Write the actual SQL.
+3. What new API endpoints are needed? List METHOD /path and request/response shape.
+4. What new LLM tools/functions should be added for the Telegram bot? (llm/functions.js)
+5. Any external APIs or services required? (costs, rate limits, free tier?)
+6. What can be reused from existing code patterns?`,
+  },
+  {
+    name: 'UI/UX Design',
+    prompt: `Design the user interface and experience:
+1. Where does this live? (Dashboard card, standalone page, Telegram bot command, all three?)
+2. Walk through the complete user flow step by step — from first interaction to completion
+3. What does the MVP (minimum viable) version look like? What's the simplest thing we can ship?
+4. What does the "full" version look like with all bells and whistles?
+5. Any animations, transitions, or micro-interactions that would elevate it?
+6. How does it look on the TV dashboard vs mobile?`,
+  },
+  {
+    name: 'Implementation Plan',
+    prompt: `Create a detailed implementation plan:
+1. Break this into ordered tasks with clear deliverables
+2. Mark dependencies — what must be done before what?
+3. Which tasks can be done in parallel?
+4. Estimate each task: "30 min", "1-2 hours", "half day", "full day"
+5. What's the critical path (shortest time to ship MVP)?
+6. Identify any code from existing features that can be copy-adapted`,
+  },
+  {
+    name: 'Risks & Trade-offs',
+    prompt: `Evaluate risks, trade-offs, and potential issues:
+1. Security or privacy concerns?
+2. Performance impact on the dashboard or Telegram bot?
+3. API costs (Groq tokens, external services)?
+4. Maintenance burden — will this need ongoing attention?
+5. What could we cut to ship faster without losing the core value?
+6. What's the worst that happens if this feature breaks?
+7. Any legal or compliance considerations?`,
+  },
+  {
+    name: 'Final Brief',
+    prompt: `Synthesise everything from the previous passes into a final product brief:
+1. One-paragraph executive summary
+2. Core value proposition (one sentence)
+3. MVP scope — exactly what ships first
+4. Effort estimate for MVP (total hours)
+5. Priority recommendation: "Ship now", "Ship next", "Backlog", or "Skip"
+6. Confidence level (1-10) with explanation
+7. The single biggest risk and how to mitigate it`,
+  },
+];
+
+/**
+ * Run the multi-pass theorize pipeline for an idea.
+ * Each pass builds on all previous passes for richer context.
+ */
+export async function theorizeIdea(ideaId) {
+  // Fetch the idea
+  const { data: idea, error } = await supabase
+    .from('ideas')
+    .select('*')
+    .eq('id', ideaId)
+    .single();
+  if (error || !idea) throw new Error('Idea not found');
+
+  // Get project context for grounding
+  const projectContext = await getProjectContext();
+
+  // Mark as running
+  await supabase.from('ideas').update({
+    theorize_status: 'running',
+    theorize_progress: 0,
+  }).eq('id', ideaId);
+
+  // Clear any previous theories for this idea
+  await supabase.from('idea_theories').delete().eq('idea_id', ideaId);
+
+  const passResults = [];
+
+  for (let i = 0; i < THEORIZE_PASSES.length; i++) {
+    const pass = THEORIZE_PASSES[i];
+
+    // Update progress
+    await supabase.from('ideas').update({
+      theorize_progress: i + 1,
+    }).eq('id', ideaId);
+
+    try {
+      // Build context from all previous passes
+      const previousContext = passResults.length
+        ? '\n\n--- PREVIOUS ANALYSIS ---\n' + passResults.map(
+            (r, idx) => `## Pass ${idx + 1}: ${THEORIZE_PASSES[idx].name}\n${r}`
+          ).join('\n\n')
+        : '';
+
+      const messages = [
+        {
+          role: 'system',
+          content: `You are a senior product strategist and developer analysing a feature idea for a family assistant app. You are thorough, practical, and grounded in the real codebase.
+
+${projectContext}
+
+${previousContext}
+
+Now complete Pass ${i + 1} of ${THEORIZE_PASSES.length}: "${pass.name}"`,
+        },
+        {
+          role: 'user',
+          content: `Idea: ${idea.title}${idea.description ? `\nDescription: ${idea.description}` : ''}${idea.category ? `\nCategory: ${idea.category}` : ''}${idea.enriched_summary ? `\nInitial Summary: ${idea.enriched_summary}` : ''}
+
+${pass.prompt}`,
+        },
+      ];
+
+      const result = await chatCompletion(messages);
+      const content = result.choices[0]?.message?.content || '';
+
+      // Store this pass
+      await supabase.from('idea_theories').insert({
+        idea_id: ideaId,
+        pass_number: i + 1,
+        pass_name: pass.name,
+        content,
+      });
+
+      passResults.push(content);
+      console.log(`Theorize pass ${i + 1}/${THEORIZE_PASSES.length} complete for idea ${ideaId}`);
+    } catch (err) {
+      console.error(`Theorize pass ${i + 1} failed:`, err.message);
+      await supabase.from('idea_theories').insert({
+        idea_id: ideaId,
+        pass_number: i + 1,
+        pass_name: pass.name,
+        content: `Error: ${err.message}`,
+      });
+      passResults.push(`[Failed: ${err.message}]`);
+    }
+  }
+
+  // Mark complete
+  await supabase.from('ideas').update({
+    theorize_status: 'complete',
+    theorize_progress: THEORIZE_PASSES.length,
+  }).eq('id', ideaId);
+
+  return { passes: THEORIZE_PASSES.length, completed: passResults.length };
+}
+
+/**
+ * Get theorize results for an idea.
+ */
+export async function getTheories(ideaId) {
+  const { data, error } = await supabase
+    .from('idea_theories')
+    .select('*')
+    .eq('idea_id', ideaId)
+    .order('pass_number');
+  if (error) throw error;
+  return data || [];
+}
+
+export const TOTAL_PASSES = THEORIZE_PASSES.length;

@@ -18,7 +18,7 @@ import { addFoodItem, getFoodItems, removeFoodItemById } from './services/foodEx
 import { createCountdown, updateCountdown, deleteCountdown } from './services/countdowns.js';
 import { getWatchlist, addToWatchlist, markWatched, removeFromWatchlist } from './services/watchlist.js';
 import { getBirthdays, addBirthday, updateBirthday, removeBirthday } from './services/birthdays.js';
-import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas } from './services/ideas.js';
+import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas, theorizeIdea, getTheories, TOTAL_PASSES } from './services/ideas.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import { logError, getErrors, clearErrors } from './utils/errorLog.js';
@@ -669,6 +669,40 @@ app.get('/cron/ideas', requireCronSecret, async (req, res) => {
     res.json(result);
   } catch (err) {
     logError('Cron ideas', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Theorize an idea — runs multi-pass deep analysis
+app.post('/api/ideas/:id/theorize', requireAuth, async (req, res) => {
+  try {
+    // Start theorize in background, return immediately
+    const ideaId = req.params.id;
+    res.json({ started: true, total_passes: TOTAL_PASSES });
+    // Run pipeline async (don't await)
+    theorizeIdea(ideaId).catch(err => {
+      logError('Theorize', err);
+      supabase.from('ideas').update({ theorize_status: 'failed' }).eq('id', ideaId);
+    });
+  } catch (err) {
+    logError('Theorize start', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get theorize progress and results for an idea
+app.get('/api/ideas/:id/theories', requireAuth, async (req, res) => {
+  try {
+    const { data: idea } = await supabase.from('ideas').select('theorize_status, theorize_progress').eq('id', req.params.id).single();
+    const theories = await getTheories(req.params.id);
+    res.json({
+      status: idea?.theorize_status || null,
+      progress: idea?.theorize_progress || 0,
+      total_passes: TOTAL_PASSES,
+      theories,
+    });
+  } catch (err) {
+    logError('Theories get', err);
     res.status(500).json({ error: err.message });
   }
 });
