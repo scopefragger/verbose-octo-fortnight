@@ -528,6 +528,100 @@
     }
     .theory-close:hover { background: var(--red-glow); color: var(--red); }
 
+    /* Persona badge in nav */
+    .theory-nav-item .persona-icon { font-size: 16px; }
+    .theory-nav-item.persona { border-left-color: transparent; }
+    .theory-nav-item.persona.active { border-left-color: #fdcb6e; }
+    .theory-nav-item.persona .theory-nav-num { background: rgba(253,203,110,0.2); color: var(--amber); }
+    .theory-nav-item.persona.active .theory-nav-num { background: #fdcb6e; color: #1a1a2e; }
+    .theory-nav-item.suggestions { border-left-color: transparent; }
+    .theory-nav-item.suggestions.active { border-left-color: var(--green); }
+    .theory-nav-item.suggestions .theory-nav-num { background: var(--green-glow); color: var(--green); }
+    .theory-nav-item.suggestions.active .theory-nav-num { background: var(--green); color: #fff; }
+
+    /* Section dividers in nav */
+    .theory-nav-divider {
+      padding: 14px 20px 6px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+    }
+
+    /* Action bar in theory viewer */
+    .theory-actions {
+      display: flex;
+      gap: 10px;
+      padding: 16px 40px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .theory-actions .btn { flex: 1; justify-content: center; }
+
+    /* Suggestions panel */
+    .suggestions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .suggestion-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      transition: all 0.2s;
+      cursor: pointer;
+      position: relative;
+    }
+    .suggestion-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .suggestion-card.selected { border-color: var(--green); background: rgba(0,184,148,0.05); }
+    .suggestion-card.selected::after {
+      content: '\2713';
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      color: var(--green);
+      font-weight: 700;
+      font-size: 16px;
+    }
+    .suggestion-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+    .suggestion-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; margin-bottom: 8px; }
+    .suggestion-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+    .suggestion-meta .badge { font-size: 10px; padding: 2px 8px; }
+
+    /* Retheorize modal */
+    .retheorize-textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 12px 14px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      line-height: 1.6;
+      outline: none;
+      resize: vertical;
+    }
+    .retheorize-textarea:focus { border-color: var(--accent); }
+    .selected-suggestions {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: var(--surface-2);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      color: var(--text-dim);
+      max-height: 120px;
+      overflow-y: auto;
+    }
+    .selected-suggestions li { margin-bottom: 4px; }
+
     @media (max-width: 768px) {
       .theory-sidebar { width: 200px; }
       .theory-content { padding: 20px; }
@@ -910,31 +1004,62 @@
       overlay.className = 'theory-overlay';
       overlay.id = 'theoryOverlay';
 
-      const passNames = [
-        'Problem & Users',
-        'User Stories & Scenarios',
-        'Technical Architecture',
-        'UI/UX Design',
-        'Implementation Plan',
-        'Risks & Trade-offs',
-        'Final Brief',
-      ];
+      // Group theories into sections
+      const analysisTheories = theories.filter(t => t.pass_number <= 7);
+      const personaTheories = theories.filter(t => t.pass_number >= 8 && t.pass_number <= 11);
+      const improvementTheory = theories.find(t => t.pass_number === 12);
 
-      const navItems = theories.map((t, idx) => `
-        <div class="theory-nav-item ${idx === 0 ? 'active' : ''}" data-pass="${idx}" onclick="switchTheoryPass(${idx})">
-          <div class="theory-nav-num">${t.pass_number}</div>
-          <span>${esc(t.pass_name)}</span>
-        </div>
-      `).join('');
+      const personaIcons = { 8: '👩', 9: '👨', 10: '👧', 11: '👦' };
+
+      let navHtml = '';
+
+      // Analysis section
+      if (analysisTheories.length) {
+        navHtml += '<div class="theory-nav-divider">Analysis</div>';
+        navHtml += analysisTheories.map((t, idx) => `
+          <div class="theory-nav-item ${idx === 0 ? 'active' : ''}" data-pass="${theories.indexOf(t)}" onclick="switchTheoryPass(${theories.indexOf(t)})">
+            <div class="theory-nav-num">${t.pass_number}</div>
+            <span>${esc(t.pass_name)}</span>
+          </div>
+        `).join('');
+      }
+
+      // Persona section
+      if (personaTheories.length) {
+        navHtml += '<div class="theory-nav-divider">Persona Tests</div>';
+        navHtml += personaTheories.map(t => `
+          <div class="theory-nav-item persona" data-pass="${theories.indexOf(t)}" onclick="switchTheoryPass(${theories.indexOf(t)})">
+            <div class="theory-nav-num">${personaIcons[t.pass_number] || t.pass_number}</div>
+            <span>${esc(t.pass_name.replace('Persona: ', ''))}</span>
+          </div>
+        `).join('');
+      }
+
+      // Improvements section
+      if (improvementTheory) {
+        navHtml += '<div class="theory-nav-divider">Synthesis</div>';
+        navHtml += `
+          <div class="theory-nav-item suggestions" data-pass="${theories.indexOf(improvementTheory)}" onclick="switchTheoryPass(${theories.indexOf(improvementTheory)})">
+            <div class="theory-nav-num">&#x2728;</div>
+            <span>Improvements</span>
+          </div>
+        `;
+      }
 
       overlay.innerHTML = `
         <button class="theory-close" onclick="closeTheoryViewer()">&times;</button>
         <div class="theory-sidebar">
           <h3>${esc(idea.title)}</h3>
-          ${navItems}
+          ${navHtml}
         </div>
-        <div class="theory-content" id="theoryContent">
-          ${renderTheoryContent(theories[0])}
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+          <div class="theory-content" id="theoryContent" style="flex:1;overflow-y:auto">
+            ${renderTheoryContent(theories[0], theories.length)}
+          </div>
+          <div class="theory-actions">
+            <button class="btn btn-generate" onclick="handleSuggestImprovements('${ideaId}')">&#x1F4A1; Get AI Suggestions</button>
+            <button class="btn btn-theorize" onclick="openRetheorizeModal('${ideaId}')">&#x1F504; Adjust & Retheorize</button>
+          </div>
         </div>
       `;
 
@@ -948,7 +1073,7 @@
       document.addEventListener('keydown', overlay._onKey);
     }
 
-    function renderTheoryContent(theory) {
+    function renderTheoryContent(theory, totalPasses) {
       // Simple markdown-ish rendering
       let content = esc(theory.content)
         .replace(/^### (.+)$/gm, '<h3>$1</h3>')
@@ -960,8 +1085,15 @@
         .replace(/^\d+\.\s/gm, (m) => `<br>${m}`)
         .replace(/`([^`]+)`/g, '<code style="background:var(--surface-3);padding:2px 6px;border-radius:4px;font-size:12px">$1</code>');
 
+      const total = totalPasses || document.getElementById('theoryOverlay')?._theories?.length || '?';
+
+      // Section label
+      let sectionLabel = 'Analysis';
+      if (theory.pass_number >= 8 && theory.pass_number <= 11) sectionLabel = 'Persona Test';
+      else if (theory.pass_number === 12) sectionLabel = 'Synthesis';
+
       return `
-        <div class="pass-label">Pass ${theory.pass_number} of 7</div>
+        <div class="pass-label">${sectionLabel} &middot; Pass ${theory.pass_number} of ${total}</div>
         <h2>${esc(theory.pass_name)}</h2>
         <div class="theory-body">${content}</div>
       `;
@@ -971,13 +1103,168 @@
       const overlay = document.getElementById('theoryOverlay');
       if (!overlay || !overlay._theories[idx]) return;
 
-      // Update nav active state
-      overlay.querySelectorAll('.theory-nav-item').forEach((el, i) => {
-        el.classList.toggle('active', i === idx);
+      // Update nav active state — match by data-pass attribute
+      overlay.querySelectorAll('.theory-nav-item').forEach(el => {
+        el.classList.toggle('active', parseInt(el.dataset.pass) === idx);
       });
 
       // Update content
-      document.getElementById('theoryContent').innerHTML = renderTheoryContent(overlay._theories[idx]);
+      document.getElementById('theoryContent').innerHTML = renderTheoryContent(overlay._theories[idx], overlay._theories.length);
+    }
+
+    // === AI Suggestions ===
+    let _currentSuggestions = [];
+
+    async function handleSuggestImprovements(ideaId) {
+      const contentEl = document.getElementById('theoryContent');
+      if (!contentEl) return;
+
+      contentEl.innerHTML = `
+        <div class="pass-label">AI Analysis</div>
+        <h2>Generating Improvement Suggestions...</h2>
+        <div class="theory-body" style="text-align:center;padding:40px">
+          <div style="font-size:40px;margin-bottom:16px">&#x1F9E0;</div>
+          <p>Analysing all theories and persona feedback to suggest enhancements...</p>
+          <div class="progress-bar-bg" style="max-width:300px;margin:20px auto">
+            <div class="progress-bar-fill" style="width:60%;animation:shimmer 1.5s infinite"></div>
+          </div>
+        </div>
+      `;
+
+      // Deselect nav items
+      document.querySelectorAll('.theory-nav-item').forEach(el => el.classList.remove('active'));
+
+      try {
+        const res = await fetch(api(`/api/ideas/${ideaId}/suggestions`), { credentials: 'same-origin' });
+        const data = await res.json();
+        _currentSuggestions = data.suggestions || [];
+
+        if (!_currentSuggestions.length) {
+          contentEl.innerHTML = `<div class="pass-label">AI Suggestions</div><h2>No suggestions generated</h2><div class="theory-body">Try running Theorize again with more passes completed.</div>`;
+          return;
+        }
+
+        const effortColors = { quick: 'var(--green)', medium: 'var(--amber)', significant: 'var(--red)' };
+        const impactColors = { high: 'var(--green)', medium: 'var(--amber)', low: 'var(--text-muted)' };
+
+        contentEl.innerHTML = `
+          <div class="pass-label">AI-Generated</div>
+          <h2>Improvement Suggestions</h2>
+          <p style="color:var(--text-dim);margin-bottom:16px;font-size:13px">Click suggestions to select them, then use "Adjust & Retheorize" to incorporate them into a new analysis.</p>
+          <div class="suggestions-grid">
+            ${_currentSuggestions.map((s, i) => `
+              <div class="suggestion-card" onclick="toggleSuggestion(${i})" data-idx="${i}">
+                <div class="suggestion-title">${esc(s.title)}</div>
+                <div class="suggestion-desc">${esc(s.description)}</div>
+                <div class="suggestion-meta">
+                  <span class="badge" style="background:${effortColors[s.effort] || 'var(--surface-3)'}22;color:${effortColors[s.effort] || 'var(--text-dim)'}">${esc(s.effort || '?')}</span>
+                  <span class="badge" style="background:${impactColors[s.impact] || 'var(--surface-3)'}22;color:${impactColors[s.impact] || 'var(--text-dim)'}">${esc(s.impact || '?')} impact</span>
+                  ${(s.persona_appeal || []).map(p => `<span class="badge badge-category">${esc(p)}</span>`).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } catch (e) {
+        console.error('Failed to get suggestions:', e);
+        contentEl.innerHTML = `<div class="pass-label">Error</div><h2>Failed to generate suggestions</h2><div class="theory-body" style="color:var(--red)">${esc(e.message)}</div>`;
+      }
+    }
+
+    const _selectedSuggestions = new Set();
+
+    function toggleSuggestion(idx) {
+      if (_selectedSuggestions.has(idx)) {
+        _selectedSuggestions.delete(idx);
+      } else {
+        _selectedSuggestions.add(idx);
+      }
+      // Update UI
+      document.querySelectorAll('.suggestion-card').forEach(el => {
+        el.classList.toggle('selected', _selectedSuggestions.has(parseInt(el.dataset.idx)));
+      });
+    }
+
+    // === Retheorize ===
+    function openRetheorizeModal(ideaId) {
+      // Gather selected suggestions text
+      const selectedText = [..._selectedSuggestions]
+        .map(i => _currentSuggestions[i])
+        .filter(Boolean)
+        .map(s => `- ${s.title}: ${s.description}`)
+        .join('\n');
+
+      const modal = document.createElement('div');
+      modal.className = 'modal-backdrop';
+      modal.innerHTML = `
+        <div class="modal-card" style="max-width:560px">
+          <h2>&#x1F504; Adjust & Retheorize</h2>
+          <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px">
+            Describe what you want to change, add, or focus on. The AI will re-run all 12 passes with your adjustments in mind.
+          </p>
+          <div class="field">
+            <label>Your Adjustments & Notes</label>
+            <textarea class="retheorize-textarea" id="retheorizeNotes" placeholder="e.g. Focus more on the kids' experience, make it simpler, add gamification...">${selectedText ? 'Include these suggested improvements:\n' + selectedText + '\n\nAdditional notes:\n' : ''}</textarea>
+          </div>
+          ${selectedText ? `
+            <div class="selected-suggestions">
+              <strong>${_selectedSuggestions.size} suggestion(s) selected:</strong>
+              <ul style="margin-top:4px;padding-left:16px">
+                ${[..._selectedSuggestions].map(i => `<li>${esc(_currentSuggestions[i]?.title || '')}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+          <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="this.closest('.modal-backdrop').remove()">Cancel</button>
+            <button class="btn btn-theorize" id="retheorizeBtn" onclick="submitRetheorize('${ideaId}')">&#x1F680; Retheorize</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+      setTimeout(() => document.getElementById('retheorizeNotes').focus(), 100);
+    }
+
+    async function submitRetheorize(ideaId) {
+      const notes = document.getElementById('retheorizeNotes').value.trim();
+      if (!notes) {
+        document.getElementById('retheorizeNotes').style.borderColor = 'var(--red)';
+        return;
+      }
+
+      const btn = document.getElementById('retheorizeBtn');
+      btn.disabled = true;
+      btn.innerHTML = '&#x23F3; Starting...';
+
+      try {
+        const res = await fetch(api(`/api/ideas/${ideaId}/retheorize`), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adjustments: notes }),
+          credentials: 'same-origin',
+        });
+        if (!res.ok) throw new Error('Failed to start retheorize');
+
+        // Close modal and theory viewer
+        document.querySelector('.modal-backdrop')?.remove();
+        closeTheoryViewer();
+
+        // Update local state and start polling
+        const idea = allIdeas.find(i => i.id === ideaId);
+        if (idea) {
+          idea.theorize_status = 'running';
+          idea.theorize_progress = 0;
+          renderIdeas();
+        }
+
+        _selectedSuggestions.clear();
+        _currentSuggestions = [];
+        pollTheorize(ideaId);
+      } catch (e) {
+        console.error('Failed to start retheorize:', e);
+        btn.disabled = false;
+        btn.innerHTML = '&#x1F680; Retheorize';
+      }
     }
 
     function closeTheoryViewer() {

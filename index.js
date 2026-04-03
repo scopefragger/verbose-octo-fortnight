@@ -18,7 +18,7 @@ import { addFoodItem, getFoodItems, removeFoodItemById } from './services/foodEx
 import { createCountdown, updateCountdown, deleteCountdown } from './services/countdowns.js';
 import { getWatchlist, addToWatchlist, markWatched, removeFromWatchlist } from './services/watchlist.js';
 import { getBirthdays, addBirthday, updateBirthday, removeBirthday } from './services/birthdays.js';
-import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas, theorizeIdea, getTheories, TOTAL_PASSES } from './services/ideas.js';
+import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas, theorizeIdea, getTheories, retheorizeIdea, suggestImprovements, TOTAL_PASSES } from './services/ideas.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import { logError, getErrors, clearErrors } from './utils/errorLog.js';
@@ -719,6 +719,34 @@ app.get('/api/ideas/:id/theories', requireAuth, async (req, res) => {
     });
   } catch (err) {
     logError('Theories get', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Retheorize an idea with user adjustments
+app.post('/api/ideas/:id/retheorize', requireAuth, async (req, res) => {
+  try {
+    const ideaId = req.params.id;
+    const adjustments = req.body?.adjustments;
+    if (!adjustments) return res.status(400).json({ error: 'adjustments field required' });
+    res.json({ started: true, total_passes: TOTAL_PASSES });
+    retheorizeIdea(ideaId, adjustments).catch(err => {
+      logError('Retheorize', err);
+      supabase.from('ideas').update({ theorize_status: 'failed' }).eq('id', ideaId);
+    });
+  } catch (err) {
+    logError('Retheorize start', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get AI-suggested improvements for a theorized idea
+app.get('/api/ideas/:id/suggestions', requireAuth, async (req, res) => {
+  try {
+    const suggestions = await suggestImprovements(req.params.id);
+    res.json({ suggestions });
+  } catch (err) {
+    logError('Suggestions', err);
     res.status(500).json({ error: err.message });
   }
 });
