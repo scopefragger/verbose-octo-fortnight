@@ -1057,8 +1057,7 @@
             ${renderTheoryContent(theories[0], theories.length)}
           </div>
           <div class="theory-actions">
-            <button class="btn btn-generate" onclick="handleSuggestImprovements('${ideaId}')">&#x1F4A1; Get AI Suggestions</button>
-            <button class="btn btn-theorize" onclick="openRetheorizeModal('${ideaId}')">&#x1F504; Adjust & Retheorize</button>
+            <button class="btn btn-theorize" onclick="openRetheorizePanel('${ideaId}')">&#x1F504; Adjust & Retheorize</button>
           </div>
         </div>
       `;
@@ -1112,48 +1111,60 @@
       document.getElementById('theoryContent').innerHTML = renderTheoryContent(overlay._theories[idx], overlay._theories.length);
     }
 
-    // === AI Suggestions ===
+    // === Adjust & Retheorize (unified panel) ===
     let _currentSuggestions = [];
+    const _selectedSuggestions = new Set();
 
-    async function handleSuggestImprovements(ideaId) {
+    async function openRetheorizePanel(ideaId) {
       const contentEl = document.getElementById('theoryContent');
       if (!contentEl) return;
 
+      // Deselect nav items
+      document.querySelectorAll('.theory-nav-item').forEach(el => el.classList.remove('active'));
+
+      _currentSuggestions = [];
+      _selectedSuggestions.clear();
+
+      // Show loading state while fetching suggestions
       contentEl.innerHTML = `
-        <div class="pass-label">AI Analysis</div>
-        <h2>Generating Improvement Suggestions...</h2>
+        <div class="pass-label">Adjust & Retheorize</div>
+        <h2>Loading AI Suggestions...</h2>
         <div class="theory-body" style="text-align:center;padding:40px">
           <div style="font-size:40px;margin-bottom:16px">&#x1F9E0;</div>
-          <p>Analysing all theories and persona feedback to suggest enhancements...</p>
+          <p>Analysing all theories and persona feedback to suggest improvements...</p>
           <div class="progress-bar-bg" style="max-width:300px;margin:20px auto">
             <div class="progress-bar-fill" style="width:60%;animation:shimmer 1.5s infinite"></div>
           </div>
         </div>
       `;
 
-      // Deselect nav items
-      document.querySelectorAll('.theory-nav-item').forEach(el => el.classList.remove('active'));
-
+      // Fetch AI suggestions
       try {
         const res = await fetch(api(`/api/ideas/${ideaId}/suggestions`), { credentials: 'same-origin' });
         const data = await res.json();
         _currentSuggestions = data.suggestions || [];
+      } catch (e) {
+        console.error('Failed to get suggestions:', e);
+        _currentSuggestions = [];
+      }
 
-        if (!_currentSuggestions.length) {
-          contentEl.innerHTML = `<div class="pass-label">AI Suggestions</div><h2>No suggestions generated</h2><div class="theory-body">Try running Theorize again with more passes completed.</div>`;
-          return;
-        }
+      renderRetheorizePanel(ideaId);
+    }
 
-        const effortColors = { quick: 'var(--green)', medium: 'var(--amber)', significant: 'var(--red)' };
-        const impactColors = { high: 'var(--green)', medium: 'var(--amber)', low: 'var(--text-muted)' };
+    function renderRetheorizePanel(ideaId) {
+      const contentEl = document.getElementById('theoryContent');
+      if (!contentEl) return;
 
-        contentEl.innerHTML = `
-          <div class="pass-label">AI-Generated</div>
-          <h2>Improvement Suggestions</h2>
-          <p style="color:var(--text-dim);margin-bottom:16px;font-size:13px">Click suggestions to select them, then use "Adjust & Retheorize" to incorporate them into a new analysis.</p>
+      const effortColors = { quick: 'var(--green)', medium: 'var(--amber)', significant: 'var(--red)' };
+      const impactColors = { high: 'var(--green)', medium: 'var(--amber)', low: 'var(--text-muted)' };
+
+      const suggestionsHtml = _currentSuggestions.length ? `
+        <div style="margin-bottom:24px">
+          <h3 style="font-size:15px;margin-bottom:6px;color:var(--accent-light)">AI-Suggested Improvements</h3>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Select the improvements you want to include. These will be fed into the retheorize passes.</p>
           <div class="suggestions-grid">
             ${_currentSuggestions.map((s, i) => `
-              <div class="suggestion-card" onclick="toggleSuggestion(${i})" data-idx="${i}">
+              <div class="suggestion-card ${_selectedSuggestions.has(i) ? 'selected' : ''}" onclick="toggleSuggestion(${i}, '${ideaId}')" data-idx="${i}">
                 <div class="suggestion-title">${esc(s.title)}</div>
                 <div class="suggestion-desc">${esc(s.description)}</div>
                 <div class="suggestion-meta">
@@ -1164,89 +1175,127 @@
               </div>
             `).join('')}
           </div>
-        `;
-      } catch (e) {
-        console.error('Failed to get suggestions:', e);
-        contentEl.innerHTML = `<div class="pass-label">Error</div><h2>Failed to generate suggestions</h2><div class="theory-body" style="color:var(--red)">${esc(e.message)}</div>`;
-      }
+        </div>
+      ` : `
+        <div style="margin-bottom:24px;padding:20px;background:var(--surface-2);border-radius:var(--radius-sm);text-align:center">
+          <p style="font-size:13px;color:var(--text-dim)">No AI suggestions available. You can still add your own adjustments below.</p>
+        </div>
+      `;
+
+      const selectedCount = _selectedSuggestions.size;
+      const selectedSummary = selectedCount > 0 ? `
+        <div style="margin-bottom:16px;padding:10px 14px;background:rgba(0,184,148,0.08);border:1px solid rgba(0,184,148,0.2);border-radius:var(--radius-sm)">
+          <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:4px">${selectedCount} improvement${selectedCount > 1 ? 's' : ''} selected</div>
+          <div style="font-size:12px;color:var(--text-dim)">${[..._selectedSuggestions].map(i => _currentSuggestions[i]?.title).filter(Boolean).join(' &middot; ')}</div>
+        </div>
+      ` : '';
+
+      contentEl.innerHTML = `
+        <div class="pass-label">Refine Your Idea</div>
+        <h2>Adjust & Retheorize</h2>
+        <p style="color:var(--text-dim);margin-bottom:20px;font-size:13px;line-height:1.6">
+          Pick AI-suggested improvements and/or write your own notes. The AI will re-run all 12 passes
+          (analysis, persona tests, and synthesis) incorporating your changes.
+        </p>
+
+        ${suggestionsHtml}
+
+        ${selectedSummary}
+
+        <div style="margin-bottom:20px">
+          <h3 style="font-size:15px;margin-bottom:6px;color:var(--accent-light)">Additional Notes</h3>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Optional — add your own directions, priorities, or constraints.</p>
+          <textarea class="retheorize-textarea" id="retheorizeNotes" placeholder="e.g. Focus more on the kids' experience, make it simpler, add gamification, prioritise quick wins..."></textarea>
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-theorize" style="flex:1;justify-content:center;padding:12px" id="retheorizeBtn" onclick="submitRetheorize('${ideaId}')">
+            &#x1F680; Retheorize with ${selectedCount > 0 ? selectedCount + ' improvement' + (selectedCount > 1 ? 's' : '') : 'adjustments'}
+          </button>
+          <button class="btn btn-secondary" style="padding:12px" onclick="refreshSuggestions('${ideaId}')">
+            &#x1F504; New Suggestions
+          </button>
+        </div>
+      `;
     }
 
-    const _selectedSuggestions = new Set();
-
-    function toggleSuggestion(idx) {
+    function toggleSuggestion(idx, ideaId) {
       if (_selectedSuggestions.has(idx)) {
         _selectedSuggestions.delete(idx);
       } else {
         _selectedSuggestions.add(idx);
       }
-      // Update UI
-      document.querySelectorAll('.suggestion-card').forEach(el => {
-        el.classList.toggle('selected', _selectedSuggestions.has(parseInt(el.dataset.idx)));
-      });
+      // Preserve textarea value across re-renders
+      const notes = document.getElementById('retheorizeNotes')?.value || '';
+      renderRetheorizePanel(ideaId);
+      const ta = document.getElementById('retheorizeNotes');
+      if (ta) ta.value = notes;
     }
 
-    // === Retheorize ===
-    function openRetheorizeModal(ideaId) {
-      // Gather selected suggestions text
+    async function refreshSuggestions(ideaId) {
+      const notes = document.getElementById('retheorizeNotes')?.value || '';
+      _currentSuggestions = [];
+      _selectedSuggestions.clear();
+
+      const contentEl = document.getElementById('theoryContent');
+      contentEl.innerHTML = `
+        <div class="pass-label">Adjust & Retheorize</div>
+        <h2>Generating Fresh Suggestions...</h2>
+        <div class="theory-body" style="text-align:center;padding:40px">
+          <div style="font-size:40px;margin-bottom:16px">&#x1F9E0;</div>
+          <div class="progress-bar-bg" style="max-width:300px;margin:20px auto">
+            <div class="progress-bar-fill" style="width:60%;animation:shimmer 1.5s infinite"></div>
+          </div>
+        </div>
+      `;
+
+      try {
+        const res = await fetch(api(`/api/ideas/${ideaId}/suggestions`), { credentials: 'same-origin' });
+        const data = await res.json();
+        _currentSuggestions = data.suggestions || [];
+      } catch (e) {
+        console.error('Failed to refresh suggestions:', e);
+      }
+
+      renderRetheorizePanel(ideaId);
+      const ta = document.getElementById('retheorizeNotes');
+      if (ta) ta.value = notes;
+    }
+
+    async function submitRetheorize(ideaId) {
+      // Build adjustments from selected suggestions + notes
       const selectedText = [..._selectedSuggestions]
         .map(i => _currentSuggestions[i])
         .filter(Boolean)
         .map(s => `- ${s.title}: ${s.description}`)
         .join('\n');
 
-      const modal = document.createElement('div');
-      modal.className = 'modal-backdrop';
-      modal.innerHTML = `
-        <div class="modal-card" style="max-width:560px">
-          <h2>&#x1F504; Adjust & Retheorize</h2>
-          <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px">
-            Describe what you want to change, add, or focus on. The AI will re-run all 12 passes with your adjustments in mind.
-          </p>
-          <div class="field">
-            <label>Your Adjustments & Notes</label>
-            <textarea class="retheorize-textarea" id="retheorizeNotes" placeholder="e.g. Focus more on the kids' experience, make it simpler, add gamification...">${selectedText ? 'Include these suggested improvements:\n' + selectedText + '\n\nAdditional notes:\n' : ''}</textarea>
-          </div>
-          ${selectedText ? `
-            <div class="selected-suggestions">
-              <strong>${_selectedSuggestions.size} suggestion(s) selected:</strong>
-              <ul style="margin-top:4px;padding-left:16px">
-                ${[..._selectedSuggestions].map(i => `<li>${esc(_currentSuggestions[i]?.title || '')}</li>`).join('')}
-              </ul>
-            </div>
-          ` : ''}
-          <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="this.closest('.modal-backdrop').remove()">Cancel</button>
-            <button class="btn btn-theorize" id="retheorizeBtn" onclick="submitRetheorize('${ideaId}')">&#x1F680; Retheorize</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-      modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-      setTimeout(() => document.getElementById('retheorizeNotes').focus(), 100);
-    }
+      const notes = (document.getElementById('retheorizeNotes')?.value || '').trim();
+      const adjustments = [
+        selectedText ? `Incorporate these improvements:\n${selectedText}` : '',
+        notes ? `Additional direction:\n${notes}` : '',
+      ].filter(Boolean).join('\n\n');
 
-    async function submitRetheorize(ideaId) {
-      const notes = document.getElementById('retheorizeNotes').value.trim();
-      if (!notes) {
-        document.getElementById('retheorizeNotes').style.borderColor = 'var(--red)';
+      if (!adjustments) {
+        const ta = document.getElementById('retheorizeNotes');
+        if (ta) ta.style.borderColor = 'var(--red)';
         return;
       }
 
       const btn = document.getElementById('retheorizeBtn');
       btn.disabled = true;
-      btn.innerHTML = '&#x23F3; Starting...';
+      btn.innerHTML = '&#x23F3; Starting retheorize...';
 
       try {
         const res = await fetch(api(`/api/ideas/${ideaId}/retheorize`), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adjustments: notes }),
+          body: JSON.stringify({ adjustments }),
           credentials: 'same-origin',
         });
         if (!res.ok) throw new Error('Failed to start retheorize');
 
-        // Close modal and theory viewer
-        document.querySelector('.modal-backdrop')?.remove();
+        // Close theory viewer
         closeTheoryViewer();
 
         // Update local state and start polling
