@@ -681,9 +681,9 @@
           enrichedHtml = `<div class="enriched-section"><div class="enriched-text" style="color:var(--red)">${esc(idea.enriched_summary)}</div></div>`;
         }
 
-        // Theorize button logic
+        // Theorize button logic — available on enriched and pending ideas
         let theorizeBtn = '';
-        if (idea.status === 'enriched') {
+        if (idea.status === 'enriched' || idea.status === 'pending') {
           if (idea.theorize_status === 'running') {
             const pct = idea.theorize_progress ? Math.round((idea.theorize_progress / 7) * 100) : 0;
             theorizeBtn = `
