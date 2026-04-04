@@ -9,6 +9,7 @@ import { getTheme } from '../services/themes.js';
 import { getFoodItems } from '../services/foodExpiry.js';
 import { getWatchlist } from '../services/watchlist.js';
 import { getBirthdays, getUpcomingBirthdayEvents } from '../services/birthdays.js';
+import { listGoals } from '../services/goals.js';
 import { formatForUser } from '../utils/time.js';
 
 /**
@@ -42,7 +43,7 @@ export async function getDashboardData(familyId) {
 
   // Fetch all data in a single parallel batch
   const reminderPromises = members.map((m) => listReminders(m.id));
-  const [todayEvents, weekEvents, listsWithItems, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme, foodItems, watchlistItems, allBirthdays, ...reminderResults] = await Promise.all([
+  const [todayEvents, weekEvents, listsWithItems, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme, foodItems, watchlistItems, allBirthdays, activeGoals, ...reminderResults] = await Promise.all([
     listEvents(familyId, todayStart, todayEnd),
     listEvents(familyId, tomorrowStart, weekEndBound),
     getAllListsWithItems(familyId),
@@ -54,6 +55,7 @@ export async function getDashboardData(familyId) {
     getFoodItems(familyId),
     getWatchlist(familyId),
     getBirthdays(familyId),
+    listGoals(familyId, 'active'),
     ...reminderPromises,
   ]);
   const allReminders = reminderResults.flat();
@@ -161,6 +163,14 @@ export async function getDashboardData(familyId) {
       const age = nextBday.getFullYear() - y;
       return { ...b, age, days_until: daysUntil };
     }).sort((a, b) => a.days_until - b.days_until),
+    goals: (activeGoals || []).map(g => ({
+      id: g.id,
+      title: g.title,
+      description: g.description,
+      target_date: g.target_date,
+      status: g.status,
+      created_at: g.created_at,
+    })),
     theme: dashboardTheme,
     updated_at: new Date().toISOString(),
   };
