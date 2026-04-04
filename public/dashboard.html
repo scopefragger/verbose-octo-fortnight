@@ -3011,6 +3011,11 @@
         <div class="app-name">Reminders</div>
         <div class="app-desc">Pending & recurring</div>
       </div>
+      <div class="app-tile" onclick="toggleAppsDrawer(); openGoalsApp();">
+        <div class="app-icon">&#x1F3AF;</div>
+        <div class="app-name">Family Goals</div>
+        <div class="app-desc">Set & track goals</div>
+      </div>
       <div class="app-tile" onclick="toggleAppsDrawer(); window.location.href='/ideas' + (window._urlSecret ? '?secret=' + window._urlSecret : '');">
         <div class="app-icon">&#x1F4A1;</div>
         <div class="app-name">Ideas Lab</div>
@@ -5705,6 +5710,247 @@
           </div>
         `;
       }).join('');
+    }
+
+    /* ---- Goals App ---- */
+    async function openGoalsApp() {
+      const goals = window._dashData?.goals || [];
+
+      const overlay = document.createElement('div');
+      overlay.className = 'birthday-overlay';
+      overlay.innerHTML = `
+        <div class="birthday-panel" style="max-width:600px">
+          <div class="birthday-header">
+            <span style="font-size:24px">&#x1F3AF;</span>
+            <h2>Family Goals</h2>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <select id="goals-filter" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:0.8rem;cursor:pointer;">
+                <option value="active" selected>Active</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              <button class="card-add-btn" id="goals-app-add-btn">+ Add</button>
+            </div>
+            <button onclick="this.closest('.birthday-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px 8px;">&#x2715;</button>
+          </div>
+          <div class="birthday-body" id="goals-app-body">
+            ${renderGoalsApp(goals)}
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+      overlay.querySelector('#goals-app-add-btn').addEventListener('click', () => {
+        openGoalAddModal(overlay);
+      });
+
+      // Filter change
+      overlay.querySelector('#goals-filter').addEventListener('change', async (e) => {
+        const status = e.target.value;
+        const body = overlay.querySelector('#goals-app-body');
+        body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-light)">Loading...</div>';
+        try {
+          const res = await fetch(`/api/goals?status=${status}`);
+          const data = await res.json();
+          body.innerHTML = renderGoalsApp(data.goals || []);
+        } catch (err) {
+          body.innerHTML = '<div style="text-align:center;padding:20px;color:#e74c3c">Failed to load goals</div>';
+        }
+      });
+
+      // Delegate actions
+      overlay.querySelector('#goals-app-body').addEventListener('click', async (e) => {
+        const completeBtn = e.target.closest('.goal-app-complete');
+        if (completeBtn) {
+          completeBtn.disabled = true;
+          await fetch(`/api/goals/${completeBtn.dataset.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'completed' }),
+          });
+          overlay.remove();
+          setTimeout(() => { refreshDashboard(); openGoalsApp(); }, 300);
+          return;
+        }
+
+        const deleteBtn = e.target.closest('.goal-app-delete');
+        if (deleteBtn) {
+          if (!confirm('Delete this goal?')) return;
+          deleteBtn.disabled = true;
+          await fetch(`/api/goals/${deleteBtn.dataset.id}`, { method: 'DELETE' });
+          overlay.remove();
+          setTimeout(() => { refreshDashboard(); openGoalsApp(); }, 300);
+          return;
+        }
+
+        const progressBtn = e.target.closest('.goal-app-progress');
+        if (progressBtn) {
+          openGoalProgressModal(progressBtn.dataset.id, overlay);
+          return;
+        }
+
+        const historyBtn = e.target.closest('.goal-app-history');
+        if (historyBtn) {
+          openGoalHistoryModal(historyBtn.dataset.id, historyBtn.dataset.title);
+          return;
+        }
+      });
+    }
+
+    function renderGoalsApp(goals) {
+      if (!goals || goals.length === 0) {
+        return '<div class="watchlist-empty"><div class="icon">&#x1F3AF;</div>No goals yet — add one to get started!</div>';
+      }
+      return goals.map(g => {
+        let targetHtml = '';
+        if (g.target_date) {
+          const daysLeft = Math.ceil((new Date(g.target_date + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24));
+          const dateStr = new Date(g.target_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+          const color = daysLeft <= 0 ? '#e74c3c' : daysLeft <= 3 ? '#f39c12' : 'var(--accent)';
+          const label = daysLeft <= 0 ? 'Overdue' : daysLeft === 0 ? 'Today!' : `${daysLeft}d left`;
+          targetHtml = `<div class="birthday-item-countdown" style="color:${color}">${label}<div style="font-size:0.65rem;color:var(--text-light)">${dateStr}</div></div>`;
+        }
+        const statusIcon = g.status === 'completed' ? '&#x2705;' : g.status === 'cancelled' ? '&#x274C;' : '&#x1F3AF;';
+        const isActive = g.status === 'active';
+        return `
+          <div class="birthday-item">
+            <div class="birthday-item-icon">${statusIcon}</div>
+            <div class="birthday-item-info">
+              <div class="birthday-item-name">${esc(g.title)}</div>
+              <div class="birthday-item-meta">${g.description ? esc(g.description) : 'No description'}${g.completed_at ? ' &middot; Completed ' + new Date(g.completed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''}</div>
+            </div>
+            ${targetHtml}
+            <div class="birthday-item-actions" style="display:flex;gap:4px;">
+              ${isActive ? `
+                <button class="goal-app-progress" data-id="${g.id}" title="Log progress" style="color:var(--accent);border-color:var(--accent);background:none;border:1px solid;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem">&#x270F;&#xFE0F;</button>
+                <button class="goal-app-complete" data-id="${g.id}" title="Mark complete" style="color:#27ae60;border-color:#27ae60;background:none;border:1px solid;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem">&#x2713;</button>
+              ` : ''}
+              <button class="goal-app-history" data-id="${g.id}" data-title="${esc(g.title)}" title="View progress" style="color:var(--primary);border-color:var(--primary);background:none;border:1px solid;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem">&#x1F4CA;</button>
+              <button class="goal-app-delete" data-id="${g.id}" title="Delete" style="color:#e74c3c;border-color:#e74c3c;background:none;border:1px solid;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.75rem">&#x1F5D1;</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openGoalAddModal(parentOverlay) {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.style.zIndex = '9995';
+      modal.innerHTML = `
+        <div class="modal" style="width:420px">
+          <h3>&#x1F3AF; New Family Goal</h3>
+          <label>Goal Title</label>
+          <input type="text" id="goal-add-title" placeholder="e.g. Read 10 books this month" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;background:var(--card);color:var(--text)">
+          <label>Description (optional)</label>
+          <textarea id="goal-add-desc" placeholder="More details about the goal..." rows="3" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;background:var(--card);color:var(--text);resize:vertical;font-family:inherit"></textarea>
+          <label>Target Date (optional)</label>
+          <input type="date" id="goal-add-date" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:16px;background:var(--card);color:var(--text)">
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn-cancel" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:none;cursor:pointer;color:var(--text)">Cancel</button>
+            <button class="btn-save" style="padding:8px 16px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">Create Goal</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+      modal.querySelector('.btn-cancel').onclick = () => modal.remove();
+      modal.querySelector('.btn-save').onclick = async () => {
+        const title = modal.querySelector('#goal-add-title').value.trim();
+        if (!title) { modal.querySelector('#goal-add-title').style.borderColor = '#e74c3c'; return; }
+        modal.querySelector('.btn-save').disabled = true;
+        modal.querySelector('.btn-save').textContent = 'Creating...';
+        await fetch('/api/goals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            description: modal.querySelector('#goal-add-desc').value.trim() || null,
+            target_date: modal.querySelector('#goal-add-date').value || null,
+          }),
+        });
+        modal.remove();
+        if (parentOverlay) parentOverlay.remove();
+        setTimeout(() => { refreshDashboard(); openGoalsApp(); }, 300);
+      };
+      modal.querySelector('#goal-add-title').focus();
+    }
+
+    function openGoalProgressModal(goalId, parentOverlay) {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.style.zIndex = '9995';
+      modal.innerHTML = `
+        <div class="modal" style="width:400px">
+          <h3>&#x270F;&#xFE0F; Log Progress</h3>
+          <label>What did you accomplish?</label>
+          <textarea id="progress-note" placeholder="e.g. Finished book #3!" rows="3" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:16px;background:var(--card);color:var(--text);resize:vertical;font-family:inherit"></textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn-cancel" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:none;cursor:pointer;color:var(--text)">Cancel</button>
+            <button class="btn-save" style="padding:8px 16px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer;font-weight:600">Log Progress</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+      modal.querySelector('.btn-cancel').onclick = () => modal.remove();
+      modal.querySelector('.btn-save').onclick = async () => {
+        const note = modal.querySelector('#progress-note').value.trim();
+        if (!note) { modal.querySelector('#progress-note').style.borderColor = '#e74c3c'; return; }
+        modal.querySelector('.btn-save').disabled = true;
+        modal.querySelector('.btn-save').textContent = 'Saving...';
+        await fetch(`/api/goals/${goalId}/progress`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note }),
+        });
+        modal.remove();
+      };
+      modal.querySelector('#progress-note').focus();
+    }
+
+    async function openGoalHistoryModal(goalId, title) {
+      const modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+      modal.style.zIndex = '9995';
+      modal.innerHTML = `
+        <div class="modal" style="width:450px;max-height:80vh;overflow-y:auto">
+          <h3>&#x1F4CA; Progress — ${esc(title)}</h3>
+          <div id="goal-history-body" style="padding:8px 0"><div style="text-align:center;padding:20px;color:var(--text-light)">Loading...</div></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+            <button class="btn-cancel" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:none;cursor:pointer;color:var(--text)">Close</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+      modal.querySelector('.btn-cancel').onclick = () => modal.remove();
+
+      try {
+        const res = await fetch(`/api/goals/${goalId}/progress`);
+        const data = await res.json();
+        const body = modal.querySelector('#goal-history-body');
+        if (!data.progress || data.progress.length === 0) {
+          body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-light)">No progress logged yet.</div>';
+        } else {
+          body.innerHTML = data.progress.map(p => {
+            const date = new Date(p.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+            return `
+              <div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);">
+                <div style="color:var(--accent);font-size:16px;flex-shrink:0;margin-top:2px;">&#x2714;&#xFE0F;</div>
+                <div style="flex:1">
+                  <div style="font-size:0.85rem;color:var(--text)">${esc(p.note)}</div>
+                  <div style="font-size:0.7rem;color:var(--text-light);margin-top:2px">${date}</div>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      } catch (err) {
+        modal.querySelector('#goal-history-body').innerHTML = '<div style="text-align:center;padding:20px;color:#e74c3c">Failed to load progress</div>';
+      }
     }
 
     /* ---- Birthday Manager ---- */
