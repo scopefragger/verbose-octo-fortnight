@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Build Your Dream House!</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0f0c29;
+      --bg2: #302b63;
+      --bg3: #24243e;
+      --card: rgba(255,255,255,0.08);
+      --card-hover: rgba(255,255,255,0.15);
+      --card-selected: rgba(255,200,50,0.25);
+      --text: #ffffff;
+      --text-dim: rgba(255,255,255,0.6);
+      --accent: #ffc832;
+      --accent-glow: rgba(255,200,50,0.4);
+      --timer-warn: #ff6b6b;
+      --timer-ok: #51cf66;
+      --radius: 16px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, var(--bg), var(--bg2), var(--bg3));
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* === SCREENS === */
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+    /* === START SCREEN === */
+    .start-screen { text-align: center; padding: 20px; gap: 30px; }
+    .start-title { font-size: clamp(2rem, 6vw, 4rem); font-weight: 900; }
+    .start-title span { display: block; background: linear-gradient(135deg, #ffc832, #ff6b9d, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .start-subtitle { font-size: clamp(1rem, 2.5vw, 1.4rem); color: var(--text-dim); max-width: 500px; line-height: 1.6; }
+    .start-house { font-size: clamp(60px, 15vw, 120px); animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+
+    .name-input-group { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+    .name-input {
+      font-size: 1.2rem; padding: 14px 24px; border-radius: 50px;
+      border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1);
+      color: white; text-align: center; width: 280px; outline: none;
+      transition: border-color 0.3s;
+    }
+    .name-input::placeholder { color: rgba(255,255,255,0.4); }
+    .name-input:focus { border-color: var(--accent); }
+
+    .start-btn {
+      font-size: 1.3rem; padding: 16px 48px; border-radius: 50px;
+      border: none; background: linear-gradient(135deg, #ffc832, #ff9f1a);
+      color: #1a1a2e; font-weight: 800; cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+    .start-btn:hover { transform: scale(1.05); box-shadow: 0 6px 30px var(--accent-glow); }
+    .start-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .gallery-link {
+      color: var(--text-dim); text-decoration: none; font-size: 0.9rem;
+      border-bottom: 1px dashed rgba(255,255,255,0.3); padding-bottom: 2px;
+      transition: color 0.2s;
+    }
+    .gallery-link:hover { color: var(--accent); }
+
+    /* === QUIZ SCREEN === */
+    .quiz-screen { padding: 20px; gap: 20px; }
+    .quiz-header { text-align: center; width: 100%; max-width: 900px; }
+    .quiz-progress { display: flex; gap: 6px; justify-content: center; margin-bottom: 12px; }
+    .progress-dot {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); transition: all 0.3s;
+    }
+    .progress-dot.done { background: var(--accent); }
+    .progress-dot.current { background: white; transform: scale(1.3); box-shadow: 0 0 10px rgba(255,255,255,0.5); }
+
+    .quiz-question { font-size: clamp(1rem, 3vw, 1.6rem); font-weight: 700; margin-bottom: 4px; }
+    .quiz-room-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 2px; font-weight: 600; }
+
+    /* Timer */
+    .timer-bar-container {
+      width: 100%; max-width: 400px; height: 8px; border-radius: 4px;
+      background: rgba(255,255,255,0.1); margin: 10px auto; overflow: hidden;
+    }
+    .timer-bar {
+      height: 100%; border-radius: 4px; background: var(--timer-ok);
+      transition: width 1s linear, background 0.3s;
+    }
+    .timer-bar.warning { background: var(--timer-warn); }
+    .timer-text { font-size: 1.8rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .timer-text.warning { color: var(--timer-warn); animation: pulse 0.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    /* Options */
+    .options-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 16px; max-width: 900px; width: 100%;
+    }
+    @media (max-width: 600px) {
+      .options-grid { grid-template-columns: 1fr; max-width: 400px; }
+    }
+
+    .option-card {
+      background: var(--card); border-radius: var(--radius);
+      padding: 24px 16px; text-align: center; cursor: pointer;
+      border: 3px solid transparent; transition: all 0.3s;
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+    }
+    .option-card:hover { background: var(--card-hover); transform: translateY(-4px); border-color: rgba(255,255,255,0.2); }
+    .option-card.selected { background: var(--card-selected); border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 8px 30px var(--accent-glow); }
+    .option-card.locked { pointer-events: none; opacity: 0.6; }
+
+    .option-emoji { font-size: clamp(40px, 8vw, 64px); }
+    .option-name { font-size: 1.1rem; font-weight: 700; }
+    .option-desc { font-size: 0.8rem; color: var(--text-dim); line-height: 1.4; }
+
+    /* === REVEAL SCREEN === */
+    .reveal-screen { padding: 20px; gap: 20px; text-align: center; }
+    .reveal-title { font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 900; }
+    .reveal-title span { background: linear-gradient(135deg, #ffc832, #ff6b9d); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .reveal-builder { font-size: 1.1rem; color: var(--text-dim); }
+    .reveal-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px; max-width: 800px; width: 100%;
+    }
+    .reveal-item {
+      background: var(--card); border-radius: var(--radius);
+      padding: 16px; text-align: center;
+      animation: revealPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+    }
+    .reveal-item:nth-child(1) { animation-delay: 0.1s; }
+    .reveal-item:nth-child(2) { animation-delay: 0.2s; }
+    .reveal-item:nth-child(3) { animation-delay: 0.3s; }
+    .reveal-item:nth-child(4) { animation-delay: 0.4s; }
+    .reveal-item:nth-child(5) { animation-delay: 0.5s; }
+    .reveal-item:nth-child(6) { animation-delay: 0.6s; }
+    .reveal-item:nth-child(7) { animation-delay: 0.7s; }
+    .reveal-item:nth-child(8) { animation-delay: 0.8s; }
+    @keyframes revealPop { 0% { opacity: 0; transform: scale(0.5) translateY(20px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+
+    .reveal-item-emoji { font-size: 36px; }
+    .reveal-item-room { font-size: 0.7rem; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-top: 4px; }
+    .reveal-item-name { font-size: 0.95rem; font-weight: 600; margin-top: 4px; }
+
+    .reveal-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
+    .reveal-btn {
+      padding: 12px 32px; border-radius: 50px; font-size: 1rem; font-weight: 700;
+      cursor: pointer; transition: transform 0.2s;
+    }
+    .reveal-btn:hover { transform: scale(1.05); }
+    .btn-save { background: linear-gradient(135deg, #ffc832, #ff9f1a); color: #1a1a2e; border: none; }
+    .btn-retry { background: none; border: 2px solid rgba(255,255,255,0.3); color: white; }
+    .btn-back { background: none; border: 2px solid rgba(255,255,255,0.2); color: var(--text-dim); }
+
+    /* === GALLERY SCREEN === */
+    .gallery-screen { padding: 20px; gap: 20px; justify-content: flex-start; padding-top: 40px; min-height: 100vh; }
+    .gallery-title { font-size: 2rem; font-weight: 900; }
+    .gallery-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px; max-width: 900px; width: 100%;
+    }
+    .gallery-card {
+      background: var(--card); border-radius: var(--radius);
+      padding: 20px; cursor: pointer; transition: all 0.3s;
+    }
+    .gallery-card:hover { background: var(--card-hover); transform: translateY(-4px); }
+    .gallery-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .gallery-card-name { font-weight: 700; font-size: 1rem; }
+    .gallery-card-date { font-size: 0.75rem; color: var(--text-dim); }
+    .gallery-card-items { display: flex; flex-wrap: wrap; gap: 6px; }
+    .gallery-card-item { font-size: 24px; }
+    .gallery-card-actions { margin-top: 12px; display: flex; gap: 8px; }
+    .gallery-del-btn {
+      background: none; border: 1px solid rgba(255,100,100,0.4); color: #ff6b6b;
+      padding: 4px 12px; border-radius: 8px; font-size: 0.75rem; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .gallery-del-btn:hover { background: rgba(255,100,100,0.15); }
+    .gallery-empty { text-align: center; padding: 60px 20px; color: var(--text-dim); }
+    .gallery-empty-icon { font-size: 60px; margin-bottom: 16px; }
+
+    /* Confetti */
+    .confetti-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999; overflow: hidden; }
+    .confetti-piece {
+      position: absolute; top: -20px;
+      width: 10px; height: 10px; border-radius: 2px;
+      animation: confettiFall 3s ease-in forwards;
+    }
+    @keyframes confettiFall {
+      0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- START SCREEN -->
+  <div class="screen start-screen active" id="startScreen">
+    <div class="start-house">&#x1F3E0;</div>
+    <div class="start-title"><span>Build Your Dream House!</span></div>
+    <div class="start-subtitle">Pick from 3 options for each room. You've got 30 seconds per question — choose fast!</div>
+    <div class="name-input-group">
+      <input class="name-input" id="builderName" type="text" placeholder="Your name..." maxlength="30" autocomplete="off">
+    </div>
+    <button class="start-btn" id="startBtn" disabled>Let's Go!</button>
+    <a class="gallery-link" href="#" id="galleryLink">View saved houses</a>
+  </div>
+
+  <!-- QUIZ SCREEN -->
+  <div class="screen quiz-screen" id="quizScreen">
+    <div class="quiz-header">
+      <div class="quiz-progress" id="progressDots"></div>
+      <div class="quiz-room-label" id="roomLabel"></div>
+      <div class="quiz-question" id="questionText"></div>
+      <div class="timer-text" id="timerText">30</div>
+      <div class="timer-bar-container"><div class="timer-bar" id="timerBar"></div></div>
+    </div>
+    <div class="options-grid" id="optionsGrid"></div>
+  </div>
+
+  <!-- REVEAL SCREEN -->
+  <div class="screen reveal-screen" id="revealScreen">
+    <div class="reveal-title"><span>Your Dream House!</span></div>
+    <div class="reveal-builder" id="revealBuilder"></div>
+    <div class="reveal-grid" id="revealGrid"></div>
+    <div class="reveal-actions">
+      <button class="reveal-btn btn-save" id="saveBtn">Save My House</button>
+      <button class="reveal-btn btn-retry" id="retryBtn">Build Again</button>
+      <button class="reveal-btn btn-back" id="backBtn">Back Home</button>
+    </div>
+  </div>
+
+  <!-- GALLERY SCREEN -->
+  <div class="screen gallery-screen" id="galleryScreen">
+    <div class="gallery-title">&#x1F3E0; Saved Houses</div>
+    <div class="gallery-grid" id="galleryGrid"></div>
+    <div class="reveal-actions">
+      <button class="reveal-btn btn-save" id="galleryBuildBtn">Build a New House</button>
+      <button class="reveal-btn btn-back" id="galleryBackBtn">Back Home</button>
+    </div>
+  </div>
+
+<script>
+  // === QUIZ DATA ===
+  const QUESTIONS = [
+    {
+      room: 'Living Room',
+      question: 'Pick your dream sofa!',
+      options: [
+        { emoji: '&#x1F43E;', name: 'Pikachu Sofa', desc: 'Electric yellow with a lightning bolt cushion!' },
+        { emoji: '&#x1F30A;', name: 'Stitch Sofa', desc: 'Blue & fluffy — experiment 626 approved!' },
+        { emoji: '&#x1F525;', name: 'Dragon Throne', desc: 'A blazing hot seat fit for a dragon tamer!' },
+      ],
+    },
+    {
+      room: 'Living Room',
+      question: 'Choose your TV setup!',
+      options: [
+        { emoji: '&#x1F3AE;', name: 'Gaming Mega Screen', desc: 'Giant screen with neon LED lights everywhere!' },
+        { emoji: '&#x1F3AC;', name: 'Cinema Wall', desc: 'Full wall projector with surround sound!' },
+        { emoji: '&#x1FA90;', name: 'Magic Mirror TV', desc: 'Looks like a mirror until you say "show time!"' },
+      ],
+    },
+    {
+      room: 'Kitchen',
+      question: 'What kitchen do you want?',
+      options: [
+        { emoji: '&#x1F370;', name: 'Candy Kitchen', desc: 'Everything is made of sweets and chocolate!' },
+        { emoji: '&#x1F680;', name: 'Space Kitchen', desc: 'Floating food dispensers and zero-gravity snacks!' },
+        { emoji: '&#x1F333;', name: 'Treehouse Kitchen', desc: 'Cook in the treetops with vines and fairy lights!' },
+      ],
+    },
+    {
+      room: 'Bedroom',
+      question: 'Pick your dream bed!',
+      options: [
+        { emoji: '&#x1F680;', name: 'Rocket Ship Bed', desc: 'Blast off to dreamland every night!' },
+        { emoji: '&#x1F984;', name: 'Unicorn Cloud Bed', desc: 'Sleep on rainbow clouds with sparkles!' },
+        { emoji: '&#x1F3F0;', name: 'Castle Bunk Bed', desc: 'A mini castle with a slide to get out of bed!' },
+      ],
+    },
+    {
+      room: 'Bedroom',
+      question: 'Choose your wardrobe!',
+      options: [
+        { emoji: '&#x1FA84;', name: 'Narnia Wardrobe', desc: 'Step inside and who knows where you\'ll end up!' },
+        { emoji: '&#x1F308;', name: 'Rainbow Closet', desc: 'Clothes sorted by colour with a disco ball!' },
+        { emoji: '&#x1F916;', name: 'Robot Butler Closet', desc: 'A robot picks your outfit every morning!' },
+      ],
+    },
+    {
+      room: 'Bathroom',
+      question: 'Pick your bath or shower!',
+      options: [
+        { emoji: '&#x1F30B;', name: 'Volcano Hot Tub', desc: 'Bubbling hot springs inside a mini volcano!' },
+        { emoji: '&#x1F9DC;', name: 'Mermaid Lagoon Bath', desc: 'An underwater grotto with shells and pearls!' },
+        { emoji: '&#x2601;&#xFE0F;', name: 'Cloud Shower', desc: 'Rain falls from a fluffy cloud above your head!' },
+      ],
+    },
+    {
+      room: 'Garden',
+      question: 'Design your garden!',
+      options: [
+        { emoji: '&#x1F996;', name: 'Dinosaur Park', desc: 'Life-size dino statues and a fossil dig pit!' },
+        { emoji: '&#x1F3A2;', name: 'Theme Park Garden', desc: 'Your own rollercoaster and candy floss machine!' },
+        { emoji: '&#x1F3DD;&#xFE0F;', name: 'Tropical Beach', desc: 'Palm trees, sand, and a wave pool!' },
+      ],
+    },
+    {
+      room: 'Secret Room',
+      question: 'Every dream house needs a secret room...',
+      options: [
+        { emoji: '&#x1F3AE;', name: 'Arcade Paradise', desc: 'Every game ever made, with unlimited lives!' },
+        { emoji: '&#x1F4DA;', name: 'Wizard Library', desc: 'Floating books, secret spells, and a magic wand!' },
+        { emoji: '&#x1F3A4;', name: 'Pop Star Studio', desc: 'Recording booth, stage, lights, and a fog machine!' },
+      ],
+    },
+  ];
+
+  const TIMER_SECONDS = 30;
+
+  // === STATE ===
+  let currentQuestion = 0;
+  let choices = [];
+  let timerInterval = null;
+  let timeLeft = TIMER_SECONDS;
+  let builderName = '';
+
+  // === HELPERS ===
+  function esc(str) {
+    if (!str) return '';
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  function getSecret() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('secret') || '';
+  }
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function launchConfetti() {
+    const container = document.createElement('div');
+    container.className = 'confetti-container';
+    document.body.appendChild(container);
+    const colors = ['#ffc832', '#ff6b9d', '#51cf66', '#339af0', '#c084fc', '#ff922b'];
+    for (let i = 0; i < 80; i++) {
+      const piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+      piece.style.left = Math.random() * 100 + '%';
+      piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+      piece.style.animationDelay = (Math.random() * 2).toFixed(2) + 's';
+      piece.style.animationDuration = (2 + Math.random() * 2).toFixed(2) + 's';
+      container.appendChild(piece);
+    }
+    setTimeout(() => container.remove(), 5000);
+  }
+
+  // === START ===
+  const nameInput = document.getElementById('builderName');
+  const startBtn = document.getElementById('startBtn');
+
+  nameInput.addEventListener('input', () => {
+    startBtn.disabled = !nameInput.value.trim();
+  });
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && nameInput.value.trim()) startGame();
+  });
+  startBtn.addEventListener('click', startGame);
+  document.getElementById('galleryLink').addEventListener('click', (e) => { e.preventDefault(); openGallery(); });
+
+  function startGame() {
+    builderName = nameInput.value.trim();
+    if (!builderName) return;
+    currentQuestion = 0;
+    choices = [];
+    showScreen('quizScreen');
+    renderQuestion();
+  }
+
+  // === QUIZ ===
+  function renderQuestion() {
+    const q = QUESTIONS[currentQuestion];
+
+    // Progress dots
+    const dots = document.getElementById('progressDots');
+    dots.innerHTML = QUESTIONS.map((_, i) => {
+      let cls = 'progress-dot';
+      if (i < currentQuestion) cls += ' done';
+      if (i === currentQuestion) cls += ' current';
+      return `<div class="${cls}"></div>`;
+    }).join('');
+
+    document.getElementById('roomLabel').textContent = q.room;
+    document.getElementById('questionText').innerHTML = q.question;
+
+    const grid = document.getElementById('optionsGrid');
+    grid.innerHTML = q.options.map((opt, i) => `
+      <div class="option-card" data-index="${i}">
+        <div class="option-emoji">${opt.emoji}</div>
+        <div class="option-name">${esc(opt.name)}</div>
+        <div class="option-desc">${esc(opt.desc)}</div>
+      </div>
+    `).join('');
+
+    grid.querySelectorAll('.option-card').forEach(card => {
+      card.addEventListener('click', () => selectOption(card));
+    });
+
+    startTimer();
+  }
+
+  function startTimer() {
+    timeLeft = TIMER_SECONDS;
+    updateTimerDisplay();
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      timeLeft--;
+      updateTimerDisplay();
+      if (timeLeft <= 0) {
+        clearInterval(timerInterval);
+        autoSelect();
+      }
+    }, 1000);
+  }
+
+  function updateTimerDisplay() {
+    const text = document.getElementById('timerText');
+    const bar = document.getElementById('timerBar');
+    text.textContent = timeLeft;
+    const pct = (timeLeft / TIMER_SECONDS) * 100;
+    bar.style.width = pct + '%';
+
+    if (timeLeft <= 10) {
+      text.className = 'timer-text warning';
+      bar.className = 'timer-bar warning';
+    } else {
+      text.className = 'timer-text';
+      bar.className = 'timer-bar';
+    }
+  }
+
+  function selectOption(card) {
+    clearInterval(timerInterval);
+
+    // Visual feedback
+    document.querySelectorAll('.option-card').forEach(c => {
+      c.classList.add('locked');
+      c.classList.remove('selected');
+    });
+    card.classList.add('selected');
+    card.classList.remove('locked');
+
+    const idx = parseInt(card.dataset.index);
+    const q = QUESTIONS[currentQuestion];
+    choices.push({
+      room: q.room,
+      question: q.question,
+      choice: q.options[idx],
+    });
+
+    setTimeout(() => {
+      currentQuestion++;
+      if (currentQuestion >= QUESTIONS.length) {
+        showReveal();
+      } else {
+        renderQuestion();
+      }
+    }, 800);
+  }
+
+  function autoSelect() {
+    // Pick random if timer runs out
+    const cards = document.querySelectorAll('.option-card');
+    const randomIdx = Math.floor(Math.random() * cards.length);
+    selectOption(cards[randomIdx]);
+  }
+
+  // === REVEAL ===
+  function showReveal() {
+    showScreen('revealScreen');
+    launchConfetti();
+
+    document.getElementById('revealBuilder').textContent = `Designed by ${builderName}`;
+    const grid = document.getElementById('revealGrid');
+    grid.innerHTML = choices.map(c => `
+      <div class="reveal-item">
+        <div class="reveal-item-emoji">${c.choice.emoji}</div>
+        <div class="reveal-item-room">${esc(c.room)}</div>
+        <div class="reveal-item-name">${esc(c.choice.name)}</div>
+      </div>
+    `).join('');
+
+    document.getElementById('saveBtn').disabled = false;
+    document.getElementById('saveBtn').textContent = 'Save My House';
+  }
+
+  document.getElementById('saveBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    try {
+      const secret = getSecret();
+      await fetch('/api/houses' + (secret ? '?secret=' + secret : ''), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          builder_name: builderName,
+          choices: choices.map(c => ({
+            room: c.room,
+            name: c.choice.name,
+            emoji: c.choice.emoji,
+            desc: c.choice.desc,
+          })),
+        }),
+      });
+      btn.textContent = 'Saved!';
+      launchConfetti();
+    } catch (err) {
+      btn.textContent = 'Save Failed';
+      console.error(err);
+    }
+  });
+
+  document.getElementById('retryBtn').addEventListener('click', () => {
+    showScreen('startScreen');
+    nameInput.value = builderName;
+    startBtn.disabled = false;
+  });
+
+  document.getElementById('backBtn').addEventListener('click', () => {
+    const secret = getSecret();
+    window.location.href = '/dashboard' + (secret ? '?secret=' + secret : '');
+  });
+
+  // === GALLERY ===
+  document.getElementById('galleryBuildBtn').addEventListener('click', () => {
+    showScreen('startScreen');
+  });
+  document.getElementById('galleryBackBtn').addEventListener('click', () => {
+    const secret = getSecret();
+    window.location.href = '/dashboard' + (secret ? '?secret=' + secret : '');
+  });
+
+  async function openGallery() {
+    showScreen('galleryScreen');
+    const grid = document.getElementById('galleryGrid');
+    grid.innerHTML = '<div class="gallery-empty"><div class="gallery-empty-icon">&#x23F3;</div>Loading...</div>';
+
+    try {
+      const secret = getSecret();
+      const res = await fetch('/api/houses' + (secret ? '?secret=' + secret : ''));
+      const data = await res.json();
+      const houses = data.houses || [];
+
+      if (houses.length === 0) {
+        grid.innerHTML = '<div class="gallery-empty"><div class="gallery-empty-icon">&#x1F3DA;&#xFE0F;</div>No saved houses yet.<br>Build your first one!</div>';
+        return;
+      }
+
+      grid.innerHTML = houses.map(h => {
+        const items = h.choices || [];
+        const date = new Date(h.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        return `
+          <div class="gallery-card" data-id="${h.id}">
+            <div class="gallery-card-header">
+              <div class="gallery-card-name">&#x1F3E0; ${esc(h.builder_name)}'s House</div>
+              <div class="gallery-card-date">${date}</div>
+            </div>
+            <div class="gallery-card-items">
+              ${items.map(i => `<span class="gallery-card-item" title="${esc(i.name)}">${i.emoji}</span>`).join('')}
+            </div>
+            <div class="gallery-card-actions">
+              <button class="gallery-del-btn" data-id="${h.id}">&#x1F5D1; Delete</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Delete handler
+      grid.querySelectorAll('.gallery-del-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (!confirm('Delete this house?')) return;
+          btn.disabled = true;
+          const secret = getSecret();
+          await fetch(`/api/houses/${btn.dataset.id}` + (secret ? '?secret=' + secret : ''), { method: 'DELETE' });
+          openGallery();
+        });
+      });
+    } catch (err) {
+      grid.innerHTML = '<div class="gallery-empty"><div class="gallery-empty-icon">&#x26A0;&#xFE0F;</div>Failed to load houses</div>';
+    }
+  }
+
+  // Focus name input on load
+  nameInput.focus();
+</script>
+</body>
+</html>

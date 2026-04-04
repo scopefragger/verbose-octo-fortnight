@@ -20,6 +20,7 @@ import { getWatchlist, addToWatchlist, markWatched, removeFromWatchlist } from '
 import { getBirthdays, addBirthday, updateBirthday, removeBirthday } from './services/birthdays.js';
 import { createGoal, listGoals, updateGoal, deleteGoal, addProgress, getProgress } from './services/goals.js';
 import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas, theorizeIdea, getTheories, retheorizeIdea, suggestImprovements, generateHandoff, executeHandoff, getHandoffStatus, TOTAL_PASSES } from './services/ideas.js';
+import { saveHouseDesign, listHouseDesigns, getHouseDesign, deleteHouseDesign } from './services/houseBuilder.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import { logError, getErrors, clearErrors } from './utils/errorLog.js';
@@ -82,6 +83,13 @@ app.get('/cron/weekly', requireCronSecret, async (req, res) => {
 // Dashboard HTML page
 app.get('/dashboard', requireAuth, (req, res) => {
   const filePath = path.join(__dirname, 'public', 'dashboard.html');
+  const html = fs.readFileSync(filePath, 'utf-8');
+  res.type('html').send(html);
+});
+
+// House Builder page
+app.get('/house-builder', requireAuth, (req, res) => {
+  const filePath = path.join(__dirname, 'public', 'house-builder.html');
   const html = fs.readFileSync(filePath, 'utf-8');
   res.type('html').send(html);
 });
@@ -591,6 +599,55 @@ app.delete('/api/birthdays/:id', requireAuth, async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     logError('Birthday remove', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── House Builder ──
+app.get('/api/houses', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const houses = await listHouseDesigns(familyId);
+    res.json({ houses });
+  } catch (err) {
+    logError('Houses list', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/houses', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { builder_name, choices } = req.body;
+    if (!builder_name || !choices) return res.status(400).json({ error: 'builder_name and choices required' });
+    const house = await saveHouseDesign(familyId, builder_name, choices);
+    res.json(house);
+  } catch (err) {
+    logError('House save', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/houses/:id', requireAuth, async (req, res) => {
+  try {
+    const house = await getHouseDesign(req.params.id);
+    res.json(house);
+  } catch (err) {
+    logError('House get', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/houses/:id', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    await deleteHouseDesign(req.params.id, familyId);
+    res.json({ deleted: true });
+  } catch (err) {
+    logError('House delete', err);
     res.status(500).json({ error: err.message });
   }
 });
