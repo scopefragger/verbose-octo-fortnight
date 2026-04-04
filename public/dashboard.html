@@ -559,13 +559,14 @@
       padding: 12px;
       display: grid;
       grid-template-columns: 220px 1fr 1fr 1fr;
-      grid-template-rows: auto auto 1fr 1fr;
+      grid-template-rows: auto auto 1fr 1fr auto;
       gap: 12px;
       grid-template-areas:
         "sidebar header    header    header"
         "sidebar countdown countdown countdown"
         "sidebar today     upcoming  lists"
-        "sidebar meals     foodexp   reminders";
+        "sidebar meals     foodexp   reminders"
+        "sidebar goals     goals     goals";
     }
 
     /* Cards */
@@ -1733,6 +1734,7 @@
     /* === MEALS === */
     .meals-card { grid-area: meals; }
     .foodexp-card { grid-area: foodexp; }
+    .goals-card { grid-area: goals; }
     /* Apps button (bottom-left, next to settings) */
     .apps-btn {
       position: fixed;
@@ -2774,6 +2776,49 @@
     .food-del-btn:hover { opacity: 1 !important; color: #e53e3e; }
     .food-item.removing { animation: checkOff 0.5s ease forwards; }
 
+    /* === GOALS === */
+    .goal-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      transition: background 0.2s;
+    }
+    .goal-item:hover { background: var(--primary-light); }
+    .goal-icon { font-size: 18px; flex-shrink: 0; }
+    .goal-details { flex: 1; min-width: 0; }
+    .goal-details h4 { font-size: 13px; font-weight: 600; color: var(--text); }
+    .goal-details p { font-size: 11px; color: var(--text-light); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .goal-target {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      background: var(--accent-light);
+      color: var(--accent);
+      font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .goal-complete-btn {
+      background: none;
+      border: 2px solid var(--success);
+      color: var(--success);
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+      flex-shrink: 0;
+    }
+    .goal-item:hover .goal-complete-btn { opacity: 0.6; }
+    .goal-complete-btn:hover { opacity: 1 !important; background: var(--success); color: white; }
+
     /* === MOBILE (scrollable) === */
     /* Mobile-only sections (hidden on desktop where sidebar shows them) */
     .mobile-kids { display: none; grid-area: mobilekids; }
@@ -2856,7 +2901,8 @@
           "countdown countdown"
           "today upcoming"
           "lists meals"
-          "foodexp reminders";
+          "foodexp reminders"
+          "goals goals";
       }
       .sidebar { display: none; }
       .mobile-kids { display: block; }
@@ -2879,7 +2925,8 @@
           "lists"
           "meals"
           "foodexp"
-          "reminders";
+          "reminders"
+          "goals";
       }
       .countdown-area { flex-direction: column; }
       .card { padding: 12px; }
@@ -4108,6 +4155,12 @@
         handleReminderDone(reminderDoneBtn);
         return;
       }
+      // Goal complete button
+      const goalCompleteBtn = e.target.closest('.goal-complete-btn');
+      if (goalCompleteBtn) {
+        handleGoalComplete(goalCompleteBtn);
+        return;
+      }
     });
 
     async function handleCheckOffItem(itemEl) {
@@ -4293,6 +4346,33 @@
       }).join('');
     }
 
+    function renderGoals(goals) {
+      if (!goals || goals.length === 0) {
+        return '<div class="empty-state"><div class="icon">&#x1F3AF;</div>No active goals — set one via the bot!</div>';
+      }
+
+      return goals.map(g => {
+        let targetLabel = '';
+        if (g.target_date) {
+          const daysLeft = Math.ceil((new Date(g.target_date + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24));
+          if (daysLeft < 0) targetLabel = 'Overdue';
+          else if (daysLeft === 0) targetLabel = 'Due today!';
+          else targetLabel = `${daysLeft}d left`;
+        }
+        return `
+          <div class="goal-item" data-goal-id="${g.id}">
+            <div class="goal-icon">&#x1F3AF;</div>
+            <div class="goal-details">
+              <h4>${esc(g.title)}</h4>
+              ${g.description ? `<p>${esc(g.description)}</p>` : ''}
+            </div>
+            ${targetLabel ? `<span class="goal-target">${targetLabel}</span>` : ''}
+            <button class="goal-complete-btn" data-goal-id="${g.id}" title="Mark complete">&#x2713;</button>
+          </div>
+        `;
+      }).join('');
+    }
+
     function openFoodModal() {
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
@@ -4373,6 +4453,30 @@
         });
       } catch (err) {
         console.error('Complete reminder error:', err);
+      }
+      setTimeout(() => refreshDashboard(), 500);
+    }
+
+    async function handleGoalComplete(btn) {
+      const goalId = btn.dataset.goalId;
+      if (!goalId) return;
+      const row = btn.closest('.goal-item');
+      if (row) {
+        btn.innerHTML = '&#x2713;';
+        btn.style.background = 'var(--success)';
+        btn.style.color = 'white';
+        btn.style.opacity = '1';
+        row.style.opacity = '0.5';
+      }
+
+      try {
+        await fetch(`/api/goals/${goalId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'completed' }),
+        });
+      } catch (err) {
+        console.error('Complete goal error:', err);
       }
       setTimeout(() => refreshDashboard(), 500);
     }
@@ -4516,6 +4620,14 @@
                 </div>
               `).join('')}
           </div>
+
+        <!-- Goals -->
+        <div class="card goals-card">
+          <div class="card-title"><span class="icon">&#x1F3AF;</span> Family Goals</div>
+          <div class="card-body">
+            ${renderGoals(data.goals)}
+          </div>
+        </div>
       `;
 
       // Update apps badge

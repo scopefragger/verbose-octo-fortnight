@@ -7,6 +7,7 @@ import * as meals from '../services/meals.js';
 import * as themes from '../services/themes.js';
 import { seedUKHolidays } from '../services/holidays.js';
 import * as foodExpiry from '../services/foodExpiry.js';
+import * as goals from '../services/goals.js';
 import { formatForUser } from '../utils/time.js';
 import { invalidateDashboardCache } from '../utils/cache.js';
 
@@ -422,6 +423,97 @@ export const tools = [
       },
     },
   },
+  // --- Family Goals tools ---
+  {
+    type: 'function',
+    function: {
+      name: 'create_goal',
+      description: 'Create a new family goal or challenge that the family can work towards together.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Short title for the goal (e.g. "Read 10 books this month")' },
+          description: { type: 'string', description: 'Optional longer description of what the goal involves' },
+          target_date: { type: 'string', description: 'Optional target/deadline date in YYYY-MM-DD format' },
+        },
+        required: ['title'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_goals',
+      description: 'List the family\'s current goals and challenges. By default shows active goals only.',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['active', 'completed', 'cancelled'], description: 'Filter by status. Defaults to active.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_goal',
+      description: 'Update a family goal — change its title, description, target date, or mark it as completed/cancelled.',
+      parameters: {
+        type: 'object',
+        properties: {
+          goal_id: { type: 'string', description: 'UUID of the goal to update' },
+          title: { type: 'string', description: 'New title (optional)' },
+          description: { type: 'string', description: 'New description (optional)' },
+          target_date: { type: 'string', description: 'New target date in YYYY-MM-DD (optional)' },
+          status: { type: 'string', enum: ['active', 'completed', 'cancelled'], description: 'New status (optional)' },
+        },
+        required: ['goal_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_goal',
+      description: 'Delete a family goal permanently.',
+      parameters: {
+        type: 'object',
+        properties: {
+          goal_id: { type: 'string', description: 'UUID of the goal to delete' },
+        },
+        required: ['goal_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_goal_progress',
+      description: 'Log a progress update or milestone for a family goal.',
+      parameters: {
+        type: 'object',
+        properties: {
+          goal_id: { type: 'string', description: 'UUID of the goal' },
+          note: { type: 'string', description: 'Progress note (e.g. "Finished book #3!")' },
+        },
+        required: ['goal_id', 'note'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_goal_progress',
+      description: 'Get the progress history for a specific family goal.',
+      parameters: {
+        type: 'object',
+        properties: {
+          goal_id: { type: 'string', description: 'UUID of the goal' },
+        },
+        required: ['goal_id'],
+      },
+    },
+  },
 ];
 
 /**
@@ -432,7 +524,7 @@ export async function dispatch(functionName, args, context) {
   const { familyId, userId, timezone } = context;
 
   // Invalidate dashboard cache for any write operation
-  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items']);
+  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_goals', 'get_goal_progress']);
   if (!readOnlyFns.has(functionName)) {
     invalidateDashboardCache();
   }
@@ -731,6 +823,78 @@ export async function dispatch(functionName, args, context) {
         year,
         created,
         holidays: results.map(r => `${r.title} (${r.date})`),
+      });
+    }
+
+    // --- Family Goals dispatch ---
+    case 'create_goal': {
+      const goal = await goals.createGoal(familyId, args, userId);
+      return JSON.stringify({
+        success: true,
+        goal: {
+          id: goal.id,
+          title: goal.title,
+          description: goal.description,
+          target_date: goal.target_date,
+          status: goal.status,
+        },
+      });
+    }
+
+    case 'list_goals': {
+      const items = await goals.listGoals(familyId, args.status || 'active');
+      return JSON.stringify({
+        goals: items.map(g => ({
+          id: g.id,
+          title: g.title,
+          description: g.description,
+          target_date: g.target_date,
+          status: g.status,
+          created_at: formatForUser(g.created_at, timezone),
+        })),
+        count: items.length,
+      });
+    }
+
+    case 'update_goal': {
+      const updated = await goals.updateGoal(args.goal_id, familyId, args);
+      return JSON.stringify({
+        success: true,
+        goal: {
+          id: updated.id,
+          title: updated.title,
+          status: updated.status,
+          target_date: updated.target_date,
+        },
+      });
+    }
+
+    case 'delete_goal': {
+      const deleted = await goals.deleteGoal(args.goal_id, familyId);
+      return JSON.stringify({ success: true, deleted_title: deleted?.title });
+    }
+
+    case 'add_goal_progress': {
+      const progress = await goals.addProgress(args.goal_id, args.note, userId);
+      return JSON.stringify({
+        success: true,
+        progress: {
+          id: progress.id,
+          note: progress.note,
+          created_at: formatForUser(progress.created_at, timezone),
+        },
+      });
+    }
+
+    case 'get_goal_progress': {
+      const history = await goals.getProgress(args.goal_id);
+      return JSON.stringify({
+        progress: history.map(p => ({
+          id: p.id,
+          note: p.note,
+          created_at: formatForUser(p.created_at, timezone),
+        })),
+        count: history.length,
       });
     }
 

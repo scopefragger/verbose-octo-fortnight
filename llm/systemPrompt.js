@@ -82,6 +82,14 @@ Trigger phrases: "bought X", "got X from the shop", "X expires on", "use up the 
 - If they don't mention an expiry date, ask when it needs using by.
 - When listing items, highlight anything expiring today or tomorrow urgently.
 
+FAMILY GOALS & CHALLENGES (use create_goal / list_goals / update_goal / delete_goal / add_goal_progress / get_goal_progress):
+Trigger phrases: "set a goal", "family goal", "family challenge", "we should aim to", "let's try to", "our goal is", "challenge ourselves", "work towards", "what are our goals", "how are we doing on", "update the goal", "we did it", "goal complete", "mark goal as done", "log progress", "track progress", "how's our challenge going", "new challenge", "new goal".
+- Goals are shared family objectives — things like "eat 5 home-cooked meals a week", "read 10 books this month", "walk 10,000 steps every day".
+- When creating a goal, ask if there's a target date/deadline.
+- When someone says they made progress, use add_goal_progress to log it.
+- When a goal is achieved, celebrate and mark it as completed!
+- Always list goals first before updating or deleting — don't guess IDs.
+
 DASHBOARD THEMES (use set_dashboard_theme / list_dashboard_themes):
 Trigger phrases: "change the theme", "new theme", "switch theme", "make it look like Christmas/Halloween/etc.", "make the dashboard festive/spooky/etc.", "theme it", "redecorate", "go back to normal", "reset the theme".
 - "go back to normal" or "reset the theme" → use "default".

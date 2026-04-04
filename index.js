@@ -18,6 +18,7 @@ import { addFoodItem, getFoodItems, removeFoodItemById } from './services/foodEx
 import { createCountdown, updateCountdown, deleteCountdown } from './services/countdowns.js';
 import { getWatchlist, addToWatchlist, markWatched, removeFromWatchlist } from './services/watchlist.js';
 import { getBirthdays, addBirthday, updateBirthday, removeBirthday } from './services/birthdays.js';
+import { createGoal, listGoals, updateGoal, deleteGoal, addProgress, getProgress } from './services/goals.js';
 import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas, theorizeIdea, getTheories, retheorizeIdea, suggestImprovements, generateHandoff, executeHandoff, getHandoffStatus, TOTAL_PASSES } from './services/ideas.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
@@ -590,6 +591,84 @@ app.delete('/api/birthdays/:id', requireAuth, async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     logError('Birthday remove', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Family Goals ──
+app.get('/api/goals', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const status = req.query.status || 'active';
+    const items = await listGoals(familyId, status);
+    res.json({ goals: items });
+  } catch (err) {
+    logError('Goals list', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/goals', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { title, description, target_date } = req.body;
+    if (!title) return res.status(400).json({ error: 'title is required' });
+    const goal = await createGoal(familyId, { title, description, target_date }, null);
+    invalidateCache();
+    res.json(goal);
+  } catch (err) {
+    logError('Goal create', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/goals/:id', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const goal = await updateGoal(req.params.id, familyId, req.body);
+    invalidateCache();
+    res.json(goal);
+  } catch (err) {
+    logError('Goal update', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/goals/:id', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    await deleteGoal(req.params.id, familyId);
+    invalidateCache();
+    res.json({ deleted: true });
+  } catch (err) {
+    logError('Goal delete', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/goals/:id/progress', requireAuth, async (req, res) => {
+  try {
+    const { note } = req.body;
+    if (!note) return res.status(400).json({ error: 'note is required' });
+    const progress = await addProgress(req.params.id, note, null);
+    invalidateCache();
+    res.json(progress);
+  } catch (err) {
+    logError('Goal progress add', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/goals/:id/progress', requireAuth, async (req, res) => {
+  try {
+    const history = await getProgress(req.params.id);
+    res.json({ progress: history });
+  } catch (err) {
+    logError('Goal progress list', err);
     res.status(500).json({ error: err.message });
   }
 });
