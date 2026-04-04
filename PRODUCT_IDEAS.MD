@@ -754,3 +754,175 @@ This is a Telegram-based AI family assistant bot with shared calendar, reminders
 | Family Meeting Planner (#23) | Medium | Medium | 23 — adds accountability layer, pairs with action item digests |
 | Guest & Visitor Planner (#24) | Low | Medium | 24 — targeted use case, reuses lists and calendar |
 | Home Inventory (#25) | Medium | High | 25 — strong insurance value prop, photo attachments add delight |
+| Rewards Store (#26) | Low | High | 26 — completes the points loop, high engagement for kids |
+| Book Club & Reading Log (#27) | Low | High | 27 — natural companion to watchlist, extends kid rewards |
+| Screen Time Budget Manager (#28) | Medium | High | 28 — high parent demand, extends watchlist and points system |
+| Digest & Notification Preferences (#29) | Low | Medium | 29 — essential housekeeping as feature count grows |
+| Date Night Planner (#30) | Low | Medium | 30 — balances the kid-heavy feature set with parent-focused utility |
+
+---
+
+## New Feature Ideas (Batch 2 — Generated 2026-04-04)
+
+---
+
+### 26. Family Rewards Store
+
+**Problem:** The existing kid points system tracks earned points and displays milestones (every 20 points = 1 "Mickey Head"), but has no mechanism for actually spending those points. Points accumulate with no clear redemption path, reducing the motivational pull over time. There is nothing for a child to work *towards* — no goal to save up for, no tangible reward to unlock.
+
+**Description:** A parent-managed rewards catalogue where each entry has a name, a point cost, and an optional stock limit or cooldown period. Children can browse available rewards via the bot or dashboard and "purchase" one by spending their accumulated points. The transaction deducts points from their balance and logs the redemption in the existing `point_history` table. Parents receive a Telegram notification when a child redeems a reward, so they can honour it in real life.
+
+**Value:** Completes the motivational loop of the points system. Children gain agency — they choose what to save and spend towards. Parents get a structured, agreed reward menu instead of ad-hoc negotiations. Transforms points from an abstract score into a genuine currency with real-world consequences. Expected to significantly increase daily engagement with chores, homework, and any other points-earning features.
+
+**Use cases:**
+- "Add a reward: extra 30 minutes screen time — 10 points" — parent creates a reward item
+- "What rewards can I get with my points?" — child browses the catalogue with current balance
+- "Jake wants to redeem: trip to the cinema — 50 points" — redemption triggers point deduction and parent notification
+- "List all redeemed rewards this month" — parent reviews what has been claimed
+- "Set the cinema reward to once per month" — parent adds a cooldown to prevent immediate re-purchase
+- Dashboard shows each child's balance alongside available rewards and progress towards the next one
+
+**Integration points:**
+- Directly extends the existing `kid_points` and `point_history` tables — redemption is a debit entry in `point_history` with `type = 'redeem'`
+- Parent notification on redemption uses the existing Telegram bot DM mechanism
+- New LLM tools: `add_reward`, `list_rewards`, `redeem_reward`, `delete_reward`, `list_redemptions`
+- New DB tables: `rewards` (id, family_id, name, description, point_cost int, cooldown_days int, max_per_child int, active bool, created_by, created_at), `reward_redemptions` (id, reward_id, family_id, child_name, redeemed_at, points_spent, notified bool)
+- Dashboard widget: per-child balance card updated to include a "Rewards" tab showing the catalogue and a progress bar towards the child's next affordable reward
+
+**Implementation notes for next agent:**
+- `redeem_reward` must check `current_balance >= reward.point_cost` before deducting — return a friendly error if insufficient points ("Jake needs 12 more points for this reward")
+- Cooldown enforcement: query `reward_redemptions WHERE reward_id = ? AND child_name = ? AND redeemed_at > now() - interval '{cooldown_days} days'` before allowing a repeat redemption
+- `point_history` entry for a redemption: `change = -point_cost`, `reason = 'Redeemed: [reward name]'` — reuses existing audit log pattern exactly
+- Parent notification message: "🎁 Jake just redeemed **Trip to the cinema** (50 pts). His new balance is 12 pts." — sent to the family group chat or the creating parent's DM
+- Dashboard progress bar: `(current_balance / next_affordable_reward.point_cost * 100)%` — show the cheapest reward the child cannot yet afford as the motivational target
+
+---
+
+### 27. Book Club & Family Reading Log
+
+**Problem:** The bot already has a watchlist for films and TV shows, but there is no equivalent for books. Families — especially those with school-age children — accumulate reading lists, book recommendations, and "should read" titles across sticky notes, Goodreads profiles, and school newsletters. There is no shared family record of what everyone is reading, has read, or wants to read next. For children, there is no connection between reading activity and the rewards system.
+
+**Description:** A shared family reading log modelled closely on the existing watchlist. Each entry has a title, author, reader (which family member it belongs to), reading status (want to read, reading, finished), an optional rating, and notes. Children can log books they finish and earn configurable points, creating a direct link between reading habits and the rewards system. Parents can recommend books, track a child's reading progress through the school year, and build a shared family library of loved titles.
+
+**Value:** Encourages a reading culture with a light gamification layer that fits naturally with the existing points system. Gives parents visibility into children's reading without friction. Provides a shared family record of great reads to revisit and recommend. Directly extends the value of an existing, proven feature (watchlist) with minimal new infrastructure.
+
+**Use cases:**
+- "Add The BFG to Sam's reading list" — adds a want-to-read entry for a child
+- "Sam finished The BFG — 4 stars, brilliant!" — marks as read, awards points, stores rating
+- "What books has Robyn read this year?" — filtered reading history per child
+- "Recommend me a book similar to The BFG" — LLM uses reading history as context for a recommendation
+- "What's on our family reading list?" — full catalogue view across all family members
+- "Add to my reading list: Atomic Habits" — parent manages their own adult reading list
+- Weekly digest includes: "Reading this week — Sam: The BFG (in progress), Robyn: Matilda (finished ⭐⭐⭐⭐⭐)"
+
+**Integration points:**
+- Schema and service mirror the existing `watchlist` table almost exactly — accelerates build significantly
+- Book completion can call `addKidPoints(familyId, childName, points, reason)` from the existing `services/points.js` — configurable points per book finished
+- New LLM tools: `add_book`, `update_book_status`, `list_books`, `get_reading_history`, `delete_book`
+- New DB table: `books` (id, family_id, reader_name, title, author, status enum('want_to_read','reading','finished'), rating smallint, notes, finished_at, points_awarded bool, created_at) — mirrors `watchlist` schema closely
+- Dashboard widget: reading log tab per family member with status filters and a "Books finished this year" count; for children, show points earned from reading
+
+**Implementation notes for next agent:**
+- `reader_name` is free-text matching the pattern used in `kid_points`, `homework`, and `allowances` — no foreign key, consistent with all other child-referencing features
+- `update_book_status` to `finished` should: set `finished_at = now()`, optionally call `addKidPoints` (if `reader_name` matches a known child and points are enabled), set `points_awarded = true` to prevent duplicate awards on re-status
+- LLM recommendation: `get_book_recommendation` tool passes the reader's `finished` books as context and asks the LLM for a suggestion — no external book API needed for MVP; Llama 3.3 70B has sufficient knowledge
+- Points configuration: store configurable points-per-book in a new `reading_settings` column on `families` table (default 5 points per finished book) — or a simple env variable for MVP
+- Dashboard: reuse the watchlist widget component, parameterised by data type — minimal front-end duplication
+
+---
+
+### 28. Screen Time Budget Manager
+
+**Problem:** Parents of young children consistently cite managing screen time as one of their top daily friction points. The bot already tracks shows on the watchlist and manages kid rewards, but has no concept of daily or weekly screen time limits. Currently, screen time negotiations are entirely ad-hoc: requests, arguments, and parent memory of how long the TV has been on. There is no shared, neutral record.
+
+**Description:** A daily screen time budget system per child. Parents set a daily or weekly allowance (e.g. "Sam gets 2 hours of screen time on school days, 3 hours at weekends"). When screen time starts, a parent or child logs it ("Sam is watching TV now"). When it ends, the session is logged. The bot tracks consumed vs. remaining time and reports on it conversationally. Children can optionally earn bonus screen time by spending points from the rewards system — turning good behaviour into a screen time top-up.
+
+**Value:** Removes the subjective, conflict-prone nature of screen time negotiations by creating a neutral shared record. Both parents can instantly check the state. Children accept bot-enforced limits more readily than parent-enforced ones. The points-for-screen-time mechanic creates a powerful motivational link between the rewards system and the most universally desired resource for young children. High-frequency, daily utility.
+
+**Use cases:**
+- "Set Sam's school day screen time to 90 minutes" — configures daily budget
+- "Sam started watching TV at 4pm" — begins a session timer
+- "Sam stopped watching at 4:45pm" — logs session, updates remaining allowance
+- "How much screen time does Sam have left today?" — instant status check
+- "Sam used his 10 points to earn an extra 30 minutes" — points-to-screen-time redemption
+- "Screen time report for this week" — summary of daily usage across the week for all kids
+- Daily digest: "Sam: 45 mins used, 45 mins remaining today"
+
+**Integration points:**
+- Points-for-screen-time redemption uses the existing `rewards` system (idea #26) — parent creates a "30 minutes extra screen time" reward with a point cost; redemption auto-increments the child's daily budget
+- Session start/stop can optionally link to `watchlist` entries — "Sam started watching Moana" logs both a session and optionally marks the watchlist item as in-progress
+- New LLM tools: `set_screen_time_budget`, `start_session`, `end_session`, `get_remaining_time`, `get_screen_time_report`, `add_bonus_time`
+- New DB tables: `screen_time_budgets` (id, family_id, child_name, weekday_minutes int, weekend_minutes int, updated_at), `screen_time_sessions` (id, family_id, child_name, started_at, ended_at, duration_minutes, note, created_by), `screen_time_bonuses` (id, family_id, child_name, bonus_minutes, reason, granted_at, granted_by)
+- Dashboard widget: per-child daily gauge showing used/remaining time with a colour gradient (green → amber → red as limit approaches); weekly bar chart of daily usage
+
+**Implementation notes for next agent:**
+- "Remaining today" calculation: `budget_minutes + SUM(bonuses today) - SUM(session durations today)` — always derived, never stored, to prevent drift
+- Weekend detection: `EXTRACT(dow FROM now())` — 0 (Sunday) or 6 (Saturday) triggers `weekend_minutes` budget; otherwise `weekday_minutes`
+- If `end_session` is called without a matching `start_session`, infer duration from a user-provided estimate or ask: "How long was Sam watching for?"
+- Rollover policy: unused time does NOT roll over by default — this is intentional to prevent bank-and-binge behaviour; document this clearly in the LLM system prompt response for the feature
+- Dashboard daily reset: sessions are date-partitioned; the gauge resets at midnight per the family's configured timezone — use the existing `utils/time.js` timezone handling
+
+---
+
+### 29. Digest & Notification Preferences
+
+**Problem:** As the bot accumulates features, the daily and weekly digests grow longer and less relevant to each family member. A parent managing meal planning does not want their digest cluttered with pet care reminders. A teenager does not need the grocery list summary. Currently, all digest content is hardcoded and sent uniformly to all registered users with no per-user customisation. As more features are added (chores, homework, mood check-ins, screen time, pet care), digest fatigue will cause users to stop reading or disable the bot entirely.
+
+**Description:** A per-user notification preference centre where each family member controls which digest sections they receive, what time they receive the daily message, and which types of proactive alerts are active for them. Preferences are set conversationally ("stop sending me the pet care reminders" or "send me the daily digest at 8:30am instead of 7am") or via a dashboard settings panel. The cron system reads preferences before building each user's digest, including only the sections relevant to them.
+
+**Value:** Prevents notification fatigue as feature count grows. Increases the signal-to-noise ratio of each digest, making it more likely to be read. Directly improves retention — the most common reason users disable bots is irrelevant notification volume. Architecturally, this is foundational infrastructure that every future feature benefits from by being opt-in by default. Low build cost, high systemic value.
+
+**Use cases:**
+- "Stop sending me the pet reminders in my morning digest" — disables a section for this user
+- "Send me the daily digest at 8:30am" — updates personal digest send time
+- "What notifications am I currently getting?" — lists active digest sections and alert types
+- "Turn off weekly digests for me — I only want daily" — disables a digest frequency
+- "Enable check-in prompts for me at 7pm" — opts in to a new notification type
+- New users default to a sensible minimal set; power users can enable everything; parents with young children get kid-focused sections by default
+
+**Integration points:**
+- `cron.js` daily and weekly digest builders query `notification_preferences` for each user before assembling the digest — include only sections where `enabled = true`
+- Each future feature registers its digest section identifier at build time — the preferences system is the single source of truth for what gets sent
+- New LLM tools: `set_notification_pref`, `get_notification_prefs`, `list_notification_sections`
+- New DB table: `notification_preferences` (id, user_id, family_id, section_key varchar, enabled bool, send_time time, updated_at) — `section_key` is a string like `daily_digest`, `weekly_digest`, `pet_care`, `homework_reminders`, `screen_time_daily`, `checkin_prompts`, `chore_reminders`
+- Dashboard widget: notification settings panel with toggle switches per section, a time-picker for digest delivery time, and a preview of what the current digest would contain
+
+**Implementation notes for next agent:**
+- Default preferences: on `users` creation, seed a row per known `section_key` with `enabled = true` — opt-out model preserves existing behaviour for current users; new opt-in features (mood check-ins, screen time) default to `enabled = false`
+- `send_time` stored as `time` (PostgreSQL time type, timezone-aware via the existing `utils/time.js`) — each user's digest is dispatched at their configured time rather than a family-wide time
+- Cron refactor: the `/cron/daily` handler should iterate users and build a personalised digest per user rather than one family-wide message — this is the key architectural change; use a helper `buildDigest(userId, familyId, sections[])` function
+- Section registration pattern: define a `DIGEST_SECTIONS` constant object in a new `utils/digestSections.js` mapping `section_key` to a label and a builder function — new features add one entry to this object to become automatically configurable
+- LLM intent: "stop sending me X" should resolve `section_key` via the LLM (e.g. "pet reminders" → `pet_care`) and call `set_notification_pref(section_key, false)` — add a normalisation mapping in `systemPrompt.js`
+
+---
+
+### 30. Date Night Planner & Parent Zone
+
+**Problem:** The bot is comprehensively built around family and children — kid rewards, homework, school activities, mood check-ins — but has almost no features aimed at the parents as a couple. Coordinating adult plans (date nights, anniversary dinners, adult-only weekends away) involves the same fragmented friction as family planning, but parents are less likely to use a child-focused tool for their own relationship. There is also no structure for tracking babysitter availability, restaurant experiences, or couple-specific wish lists.
+
+**Description:** A lightweight adults-only planning layer within the existing bot. Parents can log date nights, rate restaurants they visit together, maintain a "places to go" bucket list, and track their anniversary and relationship milestones. The bot proactively suggests date ideas when it detects a quiet week on the family calendar. Babysitter availability (from the local services directory, idea #22) is surfaced when planning an evening out. Anniversaries and relationship milestones get dedicated proactive reminders — the bot should be as invested in the parents' relationship as it is in the kids' achievements.
+
+**Value:** Rounds out the product's emotional appeal for both parents rather than only serving them as coordinators of children's lives. Increases adult engagement and retention — parents are more likely to keep using a bot that also cares about *them*. Requires no new infrastructure beyond a small schema addition and sits naturally alongside the existing birthdays and calendar features. Sends a product signal that this is a family assistant, not just a children's management tool.
+
+**Use cases:**
+- "Plan a date night for Friday — Italian restaurant in town" — creates a calendar event tagged as date night, adds to restaurant wish list
+- "We tried Carluccio's last night — 4 stars, lovely pasta" — logs a restaurant visit with rating and notes
+- "Where should we go for our anniversary dinner?" — LLM suggests from the rated restaurant list or generates ideas based on location
+- "Remind me 2 weeks before our anniversary to book something special" — advance reminder tied to anniversary date
+- "What date nights have we had this year?" — logs a personal couple activity history
+- "Suggest a date idea for next week" — LLM checks the family calendar for a quiet evening and suggests an activity
+
+**Integration points:**
+- Date night events created in the existing `events` (calendar) table with a `tag = 'date_night'` metadata field — no new calendar infrastructure
+- Anniversary reminders use the existing `reminders` service with a `recurrence = 'annual'` flag — same as birthday reminders
+- Restaurant wish list stored in the existing `lists`/`list_items` tables with a named list "Date Night Restaurants" — zero new tables for this part
+- New LLM tools: `log_restaurant_visit`, `get_restaurant_history`, `suggest_date_idea`, `set_anniversary`, `get_anniversary`
+- New DB table: `restaurant_visits` (id, family_id, name, cuisine, location, visited_at, rating smallint, notes, created_by) — lightweight venue log; separate from the local services directory which is for tradespeople
+- Dashboard widget: "Parent Zone" section — upcoming date nights from the calendar, next anniversary countdown, top-rated restaurants, and a date idea suggestion button
+
+**Implementation notes for next agent:**
+- `set_anniversary` stores the date in the existing `birthdays` table with `name = 'Anniversary'` and a `is_anniversary = true` flag (add this column) — reuses all birthday reminder infrastructure without duplication
+- Date idea suggestion: the `suggest_date_idea` LLM tool queries the family calendar for evenings with no events in the next 14 days, picks the most suitable one, and asks the LLM to suggest an activity — pass `restaurant_visits` top-rated entries as context so suggestions feel personalised
+- Restaurant list is separate from the local services directory (#22) intentionally — restaurants are for couple experiences (rated, atmospheric, occasion-based) while the services directory is for tradespeople (reliable, practical, transactional); different UX needs
+- "Date Night" tag on calendar events: add a `tags text[]` column to the `events` table if not present, or use the `notes` field with a prefix convention (`[date-night]`) for MVP — avoids a schema migration for a cosmetic feature
+- Privacy model: "Parent Zone" dashboard section is collapsed by default and requires a click to expand — subtle gesture that this is adult content in a family-shared interface; no technical access control needed for MVP
