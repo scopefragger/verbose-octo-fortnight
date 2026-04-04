@@ -18,7 +18,7 @@ import { addFoodItem, getFoodItems, removeFoodItemById } from './services/foodEx
 import { createCountdown, updateCountdown, deleteCountdown } from './services/countdowns.js';
 import { getWatchlist, addToWatchlist, markWatched, removeFromWatchlist } from './services/watchlist.js';
 import { getBirthdays, addBirthday, updateBirthday, removeBirthday } from './services/birthdays.js';
-import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas, theorizeIdea, getTheories, retheorizeIdea, suggestImprovements, generateHandoff, executeHandoff, getHandoffStatus, validateHandoff, TOTAL_PASSES } from './services/ideas.js';
+import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas, theorizeIdea, getTheories, retheorizeIdea, suggestImprovements, generateHandoff, executeHandoff, getHandoffStatus, TOTAL_PASSES } from './services/ideas.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import { logError, getErrors, clearErrors } from './utils/errorLog.js';
@@ -772,17 +772,6 @@ app.get('/api/ideas/:id/handoff/status', requireAuth, async (req, res) => {
     res.json(status);
   } catch (err) {
     logError('Handoff status', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Validate handoff branch against original theories
-app.post('/api/ideas/:id/validate', requireAuth, async (req, res) => {
-  try {
-    const review = await validateHandoff(req.params.id);
-    res.json(review);
-  } catch (err) {
-    logError('Validate handoff', err);
     res.status(500).json({ error: err.message });
   }
 });

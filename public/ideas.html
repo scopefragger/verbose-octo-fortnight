@@ -1491,12 +1491,8 @@
 
     // === Handoff to Claude ===
     const HANDOFF_STEPS = [
-      { key: 'generating_prompt', label: 'Generating handoff prompt' },
-      { key: 'creating_branch', label: 'Creating feature branch' },
-      { key: 'committing_prompt', label: 'Committing prompt to repo' },
-      { key: 'generating_code', label: 'Claude is writing code...' },
-      { key: 'committing_code', label: 'Committing generated files' },
-      { key: 'creating_pr', label: 'Creating pull request' },
+      { key: 'generating_prompt', label: 'Compiling theories into handoff prompt' },
+      { key: 'committing_prompt', label: 'Committing prompt to ideas/que/' },
     ];
 
     async function openHandoffPanel(ideaId) {
@@ -1527,25 +1523,23 @@
       // Show prompt preview + confirm
       contentEl.innerHTML = `
         <div class="pass-label">Handoff to Claude</div>
-        <h2>Generate Implementation Code</h2>
+        <h2>Queue for Implementation</h2>
         <p style="color:var(--text-dim);margin-bottom:16px;font-size:13px;line-height:1.6">
-          This will compile all ${document.getElementById('theoryOverlay')?._theories?.length || '?'} analysis passes into a single handoff prompt,
-          send it to Claude to write the actual implementation code, and commit everything to a new branch with a pull request.
+          This compiles all ${document.getElementById('theoryOverlay')?._theories?.length || '?'} analysis passes into a single implementation prompt
+          and commits it to <code style="background:var(--surface-3);padding:2px 6px;border-radius:4px">ideas/que/</code> in the repo.
+          You can then feed it to Claude via your subscription.
         </p>
         <div style="padding:16px;background:var(--surface-2);border-radius:var(--radius-sm);margin-bottom:16px">
           <div style="font-size:13px;margin-bottom:8px"><strong>What happens:</strong></div>
           <div style="font-size:12px;color:var(--text-dim);line-height:1.8">
-            1. Handoff prompt generated from all theories & persona feedback<br>
-            2. New branch created: <code style="background:var(--surface-3);padding:2px 6px;border-radius:4px">idea/feature-name</code><br>
-            3. Prompt committed to <code style="background:var(--surface-3);padding:2px 6px;border-radius:4px">.claude/handoffs/</code><br>
-            4. Claude (claude-sonnet-4-20250514) writes the implementation code<br>
-            5. Generated files committed to the branch<br>
-            6. Pull request created for review
+            1. All theories, persona tests & synthesis compiled into one prompt<br>
+            2. Prompt committed to <code style="background:var(--surface-3);padding:2px 6px;border-radius:4px">ideas/que/idea-name.md</code> on main<br>
+            3. Open it in Claude and paste the prompt to generate the code
           </div>
         </div>
         <div style="display:flex;gap:10px;margin-bottom:16px">
           <button class="btn btn-secondary" onclick="previewHandoff('${ideaId}')">&#x1F4CB; Preview Prompt</button>
-          <button class="btn btn-handoff" style="flex:1;justify-content:center" id="handoffBtn" onclick="startHandoff('${ideaId}')">&#x1F680; Start Handoff to Claude</button>
+          <button class="btn btn-handoff" style="flex:1;justify-content:center" id="handoffBtn" onclick="startHandoff('${ideaId}')">&#x1F680; Queue Handoff Prompt</button>
         </div>
         <div id="promptPreviewArea"></div>
       `;
@@ -1570,7 +1564,7 @@
 
     async function startHandoff(ideaId) {
       const btn = document.getElementById('handoffBtn');
-      if (btn) { btn.disabled = true; btn.innerHTML = '&#x23F3; Starting...'; }
+      if (btn) { btn.disabled = true; btn.innerHTML = '&#x23F3; Committing...'; }
 
       try {
         const res = await fetch(api(`/api/ideas/${ideaId}/handoff`), {
@@ -1584,7 +1578,7 @@
         pollHandoff(ideaId);
       } catch (e) {
         console.error('Failed to start handoff:', e);
-        if (btn) { btn.disabled = false; btn.innerHTML = '&#x1F680; Start Handoff to Claude'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = '&#x1F680; Queue Handoff Prompt'; }
       }
     }
 
@@ -1603,10 +1597,7 @@
 
       contentEl.innerHTML = `
         <div class="pass-label">Handoff in Progress</div>
-        <h2>Claude is Building Your Feature...</h2>
-        <p style="color:var(--text-dim);margin-bottom:20px;font-size:13px">
-          This may take a few minutes. Claude is analysing the handoff prompt and writing production-ready code.
-        </p>
+        <h2>Queuing prompt...</h2>
         <div class="handoff-status" id="handoffSteps">
           ${stepsHtml}
         </div>
@@ -1619,157 +1610,37 @@
     function renderHandoffComplete(contentEl, status, ideaId) {
       if (!contentEl) return;
 
-      // Check if we already have a validation result
-      const hasValidation = status.validation_verdict;
-
       contentEl.innerHTML = `
-        <div class="pass-label">Handoff Complete</div>
-        <h2>Implementation Ready for Review</h2>
+        <div class="pass-label">Handoff Queued</div>
+        <h2>Prompt Ready for Claude</h2>
         <div class="handoff-result">
           <div style="font-size:32px;margin-bottom:12px">&#x2705;</div>
-          <div style="margin-bottom:12px">
-            <strong>Branch:</strong> <code style="background:var(--surface-3);padding:2px 8px;border-radius:4px">${esc(status.handoff_branch || 'unknown')}</code>
-          </div>
-          <div style="margin-bottom:12px">
-            <strong>Files generated:</strong> ${status.handoff_files || 0}
+          <div style="margin-bottom:16px;font-size:14px;line-height:1.6">
+            The handoff prompt has been committed to the repo. Open it and paste it into Claude to generate the implementation.
           </div>
           ${status.handoff_pr_url ? `
             <div style="margin-bottom:16px">
               <a href="${esc(status.handoff_pr_url)}" target="_blank" rel="noopener" style="font-size:15px;font-weight:600">
-                &#x1F517; View Pull Request on GitHub
+                &#x1F4C4; View Prompt on GitHub
               </a>
             </div>
           ` : ''}
+          <div style="padding:14px;background:var(--surface-2);border-radius:var(--radius-sm);margin-bottom:16px">
+            <div style="font-size:12px;font-weight:600;color:var(--accent-light);margin-bottom:8px">Next Steps</div>
+            <div style="font-size:12px;color:var(--text-dim);line-height:1.8">
+              1. Open the prompt file on GitHub (link above)<br>
+              2. Copy the full prompt<br>
+              3. Open Claude (claude.ai) and paste it in<br>
+              4. Claude will generate all the implementation files<br>
+              5. Apply the code to your repo
+            </div>
+          </div>
           <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
             ${status.handoff_pr_url ? `
-              <a href="${esc(status.handoff_pr_url)}" target="_blank" class="btn btn-generate" style="text-decoration:none">&#x1F4E5; Review PR</a>
+              <a href="${esc(status.handoff_pr_url)}" target="_blank" class="btn btn-generate" style="text-decoration:none">&#x1F4C4; Open Prompt</a>
             ` : ''}
-            <button class="btn btn-primary" id="validateBtn" onclick="runValidation('${ideaId}')">&#x1F50D; Validate Implementation</button>
-            <button class="btn btn-handoff" onclick="startHandoff('${ideaId}')">&#x1F504; Re-run Handoff</button>
+            <button class="btn btn-handoff" onclick="startHandoff('${ideaId}')">&#x1F504; Re-generate Prompt</button>
           </div>
-        </div>
-        <div id="validationArea">
-          ${hasValidation ? '' : ''}
-        </div>
-      `;
-
-      // If we already have a cached validation, load it
-      if (hasValidation && status.validation_result) {
-        renderValidationReport(status.validation_result, ideaId);
-      }
-    }
-
-    async function runValidation(ideaId) {
-      const btn = document.getElementById('validateBtn');
-      if (btn) { btn.disabled = true; btn.innerHTML = '&#x23F3; Claude is reviewing...'; }
-
-      const area = document.getElementById('validationArea');
-      if (area) {
-        area.innerHTML = `
-          <div style="margin-top:20px;text-align:center;padding:30px">
-            <div style="font-size:36px;margin-bottom:12px">&#x1F50D;</div>
-            <p style="color:var(--text-dim);font-size:14px">Claude is reviewing the generated code against your feature design...</p>
-            <p style="color:var(--text-muted);font-size:12px;margin-top:8px">Checking migrations, API endpoints, service logic, UI, persona requirements, security...</p>
-            <div class="progress-bar-bg" style="max-width:300px;margin:16px auto">
-              <div class="progress-bar-fill" style="width:50%;animation:shimmer 1.5s infinite"></div>
-            </div>
-          </div>
-        `;
-      }
-
-      try {
-        const res = await fetch(api(`/api/ideas/${ideaId}/validate`), {
-          method: 'POST',
-          credentials: 'same-origin',
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || 'Validation failed');
-        }
-        const review = await res.json();
-        renderValidationReport(review, ideaId);
-        if (btn) { btn.disabled = false; btn.innerHTML = '&#x1F50D; Re-validate'; }
-      } catch (e) {
-        console.error('Validation failed:', e);
-        if (area) {
-          area.innerHTML = `
-            <div style="margin-top:16px;padding:16px;background:var(--red-glow);border-radius:var(--radius-sm);color:var(--red)">
-              Validation failed: ${esc(e.message)}
-            </div>
-          `;
-        }
-        if (btn) { btn.disabled = false; btn.innerHTML = '&#x1F50D; Retry Validation'; }
-      }
-    }
-
-    function renderValidationReport(review, ideaId) {
-      const area = document.getElementById('validationArea');
-      if (!area) return;
-
-      const verdict = review.overall_verdict || 'unknown';
-      const score = review.overall_score || 0;
-      const statusColors = {
-        pass: 'var(--green)', partial: 'var(--amber)', fail: 'var(--red)', missing: 'var(--text-muted)'
-      };
-
-      const categoriesHtml = (review.categories || []).map(cat => `
-        <div class="val-category ${cat.status}">
-          <div class="val-cat-header">
-            <span class="val-cat-name">${esc(cat.name)}</span>
-            <span class="val-cat-score ${cat.status}">${cat.score}/10</span>
-          </div>
-          ${(cat.findings || []).map(f => `<div class="val-finding">&#x2022; ${esc(f)}</div>`).join('')}
-        </div>
-      `).join('');
-
-      const criticalHtml = (review.critical_issues || []).length ? `
-        <div class="val-section">
-          <div class="val-section-title" style="color:var(--red)">&#x1F6A8; Critical Issues</div>
-          ${review.critical_issues.map(i => `<div class="val-item critical">${esc(i)}</div>`).join('')}
-        </div>
-      ` : '';
-
-      const missingHtml = (review.missing_items || []).length ? `
-        <div class="val-section">
-          <div class="val-section-title" style="color:var(--amber)">&#x26A0; Missing from Design</div>
-          ${review.missing_items.map(i => `<div class="val-item missing">${esc(i)}</div>`).join('')}
-        </div>
-      ` : '';
-
-      const bonusHtml = (review.bonus_items || []).length ? `
-        <div class="val-section">
-          <div class="val-section-title" style="color:var(--green)">&#x2728; Bonus Additions</div>
-          ${review.bonus_items.map(i => `<div class="val-item bonus">${esc(i)}</div>`).join('')}
-        </div>
-      ` : '';
-
-      const recsHtml = (review.recommendations || []).length ? `
-        <div class="val-section">
-          <div class="val-section-title">&#x1F4CB; Recommendations</div>
-          ${review.recommendations.map(r => `<div class="val-item">${esc(r)}</div>`).join('')}
-        </div>
-      ` : '';
-
-      area.innerHTML = `
-        <div style="margin-top:24px">
-          <div class="validation-header">
-            <div class="validation-score-ring ${verdict}">${score}</div>
-            <div>
-              <div style="font-size:18px;font-weight:700;margin-bottom:4px">
-                ${verdict === 'pass' ? '&#x2705; Implementation Passes' : verdict === 'partial' ? '&#x26A0; Partially Meets Design' : '&#x274C; Does Not Meet Design'}
-              </div>
-              <div style="font-size:13px;color:var(--text-dim);line-height:1.6">${esc(review.summary || '')}</div>
-            </div>
-          </div>
-
-          <div class="validation-categories">
-            ${categoriesHtml}
-          </div>
-
-          ${criticalHtml}
-          ${missingHtml}
-          ${bonusHtml}
-          ${recsHtml}
         </div>
       `;
     }
