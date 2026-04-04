@@ -978,10 +978,11 @@ async function githubApi(endpoint, method, body, token) {
 }
 
 /**
- * Fetch a file from the repo
+ * Fetch a file from the repo (optionally from a specific branch)
  */
-async function fetchGithubFile(path, token) {
-  const data = await githubApi(`/repos/${REPO}/contents/${path}`, 'GET', null, token);
+async function fetchGithubFile(path, token, branch) {
+  const ref = branch ? `?ref=${branch}` : '';
+  const data = await githubApi(`/repos/${REPO}/contents/${path}${ref}`, 'GET', null, token);
   return Buffer.from(data.content, 'base64').toString('utf-8');
 }
 
@@ -1016,10 +1017,190 @@ async function commitFileToGithub(branch, path, content, message, token) {
 export async function getHandoffStatus(ideaId) {
   const { data } = await supabase
     .from('ideas')
-    .select('handoff_status, handoff_branch, handoff_pr_url, handoff_files, handoff_error')
+    .select('handoff_status, handoff_branch, handoff_pr_url, handoff_files, handoff_error, validation_result, validation_score, validation_verdict')
     .eq('id', ideaId)
     .single();
   return data || {};
+}
+
+/**
+ * Validate a handoff branch against the original theories.
+ * Fetches all generated files from the branch, compares them against
+ * the theorize analysis, and returns a structured review.
+ */
+export async function validateHandoff(ideaId) {
+  const githubToken = process.env.GITHUB_TOKEN;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!githubToken) throw new Error('GITHUB_TOKEN not configured');
+  if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY not configured');
+
+  const { data: idea } = await supabase.from('ideas').select('*').eq('id', ideaId).single();
+  if (!idea) throw new Error('Idea not found');
+  if (!idea.handoff_branch) throw new Error('No handoff branch found — run Handoff first');
+
+  const theories = await getTheories(ideaId);
+  if (!theories.length) throw new Error('No theories found');
+
+  // Fetch the diff between main and the handoff branch
+  let diffContent = '';
+  try {
+    const compare = await githubApi(
+      `/repos/${REPO}/compare/main...${idea.handoff_branch}`,
+      'GET', null, githubToken
+    );
+
+    // Fetch full content of each changed file from the branch
+    const fileContents = [];
+    for (const file of (compare.files || [])) {
+      if (file.status === 'removed') continue;
+      try {
+        const content = await fetchGithubFile(file.filename, githubToken, idea.handoff_branch);
+        fileContents.push({ path: file.filename, status: file.status, content });
+      } catch {
+        fileContents.push({ path: file.filename, status: file.status, content: '[Could not fetch]' });
+      }
+    }
+
+    diffContent = fileContents.map(f =>
+      `### ${f.status.toUpperCase()}: ${f.path}\n\`\`\`\n${f.content.substring(0, 6000)}\n\`\`\``
+    ).join('\n\n');
+  } catch (err) {
+    throw new Error(`Failed to fetch branch diff: ${err.message}`);
+  }
+
+  // Build the theory summary for context
+  const theoryBlocks = theories.map(t => {
+    const section = t.pass_number <= 7 ? 'Analysis'
+      : t.pass_number <= 11 ? 'Persona Test'
+      : 'Synthesis';
+    return `### ${section} — ${t.pass_name}\n${t.content}`;
+  }).join('\n\n');
+
+  const projectContext = await getProjectContext();
+
+  // Call Claude to validate
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
+  const claude = new Anthropic({ apiKey: anthropicKey });
+
+  const response = await claude.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 8000,
+    messages: [
+      {
+        role: 'user',
+        content: `You are a senior code reviewer validating an auto-generated feature implementation against its design specification.
+
+## Project Context
+${projectContext}
+
+## Original Feature Design (from theorize pipeline)
+
+**Idea:** ${idea.title}
+**Category:** ${idea.category || 'General'}
+**Description:** ${idea.description || 'N/A'}
+
+${theoryBlocks}
+
+---
+
+## Generated Implementation (files on branch \`${idea.handoff_branch}\`)
+
+${diffContent}
+
+---
+
+## Validation Task
+
+Review the generated code against the original design. Return your review as a JSON object with this exact structure:
+
+{
+  "overall_score": <number 1-10>,
+  "overall_verdict": "pass" | "partial" | "fail",
+  "summary": "<2-3 sentence overall assessment>",
+  "categories": [
+    {
+      "name": "Database & Migrations",
+      "score": <1-10>,
+      "status": "pass" | "partial" | "fail" | "missing",
+      "findings": ["<finding 1>", "<finding 2>"]
+    },
+    {
+      "name": "API Endpoints",
+      "score": <1-10>,
+      "status": "pass" | "partial" | "fail" | "missing",
+      "findings": ["<finding>"]
+    },
+    {
+      "name": "Service Logic",
+      "score": <1-10>,
+      "status": "pass" | "partial" | "fail" | "missing",
+      "findings": ["<finding>"]
+    },
+    {
+      "name": "UI/Frontend",
+      "score": <1-10>,
+      "status": "pass" | "partial" | "fail" | "missing",
+      "findings": ["<finding>"]
+    },
+    {
+      "name": "Telegram Bot Integration",
+      "score": <1-10>,
+      "status": "pass" | "partial" | "fail" | "missing",
+      "findings": ["<finding>"]
+    },
+    {
+      "name": "Persona Requirements",
+      "score": <1-10>,
+      "status": "pass" | "partial" | "fail" | "missing",
+      "findings": ["<finding about mum/dad/daughter/son needs met or missed>"]
+    },
+    {
+      "name": "Code Quality & Patterns",
+      "score": <1-10>,
+      "status": "pass" | "partial" | "fail",
+      "findings": ["<finding>"]
+    },
+    {
+      "name": "Security & Auth",
+      "score": <1-10>,
+      "status": "pass" | "partial" | "fail" | "missing",
+      "findings": ["<finding>"]
+    }
+  ],
+  "missing_items": ["<thing that was in the design but not implemented>"],
+  "bonus_items": ["<thing implemented that wasn't explicitly in the design but adds value>"],
+  "critical_issues": ["<anything that would break or cause serious problems>"],
+  "recommendations": ["<actionable suggestion to improve the implementation>"]
+}
+
+Return ONLY the JSON object, no other text.`,
+      },
+    ],
+  });
+
+  const raw = response.content[0]?.text || '{}';
+
+  // Parse with fallbacks
+  let review;
+  try {
+    review = JSON.parse(raw);
+  } catch {
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) {
+      review = JSON.parse(match[0]);
+    } else {
+      throw new Error('Failed to parse validation response');
+    }
+  }
+
+  // Store the validation result
+  await supabase.from('ideas').update({
+    validation_result: review,
+    validation_score: review.overall_score,
+    validation_verdict: review.overall_verdict,
+  }).eq('id', ideaId);
+
+  return review;
 }
 
 export const TOTAL_PASSES = THEORIZE_PASSES.length;

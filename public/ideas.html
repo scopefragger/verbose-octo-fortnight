@@ -677,6 +677,101 @@
     .handoff-result a:hover { color: #fff; }
 
     /* Prompt preview */
+    /* Validation report */
+    .validation-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .validation-score-ring {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .validation-score-ring.pass { background: var(--green-glow); color: var(--green); border: 3px solid var(--green); }
+    .validation-score-ring.partial { background: var(--amber-glow); color: var(--amber); border: 3px solid var(--amber); }
+    .validation-score-ring.fail { background: var(--red-glow); color: var(--red); border: 3px solid var(--red); }
+
+    .validation-categories {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .val-category {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      border-left: 3px solid var(--surface-3);
+    }
+    .val-category.pass { border-left-color: var(--green); }
+    .val-category.partial { border-left-color: var(--amber); }
+    .val-category.fail { border-left-color: var(--red); }
+    .val-category.missing { border-left-color: var(--text-muted); }
+    .val-cat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .val-cat-name { font-weight: 600; font-size: 13px; }
+    .val-cat-score {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .val-cat-score.pass { background: var(--green-glow); color: var(--green); }
+    .val-cat-score.partial { background: var(--amber-glow); color: var(--amber); }
+    .val-cat-score.fail { background: var(--red-glow); color: var(--red); }
+    .val-cat-score.missing { background: var(--surface-3); color: var(--text-muted); }
+    .val-finding {
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.5;
+      padding: 2px 0;
+    }
+
+    .val-section {
+      margin-bottom: 16px;
+    }
+    .val-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent-light);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .val-item {
+      font-size: 13px;
+      color: var(--text-dim);
+      padding: 4px 0 4px 16px;
+      position: relative;
+      line-height: 1.5;
+    }
+    .val-item::before {
+      content: '';
+      position: absolute;
+      left: 4px;
+      top: 10px;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+    .val-item.critical::before { background: var(--red); }
+    .val-item.bonus::before { background: var(--green); }
+    .val-item.missing::before { background: var(--amber); }
+
     .prompt-preview {
       max-height: 400px;
       overflow-y: auto;
@@ -1524,6 +1619,9 @@
     function renderHandoffComplete(contentEl, status, ideaId) {
       if (!contentEl) return;
 
+      // Check if we already have a validation result
+      const hasValidation = status.validation_verdict;
+
       contentEl.innerHTML = `
         <div class="pass-label">Handoff Complete</div>
         <h2>Implementation Ready for Review</h2>
@@ -1542,12 +1640,136 @@
               </a>
             </div>
           ` : ''}
-          <div style="display:flex;gap:10px;margin-top:16px">
+          <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
             ${status.handoff_pr_url ? `
               <a href="${esc(status.handoff_pr_url)}" target="_blank" class="btn btn-generate" style="text-decoration:none">&#x1F4E5; Review PR</a>
             ` : ''}
+            <button class="btn btn-primary" id="validateBtn" onclick="runValidation('${ideaId}')">&#x1F50D; Validate Implementation</button>
             <button class="btn btn-handoff" onclick="startHandoff('${ideaId}')">&#x1F504; Re-run Handoff</button>
           </div>
+        </div>
+        <div id="validationArea">
+          ${hasValidation ? '' : ''}
+        </div>
+      `;
+
+      // If we already have a cached validation, load it
+      if (hasValidation && status.validation_result) {
+        renderValidationReport(status.validation_result, ideaId);
+      }
+    }
+
+    async function runValidation(ideaId) {
+      const btn = document.getElementById('validateBtn');
+      if (btn) { btn.disabled = true; btn.innerHTML = '&#x23F3; Claude is reviewing...'; }
+
+      const area = document.getElementById('validationArea');
+      if (area) {
+        area.innerHTML = `
+          <div style="margin-top:20px;text-align:center;padding:30px">
+            <div style="font-size:36px;margin-bottom:12px">&#x1F50D;</div>
+            <p style="color:var(--text-dim);font-size:14px">Claude is reviewing the generated code against your feature design...</p>
+            <p style="color:var(--text-muted);font-size:12px;margin-top:8px">Checking migrations, API endpoints, service logic, UI, persona requirements, security...</p>
+            <div class="progress-bar-bg" style="max-width:300px;margin:16px auto">
+              <div class="progress-bar-fill" style="width:50%;animation:shimmer 1.5s infinite"></div>
+            </div>
+          </div>
+        `;
+      }
+
+      try {
+        const res = await fetch(api(`/api/ideas/${ideaId}/validate`), {
+          method: 'POST',
+          credentials: 'same-origin',
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Validation failed');
+        }
+        const review = await res.json();
+        renderValidationReport(review, ideaId);
+        if (btn) { btn.disabled = false; btn.innerHTML = '&#x1F50D; Re-validate'; }
+      } catch (e) {
+        console.error('Validation failed:', e);
+        if (area) {
+          area.innerHTML = `
+            <div style="margin-top:16px;padding:16px;background:var(--red-glow);border-radius:var(--radius-sm);color:var(--red)">
+              Validation failed: ${esc(e.message)}
+            </div>
+          `;
+        }
+        if (btn) { btn.disabled = false; btn.innerHTML = '&#x1F50D; Retry Validation'; }
+      }
+    }
+
+    function renderValidationReport(review, ideaId) {
+      const area = document.getElementById('validationArea');
+      if (!area) return;
+
+      const verdict = review.overall_verdict || 'unknown';
+      const score = review.overall_score || 0;
+      const statusColors = {
+        pass: 'var(--green)', partial: 'var(--amber)', fail: 'var(--red)', missing: 'var(--text-muted)'
+      };
+
+      const categoriesHtml = (review.categories || []).map(cat => `
+        <div class="val-category ${cat.status}">
+          <div class="val-cat-header">
+            <span class="val-cat-name">${esc(cat.name)}</span>
+            <span class="val-cat-score ${cat.status}">${cat.score}/10</span>
+          </div>
+          ${(cat.findings || []).map(f => `<div class="val-finding">&#x2022; ${esc(f)}</div>`).join('')}
+        </div>
+      `).join('');
+
+      const criticalHtml = (review.critical_issues || []).length ? `
+        <div class="val-section">
+          <div class="val-section-title" style="color:var(--red)">&#x1F6A8; Critical Issues</div>
+          ${review.critical_issues.map(i => `<div class="val-item critical">${esc(i)}</div>`).join('')}
+        </div>
+      ` : '';
+
+      const missingHtml = (review.missing_items || []).length ? `
+        <div class="val-section">
+          <div class="val-section-title" style="color:var(--amber)">&#x26A0; Missing from Design</div>
+          ${review.missing_items.map(i => `<div class="val-item missing">${esc(i)}</div>`).join('')}
+        </div>
+      ` : '';
+
+      const bonusHtml = (review.bonus_items || []).length ? `
+        <div class="val-section">
+          <div class="val-section-title" style="color:var(--green)">&#x2728; Bonus Additions</div>
+          ${review.bonus_items.map(i => `<div class="val-item bonus">${esc(i)}</div>`).join('')}
+        </div>
+      ` : '';
+
+      const recsHtml = (review.recommendations || []).length ? `
+        <div class="val-section">
+          <div class="val-section-title">&#x1F4CB; Recommendations</div>
+          ${review.recommendations.map(r => `<div class="val-item">${esc(r)}</div>`).join('')}
+        </div>
+      ` : '';
+
+      area.innerHTML = `
+        <div style="margin-top:24px">
+          <div class="validation-header">
+            <div class="validation-score-ring ${verdict}">${score}</div>
+            <div>
+              <div style="font-size:18px;font-weight:700;margin-bottom:4px">
+                ${verdict === 'pass' ? '&#x2705; Implementation Passes' : verdict === 'partial' ? '&#x26A0; Partially Meets Design' : '&#x274C; Does Not Meet Design'}
+              </div>
+              <div style="font-size:13px;color:var(--text-dim);line-height:1.6">${esc(review.summary || '')}</div>
+            </div>
+          </div>
+
+          <div class="validation-categories">
+            ${categoriesHtml}
+          </div>
+
+          ${criticalHtml}
+          ${missingHtml}
+          ${bonusHtml}
+          ${recsHtml}
         </div>
       `;
     }
