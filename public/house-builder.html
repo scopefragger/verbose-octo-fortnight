@@ -290,13 +290,11 @@
   </div>
 
 <script>
-  // === ART STYLE ===
-  // All images share this suffix — keeps the visual style consistent across every card
-  const ART_STYLE = 'cute Pixar 3D render, soft pastel colours, children illustration, vibrant and playful, isolated on white background, toy-like proportions, high detail';
-
+  // === IMAGE PATHS ===
+  // Static pre-generated images served from /images/house-builder/{seed}.png
+  // To regenerate: node scripts/generate-house-images.js
   function imgUrl(prompt, seed) {
-    const full = encodeURIComponent(prompt + ', ' + ART_STYLE);
-    return `https://image.pollinations.ai/prompt/${full}?width=512&height=512&seed=${seed}&nologo=true&model=flux`;
+    return `/images/house-builder/${seed}.png`;
   }
 
   // === QUIZ DATA ===
@@ -419,16 +417,10 @@
   }
 
   // Attach an image to a wrapper: shimmer while loading, swap to img on load, emoji fallback on error
-  function mountImage(wrap, src, fallbackEmoji, attempt = 0) {
-    const MAX_ATTEMPTS = 3;
-    const RETRY_DELAY = 2000; // ms between retries
-
+  function mountImage(wrap, src, fallbackEmoji) {
     const skeleton = wrap.querySelector('.option-img-skeleton, .img-skeleton');
     const img = wrap.querySelector('img');
     const emojiEl = wrap.querySelector('.option-img-emoji, .img-emoji');
-
-    // Bust cache on retry so the browser doesn't re-use the failed response
-    const url = attempt === 0 ? src : src + '&retry=' + attempt;
 
     img.onload = () => {
       img.classList.add('loaded');
@@ -437,16 +429,11 @@
       if (emojiEl) emojiEl.classList.remove('show');
     };
     img.onerror = () => {
-      if (attempt < MAX_ATTEMPTS - 1) {
-        // Retry after delay — show shimmer while waiting
-        setTimeout(() => mountImage(wrap, src, fallbackEmoji, attempt + 1), RETRY_DELAY);
-      } else {
-        // All retries exhausted — fall back to emoji
-        if (skeleton) skeleton.classList.add('hidden');
-        if (emojiEl) { emojiEl.innerHTML = fallbackEmoji; emojiEl.classList.add('show'); }
-      }
+      // Static file missing — fall back to emoji
+      if (skeleton) skeleton.classList.add('hidden');
+      if (emojiEl) { emojiEl.innerHTML = fallbackEmoji; emojiEl.classList.add('show'); }
     };
-    img.src = url;
+    img.src = src;
   }
 
   // === START ===
@@ -497,9 +484,9 @@
       </div>
     `).join('');
 
-    // Mount images — stagger 400ms apart to avoid rate limiting
+    // Mount images from local static files
     grid.querySelectorAll('.option-card').forEach((card, i) => {
-      setTimeout(() => mountImage(card.querySelector('.option-img-wrap'), q.options[i].img, q.options[i].emoji), i * 400);
+      mountImage(card.querySelector('.option-img-wrap'), q.options[i].img, q.options[i].emoji);
       card.addEventListener('click', () => selectOption(card));
     });
 
