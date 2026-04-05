@@ -71,7 +71,7 @@
     .gallery-link:hover { color: var(--accent); }
 
     /* === QUIZ SCREEN === */
-    .quiz-screen { padding: 20px; gap: 20px; }
+    .quiz-screen { padding: 20px; gap: 16px; }
     .quiz-header { text-align: center; width: 100%; max-width: 900px; }
     .quiz-progress { display: flex; gap: 6px; justify-content: center; margin-bottom: 12px; }
     .progress-dot {
@@ -87,7 +87,7 @@
     /* Timer */
     .timer-bar-container {
       width: 100%; max-width: 400px; height: 8px; border-radius: 4px;
-      background: rgba(255,255,255,0.1); margin: 10px auto; overflow: hidden;
+      background: rgba(255,255,255,0.1); margin: 8px auto; overflow: hidden;
     }
     .timer-bar {
       height: 100%; border-radius: 4px; background: var(--timer-ok);
@@ -109,17 +109,43 @@
 
     .option-card {
       background: var(--card); border-radius: var(--radius);
-      padding: 24px 16px; text-align: center; cursor: pointer;
+      overflow: hidden; cursor: pointer;
       border: 3px solid transparent; transition: all 0.3s;
-      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      display: flex; flex-direction: column;
     }
     .option-card:hover { background: var(--card-hover); transform: translateY(-4px); border-color: rgba(255,255,255,0.2); }
     .option-card.selected { background: var(--card-selected); border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 8px 30px var(--accent-glow); }
     .option-card.locked { pointer-events: none; opacity: 0.6; }
 
-    .option-emoji { font-size: clamp(40px, 8vw, 64px); }
-    .option-name { font-size: 1.1rem; font-weight: 700; }
-    .option-desc { font-size: 0.8rem; color: var(--text-dim); line-height: 1.4; }
+    /* Image area */
+    .option-img-wrap {
+      width: 100%; aspect-ratio: 1 / 1; position: relative;
+      background: rgba(0,0,0,0.3); overflow: hidden;
+    }
+    .option-img {
+      width: 100%; height: 100%; object-fit: cover;
+      transition: opacity 0.4s;
+    }
+    .option-img.loading { opacity: 0; }
+    .option-img.loaded { opacity: 1; }
+    .option-img-skeleton {
+      position: absolute; inset: 0;
+      background: linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.05) 100%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s ease-in-out infinite;
+      transition: opacity 0.4s;
+    }
+    .option-img-skeleton.hidden { opacity: 0; pointer-events: none; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    .option-img-emoji {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: clamp(36px, 8vw, 60px); opacity: 0; transition: opacity 0.3s;
+    }
+    .option-img-emoji.show { opacity: 1; }
+
+    .option-info { padding: 12px 14px; }
+    .option-name { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+    .option-desc { font-size: 0.78rem; color: var(--text-dim); line-height: 1.4; }
 
     /* === REVEAL SCREEN === */
     .reveal-screen { padding: 20px; gap: 20px; text-align: center; }
@@ -127,12 +153,12 @@
     .reveal-title span { background: linear-gradient(135deg, #ffc832, #ff6b9d); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .reveal-builder { font-size: 1.1rem; color: var(--text-dim); }
     .reveal-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
       gap: 14px; max-width: 800px; width: 100%;
     }
     .reveal-item {
       background: var(--card); border-radius: var(--radius);
-      padding: 16px; text-align: center;
+      overflow: hidden;
       animation: revealPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
     }
     .reveal-item:nth-child(1) { animation-delay: 0.1s; }
@@ -145,11 +171,18 @@
     .reveal-item:nth-child(8) { animation-delay: 0.8s; }
     @keyframes revealPop { 0% { opacity: 0; transform: scale(0.5) translateY(20px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
 
-    .reveal-item-emoji { font-size: 36px; }
-    .reveal-item-room { font-size: 0.7rem; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-top: 4px; }
-    .reveal-item-name { font-size: 0.95rem; font-weight: 600; margin-top: 4px; }
+    .reveal-item-img-wrap { width: 100%; aspect-ratio: 1/1; position: relative; background: rgba(0,0,0,0.3); overflow: hidden; }
+    .reveal-item-img { width: 100%; height: 100%; object-fit: cover; transition: opacity 0.4s; opacity: 0; }
+    .reveal-item-img.loaded { opacity: 1; }
+    .reveal-item-emoji {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 36px;
+    }
+    .reveal-item-info { padding: 10px 12px; }
+    .reveal-item-room { font-size: 0.65rem; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+    .reveal-item-name { font-size: 0.85rem; font-weight: 600; margin-top: 2px; }
 
-    .reveal-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
+    .reveal-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
     .reveal-btn {
       padding: 12px 32px; border-radius: 50px; font-size: 1rem; font-weight: 700;
       cursor: pointer; transition: transform 0.2s;
@@ -168,15 +201,24 @@
     }
     .gallery-card {
       background: var(--card); border-radius: var(--radius);
-      padding: 20px; cursor: pointer; transition: all 0.3s;
+      overflow: hidden; transition: all 0.3s;
     }
     .gallery-card:hover { background: var(--card-hover); transform: translateY(-4px); }
-    .gallery-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .gallery-card-imgs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
+    .gallery-card-thumb {
+      aspect-ratio: 1/1; overflow: hidden; background: rgba(0,0,0,0.3);
+      position: relative;
+    }
+    .gallery-card-thumb img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.4s; }
+    .gallery-card-thumb img.loaded { opacity: 1; }
+    .gallery-card-thumb-emoji {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 20px;
+    }
+    .gallery-card-body { padding: 14px; }
+    .gallery-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .gallery-card-name { font-weight: 700; font-size: 1rem; }
     .gallery-card-date { font-size: 0.75rem; color: var(--text-dim); }
-    .gallery-card-items { display: flex; flex-wrap: wrap; gap: 6px; }
-    .gallery-card-item { font-size: 24px; }
-    .gallery-card-actions { margin-top: 12px; display: flex; gap: 8px; }
+    .gallery-card-actions { margin-top: 10px; }
     .gallery-del-btn {
       background: none; border: 1px solid rgba(255,100,100,0.4); color: #ff6b6b;
       padding: 4px 12px; border-radius: 8px; font-size: 0.75rem; cursor: pointer;
@@ -248,78 +290,87 @@
   </div>
 
 <script>
+  // === ART STYLE ===
+  // All images share this suffix — keeps the visual style consistent across every card
+  const ART_STYLE = 'cute Pixar 3D render, soft pastel colours, children illustration, vibrant and playful, isolated on white background, toy-like proportions, high detail';
+
+  function imgUrl(prompt, seed) {
+    const full = encodeURIComponent(prompt + ', ' + ART_STYLE);
+    return `https://image.pollinations.ai/prompt/${full}?width=512&height=512&seed=${seed}&nologo=true&model=flux`;
+  }
+
   // === QUIZ DATA ===
   const QUESTIONS = [
     {
       room: 'Living Room',
       question: 'Pick your dream sofa!',
       options: [
-        { emoji: '&#x1F43E;', name: 'Pikachu Sofa', desc: 'Electric yellow with a lightning bolt cushion!' },
-        { emoji: '&#x1F30A;', name: 'Stitch Sofa', desc: 'Blue & fluffy — experiment 626 approved!' },
-        { emoji: '&#x1F525;', name: 'Dragon Throne', desc: 'A blazing hot seat fit for a dragon tamer!' },
+        { emoji: '&#x26A1;', name: 'Pikachu Sofa',    desc: 'Electric yellow with a lightning bolt cushion!', img: imgUrl('Pikachu shaped sofa, yellow electric pokemon furniture, cute couch', 1001) },
+        { emoji: '&#x1F30A;', name: 'Stitch Sofa',    desc: 'Blue & fluffy — experiment 626 approved!',       img: imgUrl('Lilo and Stitch blue alien sofa, fluffy monster couch, blue furry', 1002) },
+        { emoji: '&#x1F525;', name: 'Dragon Throne',  desc: 'A blazing hot seat fit for a dragon tamer!',    img: imgUrl('dragon fire throne armchair, fantasy dragon seat with flames and scales', 1003) },
       ],
     },
     {
       room: 'Living Room',
       question: 'Choose your TV setup!',
       options: [
-        { emoji: '&#x1F3AE;', name: 'Gaming Mega Screen', desc: 'Giant screen with neon LED lights everywhere!' },
-        { emoji: '&#x1F3AC;', name: 'Cinema Wall', desc: 'Full wall projector with surround sound!' },
-        { emoji: '&#x1FA90;', name: 'Magic Mirror TV', desc: 'Looks like a mirror until you say "show time!"' },
+        { emoji: '&#x1F3AE;', name: 'Gaming Mega Screen', desc: 'Giant screen with neon LED lights everywhere!', img: imgUrl('giant gaming TV setup with neon LED lights, gaming room wall screen', 1004) },
+        { emoji: '&#x1F3AC;', name: 'Cinema Wall',        desc: 'Full wall projector with surround sound!',      img: imgUrl('full wall home cinema projector screen with cozy seats and popcorn', 1005) },
+        { emoji: '&#x1FA90;', name: 'Magic Mirror TV',    desc: 'Looks like a mirror until you say "show time!"', img: imgUrl('enchanted magic mirror television, glowing fairy tale smart mirror on wall', 1006) },
       ],
     },
     {
       room: 'Kitchen',
       question: 'What kitchen do you want?',
       options: [
-        { emoji: '&#x1F370;', name: 'Candy Kitchen', desc: 'Everything is made of sweets and chocolate!' },
-        { emoji: '&#x1F680;', name: 'Space Kitchen', desc: 'Floating food dispensers and zero-gravity snacks!' },
-        { emoji: '&#x1F333;', name: 'Treehouse Kitchen', desc: 'Cook in the treetops with vines and fairy lights!' },
+        { emoji: '&#x1F370;', name: 'Candy Kitchen',     desc: 'Everything is made of sweets and chocolate!',           img: imgUrl('candy and sweets kitchen, chocolate countertops, lollipop door handles, gingerbread walls', 1007) },
+        { emoji: '&#x1F680;', name: 'Space Kitchen',     desc: 'Floating food dispensers and zero-gravity snacks!',     img: imgUrl('futuristic space station kitchen, zero gravity floating food dispensers, sci-fi interior', 1008) },
+        { emoji: '&#x1F333;', name: 'Treehouse Kitchen', desc: 'Cook in the treetops with vines and fairy lights!',     img: imgUrl('treehouse kitchen up in the tree branches, fairy lights and hanging vines, wooden cosy', 1009) },
       ],
     },
     {
       room: 'Bedroom',
       question: 'Pick your dream bed!',
       options: [
-        { emoji: '&#x1F680;', name: 'Rocket Ship Bed', desc: 'Blast off to dreamland every night!' },
-        { emoji: '&#x1F984;', name: 'Unicorn Cloud Bed', desc: 'Sleep on rainbow clouds with sparkles!' },
-        { emoji: '&#x1F3F0;', name: 'Castle Bunk Bed', desc: 'A mini castle with a slide to get out of bed!' },
+        { emoji: '&#x1F680;', name: 'Rocket Ship Bed',  desc: 'Blast off to dreamland every night!',           img: imgUrl('rocket ship kids bed, spaceship bedroom furniture, space themed bed frame', 1010) },
+        { emoji: '&#x1F984;', name: 'Unicorn Cloud Bed', desc: 'Sleep on rainbow clouds with sparkles!',       img: imgUrl('unicorn cloud bed, fluffy rainbow clouds mattress, sparkles and pastel stars', 1011) },
+        { emoji: '&#x1F3F0;', name: 'Castle Bunk Bed',  desc: 'A mini castle with a slide to get out of bed!', img: imgUrl('castle bunk bed with slide for kids, mini stone castle bedroom with towers', 1012) },
       ],
     },
     {
       room: 'Bedroom',
       question: 'Choose your wardrobe!',
       options: [
-        { emoji: '&#x1FA84;', name: 'Narnia Wardrobe', desc: 'Step inside and who knows where you\'ll end up!' },
-        { emoji: '&#x1F308;', name: 'Rainbow Closet', desc: 'Clothes sorted by colour with a disco ball!' },
-        { emoji: '&#x1F916;', name: 'Robot Butler Closet', desc: 'A robot picks your outfit every morning!' },
+        { emoji: '&#x1FA84;', name: 'Narnia Wardrobe',      desc: "Step inside and who knows where you'll end up!", img: imgUrl('magical Narnia wardrobe, enchanted wooden closet with snow and light inside, fantasy', 1013) },
+        { emoji: '&#x1F308;', name: 'Rainbow Closet',       desc: 'Clothes sorted by colour with a disco ball!',   img: imgUrl('rainbow closet, clothes organized by every colour of rainbow, disco ball inside', 1014) },
+        { emoji: '&#x1F916;', name: 'Robot Butler Closet',  desc: 'A robot picks your outfit every morning!',      img: imgUrl('robot butler wardrobe, cute robot assistant selecting clothes, futuristic closet', 1015) },
       ],
     },
     {
       room: 'Bathroom',
       question: 'Pick your bath or shower!',
       options: [
-        { emoji: '&#x1F30B;', name: 'Volcano Hot Tub', desc: 'Bubbling hot springs inside a mini volcano!' },
-        { emoji: '&#x1F9DC;', name: 'Mermaid Lagoon Bath', desc: 'An underwater grotto with shells and pearls!' },
-        { emoji: '&#x2601;&#xFE0F;', name: 'Cloud Shower', desc: 'Rain falls from a fluffy cloud above your head!' },
+        { emoji: '&#x1F30B;', name: 'Volcano Hot Tub',    desc: 'Bubbling hot springs inside a mini volcano!',        img: imgUrl('volcano hot tub bathroom, bubbling lava springs inside cute mini volcano, steam', 1016) },
+        { emoji: '&#x1F9DC;', name: 'Mermaid Lagoon Bath', desc: 'An underwater grotto with shells and pearls!',      img: imgUrl('mermaid lagoon bathtub, underwater grotto bathroom with shells pearls and coral', 1017) },
+        { emoji: '&#x2601;',  name: 'Cloud Shower',       desc: 'Rain falls from a fluffy cloud above your head!',   img: imgUrl('cloud shower, rain falls from giant fluffy white cloud above, rainbow bathroom', 1018) },
       ],
     },
     {
       room: 'Garden',
       question: 'Design your garden!',
       options: [
-        { emoji: '&#x1F996;', name: 'Dinosaur Park', desc: 'Life-size dino statues and a fossil dig pit!' },
-        { emoji: '&#x1F3A2;', name: 'Theme Park Garden', desc: 'Your own rollercoaster and candy floss machine!' },
-        { emoji: '&#x1F3DD;&#xFE0F;', name: 'Tropical Beach', desc: 'Palm trees, sand, and a wave pool!' },
+        { emoji: '&#x1F996;', name: 'Dinosaur Park',     desc: 'Life-size dino statues and a fossil dig pit!',    img: imgUrl('dinosaur park garden, life size cute dinosaur statues, fossil dig pit, jungle plants', 1019) },
+        { emoji: '&#x1F3A2;', name: 'Theme Park Garden', desc: 'Your own rollercoaster and candy floss machine!', img: imgUrl('backyard theme park, mini rollercoaster and candy floss machine, fun fair garden', 1020) },
+        { emoji: '&#x1F3DD;', name: 'Tropical Beach',    desc: 'Palm trees, sand, and a wave pool!',              img: imgUrl('tropical beach backyard, palm trees, golden sand, wave pool, sunshine', 1021) },
       ],
     },
     {
       room: 'Secret Room',
       question: 'Every dream house needs a secret room...',
       options: [
-        { emoji: '&#x1F3AE;', name: 'Arcade Paradise', desc: 'Every game ever made, with unlimited lives!' },
-        { emoji: '&#x1F4DA;', name: 'Wizard Library', desc: 'Floating books, secret spells, and a magic wand!' },
-        { emoji: '&#x1F3A4;', name: 'Pop Star Studio', desc: 'Recording booth, stage, lights, and a fog machine!' },
+        { emoji: '&#x1F3AE;', name: 'Arcade Paradise', desc: 'Every game ever made, with unlimited lives!',   img: imgUrl('arcade room paradise with every game machine, neon lights, tokens and high scores', 1022) },
+        { emoji: '&#x1F4DA;', name: 'Wizard Library',  desc: 'Floating books, secret spells, and a magic wand!', img: imgUrl('wizard library with floating magic books, glowing spell books, magic wand and potions', 1023) },
+        { emoji: '&#x1F3A4;', name: 'Pop Star Studio', desc: 'Recording booth, stage, lights, and a fog machine!', img: imgUrl('pop star recording studio with stage spotlights and fog machine, music room', 1024) },
       ],
     },
   ];
@@ -342,8 +393,7 @@
   }
 
   function getSecret() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('secret') || '';
+    return new URLSearchParams(window.location.search).get('secret') || '';
   }
 
   function showScreen(id) {
@@ -368,16 +418,31 @@
     setTimeout(() => container.remove(), 5000);
   }
 
+  // Attach an image to a wrapper: shimmer while loading, swap to img on load, emoji fallback on error
+  function mountImage(wrap, src, fallbackEmoji) {
+    const skeleton = wrap.querySelector('.option-img-skeleton, .img-skeleton');
+    const img = wrap.querySelector('img');
+    const emojiEl = wrap.querySelector('.option-img-emoji, .img-emoji');
+
+    img.src = src;
+    img.onload = () => {
+      img.classList.add('loaded');
+      img.classList.remove('loading');
+      if (skeleton) skeleton.classList.add('hidden');
+      if (emojiEl) emojiEl.classList.remove('show');
+    };
+    img.onerror = () => {
+      if (skeleton) skeleton.classList.add('hidden');
+      if (emojiEl) { emojiEl.innerHTML = fallbackEmoji; emojiEl.classList.add('show'); }
+    };
+  }
+
   // === START ===
   const nameInput = document.getElementById('builderName');
   const startBtn = document.getElementById('startBtn');
 
-  nameInput.addEventListener('input', () => {
-    startBtn.disabled = !nameInput.value.trim();
-  });
-  nameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && nameInput.value.trim()) startGame();
-  });
+  nameInput.addEventListener('input', () => { startBtn.disabled = !nameInput.value.trim(); });
+  nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && nameInput.value.trim()) startGame(); });
   startBtn.addEventListener('click', startGame);
   document.getElementById('galleryLink').addEventListener('click', (e) => { e.preventDefault(); openGallery(); });
 
@@ -395,8 +460,7 @@
     const q = QUESTIONS[currentQuestion];
 
     // Progress dots
-    const dots = document.getElementById('progressDots');
-    dots.innerHTML = QUESTIONS.map((_, i) => {
+    document.getElementById('progressDots').innerHTML = QUESTIONS.map((_, i) => {
       let cls = 'progress-dot';
       if (i < currentQuestion) cls += ' done';
       if (i === currentQuestion) cls += ' current';
@@ -409,13 +473,21 @@
     const grid = document.getElementById('optionsGrid');
     grid.innerHTML = q.options.map((opt, i) => `
       <div class="option-card" data-index="${i}">
-        <div class="option-emoji">${opt.emoji}</div>
-        <div class="option-name">${esc(opt.name)}</div>
-        <div class="option-desc">${esc(opt.desc)}</div>
+        <div class="option-img-wrap">
+          <div class="option-img-skeleton"></div>
+          <img class="option-img loading" alt="${esc(opt.name)}">
+          <div class="option-img-emoji"></div>
+        </div>
+        <div class="option-info">
+          <div class="option-name">${esc(opt.name)}</div>
+          <div class="option-desc">${esc(opt.desc)}</div>
+        </div>
       </div>
     `).join('');
 
-    grid.querySelectorAll('.option-card').forEach(card => {
+    // Mount images
+    grid.querySelectorAll('.option-card').forEach((card, i) => {
+      mountImage(card.querySelector('.option-img-wrap'), q.options[i].img, q.options[i].emoji);
       card.addEventListener('click', () => selectOption(card));
     });
 
@@ -429,10 +501,7 @@
     timerInterval = setInterval(() => {
       timeLeft--;
       updateTimerDisplay();
-      if (timeLeft <= 0) {
-        clearInterval(timerInterval);
-        autoSelect();
-      }
+      if (timeLeft <= 0) { clearInterval(timerInterval); autoSelect(); }
     }, 1000);
   }
 
@@ -440,52 +509,32 @@
     const text = document.getElementById('timerText');
     const bar = document.getElementById('timerBar');
     text.textContent = timeLeft;
-    const pct = (timeLeft / TIMER_SECONDS) * 100;
-    bar.style.width = pct + '%';
-
-    if (timeLeft <= 10) {
-      text.className = 'timer-text warning';
-      bar.className = 'timer-bar warning';
-    } else {
-      text.className = 'timer-text';
-      bar.className = 'timer-bar';
-    }
+    bar.style.width = (timeLeft / TIMER_SECONDS * 100) + '%';
+    const warn = timeLeft <= 10;
+    text.className = warn ? 'timer-text warning' : 'timer-text';
+    bar.className = warn ? 'timer-bar warning' : 'timer-bar';
   }
 
   function selectOption(card) {
     clearInterval(timerInterval);
-
-    // Visual feedback
-    document.querySelectorAll('.option-card').forEach(c => {
-      c.classList.add('locked');
-      c.classList.remove('selected');
-    });
+    document.querySelectorAll('.option-card').forEach(c => { c.classList.add('locked'); c.classList.remove('selected'); });
     card.classList.add('selected');
     card.classList.remove('locked');
 
     const idx = parseInt(card.dataset.index);
     const q = QUESTIONS[currentQuestion];
-    choices.push({
-      room: q.room,
-      question: q.question,
-      choice: q.options[idx],
-    });
+    choices.push({ room: q.room, question: q.question, choice: q.options[idx] });
 
     setTimeout(() => {
       currentQuestion++;
-      if (currentQuestion >= QUESTIONS.length) {
-        showReveal();
-      } else {
-        renderQuestion();
-      }
+      if (currentQuestion >= QUESTIONS.length) showReveal();
+      else renderQuestion();
     }, 800);
   }
 
   function autoSelect() {
-    // Pick random if timer runs out
     const cards = document.querySelectorAll('.option-card');
-    const randomIdx = Math.floor(Math.random() * cards.length);
-    selectOption(cards[randomIdx]);
+    selectOption(cards[Math.floor(Math.random() * cards.length)]);
   }
 
   // === REVEAL ===
@@ -497,11 +546,25 @@
     const grid = document.getElementById('revealGrid');
     grid.innerHTML = choices.map(c => `
       <div class="reveal-item">
-        <div class="reveal-item-emoji">${c.choice.emoji}</div>
-        <div class="reveal-item-room">${esc(c.room)}</div>
-        <div class="reveal-item-name">${esc(c.choice.name)}</div>
+        <div class="reveal-item-img-wrap">
+          <div class="reveal-item-emoji">${c.choice.emoji}</div>
+          <img class="reveal-item-img" alt="${esc(c.choice.name)}">
+        </div>
+        <div class="reveal-item-info">
+          <div class="reveal-item-room">${esc(c.room)}</div>
+          <div class="reveal-item-name">${esc(c.choice.name)}</div>
+        </div>
       </div>
     `).join('');
+
+    grid.querySelectorAll('.reveal-item').forEach((item, i) => {
+      const wrap = item.querySelector('.reveal-item-img-wrap');
+      const img = item.querySelector('.reveal-item-img');
+      const emojiEl = item.querySelector('.reveal-item-emoji');
+      img.src = choices[i].choice.img;
+      img.onload = () => { img.classList.add('loaded'); emojiEl.style.opacity = '0'; };
+      img.onerror = () => {};
+    });
 
     document.getElementById('saveBtn').disabled = false;
     document.getElementById('saveBtn').textContent = 'Save My House';
@@ -523,10 +586,11 @@
             name: c.choice.name,
             emoji: c.choice.emoji,
             desc: c.choice.desc,
+            img: c.choice.img,
           })),
         }),
       });
-      btn.textContent = 'Saved!';
+      btn.textContent = 'Saved! ✓';
       launchConfetti();
     } catch (err) {
       btn.textContent = 'Save Failed';
@@ -541,17 +605,13 @@
   });
 
   document.getElementById('backBtn').addEventListener('click', () => {
-    const secret = getSecret();
-    window.location.href = '/dashboard' + (secret ? '?secret=' + secret : '');
+    window.location.href = '/dashboard' + (getSecret() ? '?secret=' + getSecret() : '');
   });
 
   // === GALLERY ===
-  document.getElementById('galleryBuildBtn').addEventListener('click', () => {
-    showScreen('startScreen');
-  });
+  document.getElementById('galleryBuildBtn').addEventListener('click', () => showScreen('startScreen'));
   document.getElementById('galleryBackBtn').addEventListener('click', () => {
-    const secret = getSecret();
-    window.location.href = '/dashboard' + (secret ? '?secret=' + secret : '');
+    window.location.href = '/dashboard' + (getSecret() ? '?secret=' + getSecret() : '');
   });
 
   async function openGallery() {
@@ -560,8 +620,7 @@
     grid.innerHTML = '<div class="gallery-empty"><div class="gallery-empty-icon">&#x23F3;</div>Loading...</div>';
 
     try {
-      const secret = getSecret();
-      const res = await fetch('/api/houses' + (secret ? '?secret=' + secret : ''));
+      const res = await fetch('/api/houses' + (getSecret() ? '?secret=' + getSecret() : ''));
       const data = await res.json();
       const houses = data.houses || [];
 
@@ -571,23 +630,36 @@
       }
 
       grid.innerHTML = houses.map(h => {
-        const items = h.choices || [];
+        const items = (h.choices || []).slice(0, 8);
         const date = new Date(h.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
         return `
           <div class="gallery-card" data-id="${h.id}">
-            <div class="gallery-card-header">
-              <div class="gallery-card-name">&#x1F3E0; ${esc(h.builder_name)}'s House</div>
-              <div class="gallery-card-date">${date}</div>
+            <div class="gallery-card-imgs">
+              ${items.map(i => `
+                <div class="gallery-card-thumb">
+                  <div class="gallery-card-thumb-emoji">${i.emoji || '&#x1F3E0;'}</div>
+                  ${i.img ? `<img data-src="${esc(i.img)}" alt="${esc(i.name)}" loading="lazy">` : ''}
+                </div>
+              `).join('')}
             </div>
-            <div class="gallery-card-items">
-              ${items.map(i => `<span class="gallery-card-item" title="${esc(i.name)}">${i.emoji}</span>`).join('')}
-            </div>
-            <div class="gallery-card-actions">
-              <button class="gallery-del-btn" data-id="${h.id}">&#x1F5D1; Delete</button>
+            <div class="gallery-card-body">
+              <div class="gallery-card-header">
+                <div class="gallery-card-name">&#x1F3E0; ${esc(h.builder_name)}'s House</div>
+                <div class="gallery-card-date">${date}</div>
+              </div>
+              <div class="gallery-card-actions">
+                <button class="gallery-del-btn" data-id="${h.id}">&#x1F5D1; Delete</button>
+              </div>
             </div>
           </div>
         `;
       }).join('');
+
+      // Lazy-load gallery thumbs
+      grid.querySelectorAll('.gallery-card-thumb img[data-src]').forEach(img => {
+        img.src = img.dataset.src;
+        img.onload = () => img.classList.add('loaded');
+      });
 
       // Delete handler
       grid.querySelectorAll('.gallery-del-btn').forEach(btn => {
@@ -595,8 +667,7 @@
           e.stopPropagation();
           if (!confirm('Delete this house?')) return;
           btn.disabled = true;
-          const secret = getSecret();
-          await fetch(`/api/houses/${btn.dataset.id}` + (secret ? '?secret=' + secret : ''), { method: 'DELETE' });
+          await fetch(`/api/houses/${btn.dataset.id}` + (getSecret() ? '?secret=' + getSecret() : ''), { method: 'DELETE' });
           openGallery();
         });
       });
@@ -605,7 +676,6 @@
     }
   }
 
-  // Focus name input on load
   nameInput.focus();
 </script>
 </body>
