@@ -277,6 +277,134 @@ This is a Telegram-based AI family assistant bot with shared calendar, reminders
 **Implementation notes for next agent:**
 - Ownership is stored as `owner_name` (free-text, matching pattern used in `kid_points` and `health_records`) — no foreign key complexity
 - Claim privacy is enforced at the query layer: when the requesting user is the owner, `JOIN wish_claims` is omitted from the response
+
+---
+
+### 12. Family Recipe Book
+
+**Problem:** The meal planner stores meal *names* but no actual recipes. When a family member asks "how do we make that chicken pasta we had last week?", there's nowhere to look it up. Recipes exist in scattered browser bookmarks, photos of recipe cards, or just in one person's head.
+
+**Description:** A shared family recipe collection where any family member can save a recipe by name, ingredients, and steps — either typed out or described in natural language to the bot. Recipes link directly to the meal planner: when a meal is planned, the bot can automatically recall the recipe on request. Families can also tag recipes as favourites, filter by dietary needs, or browse by category (quick, weekend, kids love it).
+
+**Value:** Closes the loop between meal planning and actual cooking. Preserves family recipes across generations, removes the "how do you make it?" question, and makes the meal planner genuinely useful rather than just a label board.
+
+**Use cases:**
+- "Save a recipe for Spaghetti Bolognese — [ingredients and steps]" — stores structured recipe
+- "How do I make the chicken pasta?" — bot retrieves recipe on demand
+- "What's the recipe for tonight's dinner?" — auto-resolves from today's meal plan
+- "Show me all our quick weeknight recipes" — filtered browse
+- "Mark the chicken tikka as a family favourite" — tagging
+- "Add chicken to the shopping list for tonight's recipe" — bridges to shopping list
+
+**Integration points:**
+- Links to `meal_plans` table via `title` field — recipe lookup keyed by meal name
+- Bridges to `lists`/`list_items` for ingredient-to-shopping-list generation (complements idea #9)
+- New LLM tools: `save_recipe`, `get_recipe`, `get_recipe_for_meal`, `list_recipes`, `delete_recipe`, `tag_recipe`
+- New DB tables: `recipes` (id, family_id, title, description, ingredients JSONB, steps TEXT[], tags TEXT[], is_favourite, created_by, created_at)
+- Dashboard widget: "Tonight's Recipe" card that auto-populates from today's meal plan
+
+**Implementation notes for next agent:**
+- `ingredients` stored as JSONB array of `{name, quantity, unit}` objects — enables structured shopping list extraction
+- `title` field on `recipes` should be normalised (lowercase, trimmed) for fuzzy matching against `meal_plans.title`
+- LLM tool `get_recipe_for_meal` accepts a date; resolves via `getMealsByDate` then matches `recipe.title`
+- For MVP, skip image uploads; support text-only recipes — images are a phase 2 enhancement
+- `list_recipes` supports optional `tag` filter and `is_favourite` boolean filter
+
+---
+
+### 13. Vehicle & Home Maintenance Tracker
+
+**Problem:** Households have recurring maintenance obligations — car MOTs, annual service dates, boiler services, appliance warranties, home insurance renewals — that are easy to forget until it's too late. Missing an MOT is illegal; missing a boiler service voids the warranty. These dates are currently tracked in nobody's head, in a spreadsheet, or not at all.
+
+**Description:** A structured tracker for vehicles and household assets that records important dates (MOT due, last service, warranty expiry, insurance renewal) and sends proactive reminders as dates approach. Each vehicle or appliance is a named record with a set of associated maintenance events. The bot nudges the family weeks in advance, not the day before.
+
+**Value:** Prevents expensive legal, financial, and safety consequences from missed maintenance deadlines. Gives families a shared view of household obligations rather than one partner carrying all the mental load.
+
+**Use cases:**
+- "Add our car — Ford Focus, reg AB21 XYZ, MOT due 14 August" — creates vehicle record
+- "Log a service for the Focus today — next service in 12 months" — records and auto-schedules next
+- "When's the boiler service due?" — instant lookup
+- "Add home insurance renewal — 3rd September, £480/year" — household asset record
+- "Remind me 4 weeks before the MOT" — custom lead-time reminder
+- Weekly digest includes "Upcoming: Focus MOT in 23 days"
+
+**Integration points:**
+- Reminders reuse existing `reminders` infrastructure for advance notifications
+- One-off appointment dates (e.g. booking the service) use existing `create_event`
+- New LLM tools: `add_asset`, `list_assets`, `log_maintenance`, `get_asset_history`, `update_asset`
+- New DB tables: `household_assets` (id, family_id, name, type [vehicle|appliance|insurance|other], identifier, notes, created_at), `asset_maintenance` (id, asset_id, event_type, done_at, next_due_at, cost, notes)
+- Dashboard widget: assets sorted by soonest `next_due_at` with traffic-light colouring (green > 60 days, amber 14-60 days, red < 14 days)
+
+**Implementation notes for next agent:**
+- `type` enum: `vehicle`, `appliance`, `home_insurance`, `other` — extensible
+- `next_due_at` on `asset_maintenance` is the primary driver for reminders; cron queries `WHERE next_due_at <= now() + interval '30 days'` and triggers Telegram notifications
+- `log_maintenance` creates a new `asset_maintenance` row and optionally prompts for `next_due_at`
+- For vehicles, `identifier` stores registration plate; for appliances, model number/serial — useful for service records
+- Keep MVP to date tracking only; skip integration with DVLA or external MOT APIs
+
+---
+
+### 14. Homework & School Deadline Tracker
+
+**Problem:** The existing School & After-School Activity Tracker (idea #6) handles *when* children are at clubs and pickups, but does nothing for academic obligations: homework assignments, project deadlines, spelling test dates, and reading targets. Parents currently track these from memory, school apps, or paper homework diaries — none of which are shared or proactively surfaced.
+
+**Description:** A per-child homework and deadline tracker built for natural language input. A parent or child can log an assignment with a subject, description, and due date. The bot tracks completion status and sends reminders in the evening before deadlines. A daily "homework tonight?" digest message can prompt children to sit down and work. Parents get a weekly overview of upcoming deadlines across all children.
+
+**Value:** Reduces homework-related stress and last-minute panic. Shared visibility means either parent can prompt or support a child without needing a handover conversation. Completed homework can award kid reward points, reinforcing the existing gamification system.
+
+**Use cases:**
+- "Jake has a maths worksheet due Thursday" — logs assignment with auto-reminder Wednesday evening
+- "Maya's science project is due in two weeks — she needs to research ecosystems" — longer deadline with notes
+- "Mark Jake's maths homework as done" — updates status, optionally awards points
+- "What homework does Maya have this week?" — filtered view per child
+- "Add a spelling test for Jake every Friday" — recurring weekly reminder
+- Evening digest: "Homework reminder: Jake has maths due tomorrow"
+
+**Integration points:**
+- Completion can auto-trigger `adjust_points` from the existing kid rewards system (configurable points per completed assignment)
+- Recurring assignments (e.g. weekly reading log) reuse the recurrence pattern from `reminders`
+- New LLM tools: `add_homework`, `list_homework`, `complete_homework`, `delete_homework`
+- New DB tables: `homework` (id, family_id, child_name, subject, description, due_date, is_recurring, recurrence, completed_at, points_awarded, created_by, created_at)
+- Dashboard widget: per-child homework list sorted by due date, with overdue items highlighted in red
+
+**Implementation notes for next agent:**
+- `child_name` is free-text matching the pattern in `kid_points` — no FK complexity, consistent with the rest of the codebase
+- Evening reminder check: extend `/cron/check` to query `homework WHERE due_date = tomorrow AND completed_at IS NULL` and send Telegram alert to family group
+- `is_recurring` + `recurrence` mirrors `reminders` table — reuse the same recurrence logic; on completion, auto-create the next occurrence
+- Points integration: `complete_homework` accepts optional `award_points` boolean; if true, calls `adjustPoints(familyId, childName, +5, 'Completed homework')`
+- For MVP, skip per-subject colour coding and focus on correct due-date tracking and reminder delivery
+
+---
+
+### 15. Family Subscriptions & Bills Manager
+
+**Problem:** The average UK household has 7+ active subscriptions (Netflix, Spotify, Disney+, Amazon Prime, gym memberships, etc.) plus recurring utility bills, all with different renewal dates and costs. These are spread across multiple email inboxes, bank statements, and credit cards with no shared family view. Families regularly pay for subscriptions they've forgotten about or that have silently price-increased.
+
+**Description:** A lightweight household subscription and bill registry. Each entry stores the service name, cost, billing frequency, renewal date, and which payment method is used. The bot sends reminders before renewal dates and provides a monthly spend summary. Families can also flag subscriptions for review ("we should cancel this") and track whether action was taken.
+
+**Value:** Surfaces hidden household spend, prevents bill shock from forgotten renewals, and gives both parents visibility into recurring commitments — eliminating the "what even is this £9.99 charge?" conversation.
+
+**Use cases:**
+- "Add Netflix — £17.99/month, renews 12th of each month, paid on Visa" — creates subscription record
+- "What subscriptions do we have?" — full list with monthly cost summary
+- "How much are we spending on subscriptions per month?" — AI-calculated total
+- "Flag Disney+ for cancellation review — we barely use it" — marks for review
+- "Our broadband bill goes up to £52 in May — update it" — price change tracking
+- Monthly digest includes: "Subscriptions renewing this month: Netflix (12th, £17.99), Spotify (18th, £10.99)"
+
+**Integration points:**
+- Renewal reminders reuse existing `reminders` cron infrastructure
+- Monthly digest hooks into `/cron/monthly` (new cron endpoint) or the existing weekly digest
+- New LLM tools: `add_subscription`, `list_subscriptions`, `update_subscription`, `delete_subscription`, `get_subscription_summary`
+- New DB tables: `subscriptions` (id, family_id, name, category [streaming|music|fitness|utility|insurance|other], cost, currency, billing_frequency [monthly|annual|quarterly], renewal_day, next_renewal_at, payment_method, flagged_for_review, notes, created_at)
+- Dashboard widget: subscription grid with total monthly cost footer and renewal-soon highlights
+
+**Implementation notes for next agent:**
+- `renewal_day` (1-31) + `billing_frequency` is sufficient to calculate `next_renewal_at` dynamically — no need to store and update it manually
+- Cron reminder: query subscriptions where `next_renewal_at BETWEEN now() AND now() + interval '7 days'` and send Telegram alert
+- `get_subscription_summary` uses LLM to narrate the breakdown: total monthly, total annual equivalent, and category grouping
+- Annual subscriptions: normalise to monthly cost for comparison (`cost / 12`) in summary output
+- Flag-for-review is a boolean; a filtered `list_subscriptions(flagged=true)` gives the cancellation review list
 - LLM tool `list_wishes` must accept an optional `for_person` param so parents can query a child's list
 - Dashboard API endpoint should return claim status based on the authenticated viewer — simplest MVP: show all claims server-side on the dashboard (dashboard is password-protected, not per-user)
 - Pre-birthday digest hook: in `/cron/daily`, check if any birthday is within 7 days and include a wish list summary if unclaimed items exist
