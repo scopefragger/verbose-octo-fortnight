@@ -1554,6 +1554,7 @@ let playTurn = 1;
 let playLife = 40;
 let ctxTarget = null;
 let selectedBFId = null;
+let selectedHandIdx = null;
 let manaPool = { W:0, U:0, B:0, R:0, G:0, C:0 };
 
 const MANA_COLORS = ['W','U','B','R','G','C'];
@@ -1763,6 +1764,19 @@ function returnToHand(id) {
   renderPlayArea();
 }
 
+function playHandCardFromFocus(idx) {
+  const before = playHand.length;
+  playCardToBattlefield(idx);
+  if (playHand.length < before) closeFocusPanel(); // only close if card was actually played
+}
+
+function discardFromHand(idx) {
+  if (idx < 0 || idx >= playHand.length) return;
+  const [card] = playHand.splice(idx, 1);
+  playGraveyard.push(card);
+  renderPlayArea();
+}
+
 function putOnTop(id) {
   const idx = playBattlefield.findIndex(c => c.id === id);
   if (idx < 0) return;
@@ -1845,9 +1859,7 @@ function renderPlayHand() {
     const isLand = getCardType(card) === 'Land';
     const affordable = isLand || !card.mana_cost || canAfford(card.mana_cost);
     const costShort = card.mana_cost ? formatManaCostShort(card.mana_cost) : '';
-    return `<div class="play-hand-card" onclick="playCardToBattlefield(${i})"
-        title="${escapeHtml(card.name)}${costShort ? ' · ' + costShort : ''}"
-        style="${!affordable ? 'opacity:0.4;filter:grayscale(0.6)' : ''}">
+    return `<div class="play-hand-card" onclick="selectHandCard(${i})" title="${escapeHtml(card.name)}">
       ${img ? `<img src="${img}" alt="${escapeHtml(card.name)}" loading="lazy" />`
              : `<div class="play-hand-card-text">${escapeHtml(card.name)}</div>`}
       ${costShort ? `<div style="position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,0.75);color:${affordable?'#e8d870':'#e05555'};font-size:0.5rem;border-radius:3px;padding:1px 3px;font-weight:700">${costShort}</div>` : ''}
@@ -1890,8 +1902,40 @@ function selectBFCard(id) {
 
 function closeFocusPanel() {
   selectedBFId = null;
+  selectedHandIdx = null;
   document.getElementById('card-focus-panel').classList.remove('visible');
   renderBattlefield();
+}
+
+function selectHandCard(idx) {
+  const card = playHand[idx];
+  if (!card) return;
+
+  selectedHandIdx = idx;
+  selectedBFId = null;
+
+  const img = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || '';
+  const isLand = getCardType(card) === 'Land';
+  const affordable = isLand || !card.mana_cost || canAfford(card.mana_cost);
+
+  document.getElementById('focus-img').src = img;
+  document.getElementById('focus-img').style.display = img ? '' : 'none';
+  document.getElementById('focus-name').textContent = card.name || '';
+  document.getElementById('focus-mana').textContent = card.mana_cost || '';
+  document.getElementById('focus-type').textContent = card.type_line || '';
+  document.getElementById('focus-oracle').textContent = card.oracle_text || card.card_faces?.[0]?.oracle_text || '';
+
+  const playLabel = isLand ? '▶ Play Land' : `▶ Play ${card.mana_cost || ''}`;
+  const playDisabledStyle = affordable ? '' : 'opacity:0.5;';
+  const playTitle = affordable ? '' : `title="Not enough mana"`;
+  document.getElementById('focus-actions').innerHTML = `
+    <button class="focus-btn primary" style="${playDisabledStyle}" ${playTitle}
+      onclick="playHandCardFromFocus(${idx})">${playLabel}</button>
+    <button class="focus-btn danger" onclick="discardFromHand(${idx});closeFocusPanel()">🪦 Discard</button>
+    <button class="focus-btn" onclick="closeFocusPanel()">✕ Close</button>
+  `;
+
+  document.getElementById('card-focus-panel').classList.add('visible');
 }
 
 // === CONTEXT MENU ===
