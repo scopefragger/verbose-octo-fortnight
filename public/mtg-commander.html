@@ -71,6 +71,10 @@
       grid-template-rows: auto 1fr;
       height: calc(100vh - 57px);
       gap: 0;
+      transition: grid-template-columns 0.3s ease;
+    }
+    .layout.sidebar-collapsed {
+      grid-template-columns: 0px 1fr;
     }
 
     /* === DECK PANEL === */
@@ -80,7 +84,35 @@
       display: flex;
       flex-direction: column;
       overflow-y: auto;
+      overflow-x: hidden;
+      transition: opacity 0.2s ease;
     }
+    .sidebar-collapsed .deck-panel {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Sidebar toggle button */
+    .sidebar-toggle {
+      position: absolute;
+      left: 0; top: 50%;
+      transform: translateY(-50%);
+      width: 18px; height: 48px;
+      background: rgba(201,168,76,0.15);
+      border: 1px solid rgba(201,168,76,0.3);
+      border-left: none;
+      border-radius: 0 6px 6px 0;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: var(--gold);
+      font-size: 0.65rem;
+      z-index: 10;
+      transition: background 0.2s;
+    }
+    .sidebar-toggle:hover { background: rgba(201,168,76,0.3); }
+    .sidebar-collapsed .sidebar-toggle { display: flex; }
 
     .panel-header {
       padding: 14px 16px 10px;
@@ -821,7 +853,8 @@ Supported formats:
   </div>
 
   <!-- PLAY AREA -->
-  <div class="play-area" id="play-area">
+  <div class="play-area" id="play-area" style="position:relative">
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Show deck panel">▶</button>
     <div class="play-controls">
       <div class="turn-badge">Turn <strong id="turn-counter">1</strong></div>
       <div class="sep"></div>
@@ -1444,7 +1477,12 @@ function setMode(mode) {
   document.getElementById('stats-panel').style.display = isPlay ? 'none' : '';
   document.getElementById('hand-panel').style.display = isPlay ? 'none' : '';
   document.getElementById('play-area').classList.toggle('active', isPlay);
+  document.querySelector('.layout').classList.toggle('sidebar-collapsed', isPlay);
   if (isPlay && playLibrary.length === 0 && deckLoaded) startGame();
+}
+
+function toggleSidebar() {
+  document.querySelector('.layout').classList.remove('sidebar-collapsed');
 }
 
 // === PLAY STATE ===
