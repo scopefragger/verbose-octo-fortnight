@@ -560,25 +560,31 @@
       font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px;
       color: var(--text-dim); margin-bottom: 6px;
     }
-    .bf-zone-cards { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+    .bf-zone-cards { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
 
     .bf-wrap {
-      position: relative; width: 68px; height: 68px;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      position: relative; width: 130px; height: 130px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      flex-shrink: 0; gap: 4px;
     }
     .bf-card-img {
-      width: 62px; height: 86px;
-      border-radius: 5px; cursor: pointer;
+      width: 86px; height: 120px;
+      border-radius: 6px; cursor: pointer;
       transition: transform 0.2s ease, box-shadow 0.2s;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.6);
     }
-    .bf-card-img:hover { box-shadow: 0 4px 16px rgba(201,168,76,0.4); }
+    .bf-card-img:hover { box-shadow: 0 6px 20px rgba(201,168,76,0.5); }
     .bf-card-img.tapped { transform: rotate(90deg); }
+    .bf-card-name {
+      font-size: 0.6rem; color: var(--text-dim); text-align: center;
+      max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      line-height: 1.2;
+    }
     .bf-token {
-      width: 62px; height: 86px; border-radius: 5px; cursor: pointer;
+      width: 86px; height: 120px; border-radius: 6px; cursor: pointer;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      border: 2px solid; font-size: 0.6rem; text-align: center; padding: 4px;
-      transition: transform 0.2s; gap: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      border: 2px solid; font-size: 0.7rem; text-align: center; padding: 6px;
+      transition: transform 0.2s; gap: 4px; box-shadow: 0 2px 10px rgba(0,0,0,0.6);
     }
     .bf-token.tapped { transform: rotate(90deg); }
     .bf-token.tok-W { background: #3a3520; border-color: #c8b870; color: #e8d890; }
@@ -587,15 +593,15 @@
     .bf-token.tok-R { background: #2a1010; border-color: #c04040; color: #e08080; }
     .bf-token.tok-G { background: #102010; border-color: #408040; color: #80c080; }
     .bf-token.tok-C { background: #252525; border-color: #888; color: #ccc; }
-    .bf-token .tok-name { font-weight: 700; font-size: 0.55rem; line-height: 1.2; }
-    .bf-token .tok-pt { font-size: 0.75rem; font-weight: 700; margin-top: 2px; }
-    .bf-token .tok-type { font-size: 0.5rem; color: inherit; opacity: 0.75; }
+    .bf-token .tok-name { font-weight: 700; font-size: 0.7rem; line-height: 1.3; }
+    .bf-token .tok-pt { font-size: 1rem; font-weight: 700; margin-top: 4px; }
+    .bf-token .tok-type { font-size: 0.6rem; color: inherit; opacity: 0.75; }
 
     .bf-menu-btn {
-      position: absolute; top: -4px; right: -4px;
-      width: 16px; height: 16px; border-radius: 50%;
-      background: #333; border: 1px solid #555; color: #aaa;
-      font-size: 0.6rem; cursor: pointer; display: none;
+      position: absolute; top: 2px; right: 8px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: rgba(0,0,0,0.75); border: 1px solid #555; color: #ccc;
+      font-size: 0.75rem; cursor: pointer; display: none;
       align-items: center; justify-content: center; z-index: 5;
     }
     .bf-wrap:hover .bf-menu-btn { display: flex; }
@@ -638,7 +644,7 @@
       display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
     }
     .play-hand-card {
-      width: 62px; flex-shrink: 0; cursor: pointer; border-radius: 5px;
+      width: 80px; flex-shrink: 0; cursor: pointer; border-radius: 6px;
       overflow: hidden; transition: all 0.15s; border: 1px solid transparent;
       position: relative;
     }
@@ -1710,11 +1716,13 @@ function bfCardHTML(bfc) {
   const img = bfc.card.image_uris?.small || bfc.card.card_faces?.[0]?.image_uris?.small;
   const idStr = JSON.stringify(bfc.id);
   const tapped = bfc.tapped;
+  const shortName = bfc.card.name?.split(',')[0] || bfc.card.name;
   if (img) {
     return `<div class="bf-wrap">
       <img class="bf-card-img${tapped ? ' tapped' : ''}" src="${img}"
         alt="${escapeHtml(bfc.card.name)}" title="${escapeHtml(bfc.card.name)}"
         onclick="tapCard(${idStr})" />
+      <div class="bf-card-name">${escapeHtml(shortName)}</div>
       <button class="bf-menu-btn" onclick="showCtxMenu(event,${idStr})">⋮</button>
     </div>`;
   }
@@ -1725,6 +1733,7 @@ function bfCardHTML(bfc) {
       ${bfc.card.power != null ? `<div class="tok-pt">${bfc.card.power}/${bfc.card.toughness}</div>` : ''}
       <div class="tok-type">${bfc.card.type_line?.split('—')[1]?.trim() || 'Token'}</div>
     </div>
+    <div class="bf-card-name">${escapeHtml(shortName)}</div>
     <button class="bf-menu-btn" onclick="showCtxMenu(event,${idStr})">⋮</button>
   </div>`;
 }
