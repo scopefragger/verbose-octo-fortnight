@@ -887,6 +887,11 @@ This is a Telegram-based AI family assistant bot with shared calendar, reminders
 | Screen Time Budget Manager (#28) | Medium | High | 28 — high parent demand, extends watchlist and points system |
 | Digest & Notification Preferences (#29) | Low | Medium | 29 — essential housekeeping as feature count grows |
 | Date Night Planner (#30) | Low | Medium | 30 — balances the kid-heavy feature set with parent-focused utility |
+| Weather-Aware Activity Suggester (#31) | Low | High | 31 — zero new tables, extends existing weather fetch, high weekly value |
+| Board Game & Activity Library (#32) | Low | Medium | 32 — mirrors watchlist pattern, answers "what should we do?" |
+| Morning Routine Assistant (#33) | Medium | High | 33 — highest-friction daily moment, strong gamification fit |
+| Gratitude & Celebration Log (#34) | Low | High | 34 — emotionally unique, weekly digest upgrade, drives retention |
+| Reusable Packing List Templates (#35) | Low | High | 35 — one migration, extends existing lists, eliminates recurring effort |
 
 ---
 
@@ -1054,3 +1059,167 @@ This is a Telegram-based AI family assistant bot with shared calendar, reminders
 - Restaurant list is separate from the local services directory (#22) intentionally — restaurants are for couple experiences (rated, atmospheric, occasion-based) while the services directory is for tradespeople (reliable, practical, transactional); different UX needs
 - "Date Night" tag on calendar events: add a `tags text[]` column to the `events` table if not present, or use the `notes` field with a prefix convention (`[date-night]`) for MVP — avoids a schema migration for a cosmetic feature
 - Privacy model: "Parent Zone" dashboard section is collapsed by default and requires a click to expand — subtle gesture that this is adult content in a family-shared interface; no technical access control needed for MVP
+
+---
+
+## New Feature Ideas (Batch 3 — Generated 2026-04-06)
+
+---
+
+### 31. Weather-Aware Weekend Activity Suggester
+
+**Problem:** The bot already fetches live weather data from Open-Meteo every morning and includes it in the daily digest — but it never acts on that information. The forecast sits in the digest as raw data and the family still has to answer "so what should we do this weekend?" themselves. Meanwhile, the calendar may already show family-free windows, and the countdowns table already knows if a theme park trip or beach day is approaching. All the ingredients for a proactive activity suggestion exist — they are just not connected.
+
+**Description:** An intelligence layer on top of the existing weather integration. Every Friday (or on demand), the bot fetches the weekend forecast, cross-references the family calendar for free slots, factors in the ages of the children (Sam, 8, and Robyn, 6), and generates a contextual set of activity suggestions: one for each weather scenario (sunny, cloudy, rainy), with a mix of indoor and outdoor options. The family can say "book us in for the park Saturday" and the bot creates the calendar event in one step.
+
+**Value:** Transforms a passive data point (weather) into proactive, actionable family planning. Reduces the "what should we do this weekend?" decision paralysis. Feels like a genuinely intelligent assistant rather than a data dashboard. Requires zero new database tables — it is a pure orchestration feature on top of existing services.
+
+**Use cases:**
+- "What should we do this weekend?" — bot checks the forecast and calendar, returns three tiered suggestions
+- Friday digest includes: "Weekend looks sunny Saturday, rainy Sunday — here are some ideas: [outdoor Saturday, indoor Sunday]"
+- "Book us in for Formby beach on Saturday at 10am" — one-step calendar creation from a suggestion
+- "Suggest something for the kids for this afternoon" — on-demand, narrows to today + the current weather
+- "What outdoor activities work for a 6-year-old and 8-year-old in Merseyside?" — LLM generates from general knowledge
+
+**Integration points:**
+- Weather data fetched via existing Open-Meteo call in `routes/cron.js` — reuse `getWeatherForecast()` helper, extend to accept a date range
+- Calendar free-slot detection: query `events` for the coming weekend and identify gaps
+- Activity suggestion uses the LLM with a structured prompt including forecast, child ages, and calendar context — no external activity API needed
+- One-step booking calls existing `createEvent` from `services/calendar.js`
+- New LLM tool: `suggest_weekend_activities(forecast_summary, free_slots, child_ages)` — returns structured suggestions with title, description, and weather suitability
+- No new DB tables required — pure orchestration
+
+**Implementation notes for next agent:**
+- Extend the existing Open-Meteo fetch to return hourly forecasts for Saturday and Sunday, not just current conditions — the API already supports this via the `hourly` parameter at no extra cost
+- Weekend detection for the Friday digest: in `/cron/daily`, check if `dayOfWeek === 5` (Friday) before running the activity suggester block
+- LLM prompt structure: "Family has two children aged 6 and 8. Weekend forecast: [summary]. Free time windows: [slots]. Suggest three family activities — one outdoor (if weather permits), one indoor, one that works in any weather. Keep suggestions local to Merseyside, UK."
+- Suggestion output format: return an array of `{title, description, weather_type, duration_estimate, cost_estimate}` objects — the LLM can generate this as JSON via tool calling
+- On-demand trigger: add "suggest activities" or "what should we do" as a high-priority intent in `systemPrompt.js` — calls the suggestion tool immediately without requiring the full digest context
+
+---
+
+### 32. Family Board Game & Activity Library
+
+**Problem:** The family owns a collection of board games, card games, and physical activities — but nobody can remember what they have, whether a given game is right for a 6-year-old, or how long it takes. The recurring question "what should we play tonight?" is answered from memory, which means the same three games get played repeatedly while others gather dust. There is no equivalent of the watchlist for games and activities.
+
+**Description:** A catalogued library of the family's games, activities, and outings — both things they own and places/activities they want to try. Each entry has a name, type (board game, card game, outdoor activity, day out), player count range, duration, minimum age, and a family rating. When the family asks "what should we play?" or "what can we do for 30 minutes with the kids?", the bot filters the library by context (available time, children's ages, indoor/outdoor, current mood) and returns a curated suggestion. New entries are added conversationally as the family acquires games or discovers activities.
+
+**Value:** Converts a forgotten collection into a discoverable, queryable asset. Reduces decision fatigue for in-the-moment activity planning. Surfaces under-played games. Works perfectly alongside the Weather-Aware Activity Suggester (#31) — the suggester can draw from the library when appropriate. Completely self-contained, requires no external APIs, and is a natural companion to the watchlist feature families already use.
+
+**Use cases:**
+- "Add Ticket to Ride to our game library — 2-5 players, 60-90 minutes, age 8+" — logs a board game
+- "What games can we play with the kids right now? We have 45 minutes." — filtered suggestion
+- "Rate Catan 4 stars — great but long" — updates family rating
+- "What outdoor activities do we have logged?" — filtered browse by type
+- "Add 'visit Knowsley Safari Park' to our activity wish list" — logs a wanted activity with no date yet
+- "Mark Dobble as a favourite — kids love it" — tagging for quick filter
+
+**Integration points:**
+- Schema mirrors the `watchlist` table pattern — `title`, `status` (own/want/retired), `rating`, `notes`, `created_by`, `family_id`
+- Activity suggestions from this library can feed into the Weekend Activity Suggester (#31) — `suggest_weekend_activities` tool can optionally call `list_games(filters)` to include owned activities in its output
+- New LLM tools: `add_game`, `suggest_game`, `list_games`, `rate_game`, `delete_game`
+- New DB table: `game_library` (id, family_id, name, type enum('board_game','card_game','outdoor','day_out','craft','other'), min_players, max_players, min_age, duration_minutes, rating smallint, notes, tags text[], status enum('own','want','retired'), created_by, created_at)
+- Dashboard widget: game library browser with filter chips (type, duration, player count) and a "Suggest something now" button that calls `suggest_game` with current family context
+
+**Implementation notes for next agent:**
+- `suggest_game` LLM tool accepts `available_minutes`, `min_age`, `num_players`, `indoor_only` params — queries the library for matching entries then passes them to the LLM to pick and narrate a recommendation with a reason ("You haven't played Dobble in a while and it's perfect for a quick 15 minutes with both kids")
+- `type` enum is the primary filter axis — keep it broad enough to cover physical activities (outdoor, day_out) not just tabletop games
+- `duration_minutes` stored as a max value — for games with ranges (60-90 min), store 90 and note the range in `notes`; simplifies filtering queries
+- "Haven't played in a while" logic: join `game_library` with a future `game_sessions` log table — for MVP, omit this and just sort suggestions by `rating DESC` and `created_at ASC` (oldest added games surface first as they are most likely forgotten)
+- Tags array enables custom family categories: "camping", "travel-friendly", "requires setup", "mess-free" — populated by the LLM at add time based on game name and notes
+
+---
+
+### 33. Smart Morning Routine Assistant
+
+**Problem:** Getting two young children (aged 6 and 8) out of the house on a school morning is one of the highest-friction moments in family life. The sequence — wake up, get dressed, eat breakfast, pack bag, brush teeth, shoes on, leave by X — is the same every day but is managed entirely by parental verbal reminders, which breeds resentment and dependence. There is no structured, gamified tool within the bot that makes the morning routine a child-directed process with accountability and rewards.
+
+**Description:** A configurable morning routine system where parents define a checklist of steps per child, set a target departure time, and specify what time the routine should start. Each school morning, the bot sends each child their personalised routine prompt via Telegram at the configured start time. As steps are completed, the child (or a parent) marks them off conversationally. The bot tracks the time and gives friendly countdowns ("15 minutes until you need to leave — 3 steps still to do, Sam!"). Children earn points for completing their routine independently before departure time. Consistent streaks earn bonus points.
+
+**Value:** Transfers the cognitive load of morning reminders from parents to the bot — reducing the number of times a parent has to say "have you got your bag?" Children gain agency and self-direction through a structured but gamified process. Points and streak rewards create genuine motivation for the hardest part of the school day. Directly reduces family conflict at the highest-stress daily moment.
+
+**Use cases:**
+- "Set Sam's morning routine: wake up, get dressed, have breakfast, pack school bag, brush teeth — leave by 8:30am" — configures the checklist
+- School day 7:15am bot message: "Good morning Sam! Here's your routine for today. You need to leave by 8:30am. Step 1: Wake up and get dressed 👕" — sent automatically
+- "Sam done step 1" — parent or child marks progress; bot acknowledges and prompts the next step
+- "Sam completed his routine with 10 minutes to spare — awarding 5 points!" — on-time completion reward
+- "Sam's done his routine 5 days in a row — streak bonus: +10 points!" — streak reward
+- "What's on Robyn's morning routine?" — parent queries the configured steps
+
+**Integration points:**
+- Routine prompts sent via existing Telegram bot DM mechanism — one message per child per school day at the configured start time
+- Cron endpoint `/cron/morning-routine` (or extend `/cron/daily`) dispatches prompts on weekday mornings
+- Points on completion and streak bonuses use the existing `addKidPoints` from `services/points.js`
+- School day detection: query existing `events` table for `inset_day` or holiday tags before sending — if it is a school holiday or inset day, suppress the routine prompt automatically
+- New LLM tools: `set_morning_routine`, `get_morning_routine`, `log_routine_step`, `complete_morning_routine`, `get_routine_streak`
+- New DB tables: `morning_routines` (id, family_id, child_name, steps text[], departure_time time, start_time time, points_on_completion int, active bool), `routine_logs` (id, routine_id, family_id, child_name, date date, steps_completed text[], completed_at, on_time bool, points_awarded bool)
+
+**Implementation notes for next agent:**
+- `steps` stored as a `text[]` array on `morning_routines` — ordered; the bot presents them sequentially via the existing Telegram conversation handler
+- `log_routine_step` marks one step as done in the session's `steps_completed` array; when `length(steps_completed) == length(routine.steps)`, auto-call `complete_morning_routine`
+- Streak calculation: query `routine_logs WHERE child_name = ? AND on_time = true ORDER BY date DESC` — count consecutive dates where on_time is true; reset streak on any `on_time = false` or missing date
+- School day detection: cross-reference the `events` table for events tagged as `inset_day` or where event title contains "inset" or "holiday" — also check UK bank holidays via the existing `holidays.js` seeder data
+- The bot's multi-round tool loop (already supports up to 5 rounds) handles the step-by-step progression naturally — each "Sam done step 1" message triggers a tool call that logs the step and returns the next prompt as the assistant's reply
+
+---
+
+### 34. Family Gratitude & Celebration Log
+
+**Problem:** Family life generates countless small wins, happy moments, and things to be grateful for — a good grade, a kind act, a great day out, a personal achievement — but they go unrecorded and are quickly forgotten. The mood check-in system (#15) measures how everyone is feeling but does not capture what happened. The photo memory log (#3) captures big moments visually but not the everyday gratitude and positive micro-events that form the texture of a happy family life.
+
+**Description:** A lightweight daily positivity log where any family member can record something they are grateful for, a small win, or a celebration — in a single sentence. The bot collects these throughout the day with zero friction ("Sam got full marks on his spelling test!" or "I'm grateful the sun came out today"). Every Sunday, the bot compiles the week's entries into a "Family Highlights" digest — a curated, LLM-narrated summary of what the family appreciated and achieved. High-volume weeks surface the best moments; quiet weeks get gentle encouragement. The dashboard shows a running "this week we're grateful for..." ticker.
+
+**Value:** Builds a positive family culture through a simple, low-friction habit. Creates a longitudinal record of family happiness that is distinct from a photo album (it captures feelings and small moments, not just events). The weekly highlights digest is a high-value, emotionally resonant piece of communication that drives continued engagement with the bot. Unique to a conversational AI assistant — no static app can capture this with the same naturalness. Complements the mood check-in system (#15) without duplicating it.
+
+**Use cases:**
+- "I'm grateful for the sunny afternoon walk today" — logged in one message, zero friction
+- "Add a win: Robyn tied her shoelaces by herself for the first time!" — milestone captured
+- "What are we celebrating this week?" — returns the week's entries in a friendly list
+- Sunday digest includes a "Family Highlights" section: "This week your family celebrated Robyn's shoelace milestone, a sunny walk, Sam's spelling test, and Dad's promotion news — a great week!"
+- Dashboard shows: "This week we're grateful for... [3 recent entries]" as a rotating ticker
+
+**Integration points:**
+- Sunday highlights digest hooks into the existing weekly cron (`/cron/weekly`) — adds a new section before the calendar summary
+- The LLM narrates the highlights using Groq — same pattern as the weekly planner summary (#5): pass all entries as context, ask for a warm, brief family narrative
+- New LLM tools: `log_gratitude`, `list_gratitude`, `get_weekly_highlights`
+- New DB table: `gratitude_log` (id, family_id, user_id, entry_text, category enum('gratitude','win','celebration','milestone'), created_at) — minimal schema, maximum flexibility
+- Dashboard widget: a soft, pastel-coloured "Gratitude" card showing the last 3-5 entries as a ticker or card stack; links to the full log on click
+
+**Implementation notes for next agent:**
+- `category` enum helps the LLM narrate with appropriate tone: gratitude entries get reflective language, wins get celebratory language, milestones get sentimental language — pass category alongside entry text in the highlights prompt
+- `log_gratitude` LLM tool should be callable with minimal params: just `entry_text` and optionally `category` — default `category` to `gratitude` if not specified; the LLM can infer category from the text ("Robyn tied her shoelaces" → `milestone`)
+- Intent detection: add "grateful", "celebrate", "win", "milestone" as trigger phrases in `systemPrompt.js` — these short messages should resolve immediately to `log_gratitude` without LLM deliberation overhead
+- Weekly highlights prompt: "Here are this week's gratitude and celebration entries from the [family name] family: [entries]. Write a warm, encouraging 3-4 sentence family highlights summary. Mention specific entries by name. End with a positive note about the coming week."
+- Privacy: all entries are family-shared by default — there is no private gratitude log; the product assumes entries are intentionally shared within the family unit
+
+---
+
+### 35. Reusable Packing List Templates
+
+**Problem:** The travel planner (#16) generates an AI-assisted packing list for a specific trip, and the existing lists system stores named lists — but there is no concept of a *reusable template*. Every camping trip, school residential, or weekend away requires re-generating or re-typing the same packing list from scratch. Families with children go on broadly similar trips repeatedly: the same camping kit, the same beach bag, the same grandparents-overnight bag for the kids. This creates recurring manual effort for something that should be solved once.
+
+**Description:** A packing list template system built on top of the existing lists infrastructure. Templates are named sets of items (e.g. "Camping Essentials", "Beach Day", "Kids Overnight Bag") that can be instantiated as a real checklist list with one command. The LLM can generate a starter template based on a trip type and family profile; the family edits and saves it; next time, they use it in seconds. Templates can be tweaked before instantiation ("use the camping template but skip the kids items — it's an adults-only trip").
+
+**Value:** Eliminates repeated packing list effort for recurring trip types. Reduces pre-trip stress. The template library becomes a form of family institutional memory — encoding what the family has learned about what they actually need. Architecturally trivial: templates are stored as a special list type and instantiated by copying items into a new list. No new complex infrastructure.
+
+**Use cases:**
+- "Create a camping template from scratch for a family of 4 with kids aged 6 and 8" — LLM generates a starter template
+- "Save our current camping list as a template called 'Family Camping'" — promotes an existing list to a template
+- "Use the Family Camping template for our trip next weekend" — creates a fresh checklist list, optionally linked to a `trips` record
+- "Use the beach template but skip sun cream — we already have some" — conditional instantiation with exclusions
+- "Show me all our packing templates" — template library browse
+- "Add 'insect repellent' to the camping template permanently" — updates the template for future use
+
+**Integration points:**
+- Templates stored in the existing `lists` table with a `is_template = true` boolean column (add via migration) — template items in `list_items` with the same `list_id` relationship; instantiation copies items to a new list
+- Travel planner (#16) can call `use_template` during `create_trip` if a matching template exists — "You have a beach template — want to use it for your Tenerife trip?"
+- New LLM tools: `create_template`, `list_templates`, `use_template`, `update_template`, `delete_template`, `promote_list_to_template`
+- DB change: add `is_template bool DEFAULT false` to existing `lists` table (migration 023) — zero new tables, extends existing schema minimally
+- Dashboard widget: "Packing Templates" section in the lists panel — templates shown with a distinct visual style (e.g. dashed border, template icon); one-tap "Use this template" button
+
+**Implementation notes for next agent:**
+- `use_template` implementation: query `list_items WHERE list_id = template_id`, create a new `lists` row with `is_template = false` and a user-specified name (e.g. "Camping - July 2026"), then bulk-insert copies of the template items — straightforward two-step operation
+- Conditional exclusion ("skip sun cream"): pass exclusion terms to the LLM tool; filter the item copy loop with a case-insensitive match against `item_text` — no fuzzy search needed for MVP
+- `promote_list_to_template` sets `is_template = true` on an existing list — the simplest possible path from "I just made a great packing list" to "save it for next time"
+- Template versioning: not needed for MVP — templates are mutable; if the family needs to preserve a historical version, they can promote a copy
+- LLM-generated starter templates: use the existing Groq call with a structured prompt: "Generate a packing list template for a [trip_type] trip with [family_profile]. Return as a JSON array of item strings." — parse and insert via `addListItem` in a loop; confirm with the user before saving
