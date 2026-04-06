@@ -622,12 +622,17 @@ Supported formats:
       <button class="btn btn-gold btn-sm" onclick="drawHand()" id="draw-btn">Draw Hand</button>
       <button class="btn btn-outline btn-sm" onclick="mulligan()" id="mulligan-btn" style="display:none">Mulligan</button>
       <button class="btn btn-outline btn-sm" onclick="keepHand()" id="keep-btn" style="display:none">Keep</button>
+      <button class="btn btn-outline btn-sm" onclick="critiqueHand()" id="critique-btn" style="display:none;border-color:rgba(160,112,224,0.5);color:#c084fc">🧠 Critique</button>
     </div>
     <div class="hand-grid" id="hand-grid">
       <div class="empty-hand">
         <div class="icon">🃏</div>
         Load a deck and draw an opening hand
       </div>
+    </div>
+    <div id="critique-box" style="display:none;margin-top:14px;background:rgba(160,112,224,0.08);border:1px solid rgba(160,112,224,0.3);border-radius:10px;padding:14px 16px;">
+      <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;color:#c084fc;margin-bottom:8px">🧠 AI Critique</div>
+      <div id="critique-text" style="font-size:0.85rem;line-height:1.7;color:var(--text)"></div>
     </div>
   </div>
 
@@ -663,11 +668,12 @@ let cardCache = {};      // name → scryfall data
 // === URL SECRET ===
 const urlParams = new URLSearchParams(window.location.search);
 const secret = urlParams.get('secret') || '';
-const authHeaders = secret ? { 'X-Secret': secret } : {};
 
 function apiFetch(url, opts = {}) {
-  opts.headers = { ...authHeaders, 'Content-Type': 'application/json', ...(opts.headers || {}) };
-  return fetch(url, opts);
+  const separator = url.includes('?') ? '&' : '?';
+  const authUrl = secret ? `${url}${separator}secret=${encodeURIComponent(secret)}` : url;
+  opts.headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  return fetch(authUrl, opts);
 }
 
 // === INIT ===
@@ -971,6 +977,8 @@ function drawHand(size = 7) {
   renderHand();
   document.getElementById('mulligan-btn').style.display = '';
   document.getElementById('keep-btn').style.display = '';
+  document.getElementById('critique-btn').style.display = '';
+  document.getElementById('critique-box').style.display = 'none';
   document.getElementById('mulligan-info').textContent = 'Opening hand';
 }
 
@@ -981,6 +989,7 @@ function mulligan() {
   const pile = shuffle(buildDrawPile());
   hand = pile.slice(0, newSize);
   renderHand();
+  document.getElementById('critique-box').style.display = 'none';
   document.getElementById('mulligan-info').textContent =
     mulliganCount === 1 ? '6-card hand' :
     mulliganCount === 2 ? '5-card hand' :
@@ -992,6 +1001,45 @@ function keepHand() {
   document.getElementById('mulligan-btn').style.display = 'none';
   document.getElementById('keep-btn').style.display = 'none';
   document.getElementById('mulligan-info').textContent += ' ✓';
+}
+
+async function critiqueHand() {
+  if (!hand.length) return;
+  const btn = document.getElementById('critique-btn');
+  const box = document.getElementById('critique-box');
+  const textEl = document.getElementById('critique-text');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Thinking…';
+  box.style.display = 'block';
+  textEl.textContent = '';
+
+  const totalCards = deck.reduce((s, c) => s + c.qty, 0);
+  const lands = deck.filter(c => getCardType(c.data) === 'Land').reduce((s, c) => s + c.qty, 0);
+  const nonLands = deck.filter(c => getCardType(c.data) !== 'Land');
+  const avgCMC = nonLands.length
+    ? (nonLands.reduce((s, c) => s + getCardCMC(c.data) * c.qty, 0) / nonLands.reduce((s,c)=>s+c.qty,0)).toFixed(1)
+    : '0';
+
+  try {
+    const res = await apiFetch('/api/mtg/critique-hand', {
+      method: 'POST',
+      body: JSON.stringify({
+        hand: hand.map(c => ({ name: c.name, mana_cost: c.mana_cost, type_line: c.type_line })),
+        deckName: document.getElementById('deck-name').value.trim() || 'Unknown',
+        commander: document.getElementById('commander-input').value.trim(),
+        partner: document.getElementById('partner-input').value.trim(),
+        deckStats: { totalCards, avgCMC, lands }
+      })
+    });
+    const json = await res.json();
+    textEl.textContent = json.critique || 'No response.';
+  } catch {
+    textEl.textContent = 'Failed to get critique. Check your connection.';
+  }
+
+  btn.disabled = false;
+  btn.textContent = '🧠 Critique';
 }
 
 function renderHand() {

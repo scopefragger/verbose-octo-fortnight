@@ -22,6 +22,7 @@ import { createGoal, listGoals, updateGoal, deleteGoal, addProgress, getProgress
 import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas, theorizeIdea, getTheories, retheorizeIdea, suggestImprovements, generateHandoff, executeHandoff, getHandoffStatus, TOTAL_PASSES } from './services/ideas.js';
 import { saveHouseDesign, listHouseDesigns, getHouseDesign, deleteHouseDesign } from './services/houseBuilder.js';
 import { listDecklists, getDecklist, saveDecklist, updateDecklist, deleteDecklist } from './services/mtgCommander.js';
+import { chatCompletion } from './llm/groq.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import { logError, getErrors, clearErrors } from './utils/errorLog.js';
@@ -154,6 +155,43 @@ app.delete('/api/mtg/decks/:id', requireAuth, async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     logError('MTG delete deck', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// MTG hand critique
+app.post('/api/mtg/critique-hand', requireAuth, async (req, res) => {
+  try {
+    const { hand, deckName, commander, partner, deckStats } = req.body;
+    if (!hand?.length) return res.status(400).json({ error: 'No hand provided' });
+
+    const commanderLine = [commander, partner].filter(Boolean).join(' + ');
+    const handList = hand.map(c => `- ${c.name}${c.mana_cost ? ` (${c.mana_cost.replace(/\{|\}/g, '')})` : ''}${c.type_line ? ` [${c.type_line}]` : ''}`).join('\n');
+
+    const messages = [
+      {
+        role: 'system',
+        content: `You are an expert Magic: The Gathering Commander player and deck analyst. Give concise, practical advice. Be direct and specific. Use plain text, no markdown.`
+      },
+      {
+        role: 'user',
+        content: `Critique this opening hand for a Commander deck.
+
+Deck: ${deckName || 'Unknown'}${commanderLine ? `\nCommander: ${commanderLine}` : ''}
+${deckStats ? `Deck stats: ${deckStats.totalCards} cards, avg CMC ${deckStats.avgCMC}, ${deckStats.lands} lands` : ''}
+
+Opening hand (${hand.length} cards):
+${handList}
+
+Is this hand keepable? What's the game plan with these cards? What are the risks? Be concise — 3 to 5 sentences.`
+      }
+    ];
+
+    const result = await chatCompletion(messages);
+    const critique = result.choices[0]?.message?.content || 'No response from AI.';
+    res.json({ critique });
+  } catch (err) {
+    logError('MTG critique hand', err);
     res.status(500).json({ error: err.message });
   }
 });
