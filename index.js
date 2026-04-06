@@ -21,6 +21,7 @@ import { getBirthdays, addBirthday, updateBirthday, removeBirthday } from './ser
 import { createGoal, listGoals, updateGoal, deleteGoal, addProgress, getProgress } from './services/goals.js';
 import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas, theorizeIdea, getTheories, retheorizeIdea, suggestImprovements, generateHandoff, executeHandoff, getHandoffStatus, TOTAL_PASSES } from './services/ideas.js';
 import { saveHouseDesign, listHouseDesigns, getHouseDesign, deleteHouseDesign } from './services/houseBuilder.js';
+import { listDecklists, getDecklist, saveDecklist, updateDecklist, deleteDecklist } from './services/mtgCommander.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import { logError, getErrors, clearErrors } from './utils/errorLog.js';
@@ -85,6 +86,76 @@ app.get('/dashboard', requireAuth, (req, res) => {
   const filePath = path.join(__dirname, 'public', 'dashboard.html');
   const html = fs.readFileSync(filePath, 'utf-8');
   res.type('html').send(html);
+});
+
+// MTG Commander page
+app.get('/mtg-commander', requireAuth, (req, res) => {
+  const filePath = path.join(__dirname, 'public', 'mtg-commander.html');
+  const html = fs.readFileSync(filePath, 'utf-8');
+  res.type('html').send(html);
+});
+
+// MTG Commander API
+app.get('/api/mtg/decks', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const decks = await listDecklists(familyId);
+    res.json({ decks });
+  } catch (err) {
+    logError('MTG list decks', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/mtg/decks/:id', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const deck = await getDecklist(req.params.id, familyId);
+    res.json(deck);
+  } catch (err) {
+    logError('MTG get deck', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/mtg/decks', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { name, commander, partner, cards, tokens } = req.body;
+    if (!name || !cards?.length) return res.status(400).json({ error: 'name and cards required' });
+    const deck = await saveDecklist(familyId, { name, commander, partner, cards, tokens });
+    res.json(deck);
+  } catch (err) {
+    logError('MTG save deck', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/mtg/decks/:id', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const deck = await updateDecklist(req.params.id, familyId, req.body);
+    res.json(deck);
+  } catch (err) {
+    logError('MTG update deck', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/mtg/decks/:id', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    await deleteDecklist(req.params.id, familyId);
+    res.json({ deleted: true });
+  } catch (err) {
+    logError('MTG delete deck', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // House Builder page
