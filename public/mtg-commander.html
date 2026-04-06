@@ -607,6 +607,12 @@
     }
     .bf-card-img:hover { box-shadow: 0 6px 20px rgba(201,168,76,0.5); }
     .bf-card-img.tapped { transform: rotate(90deg); }
+    .bf-wrap { cursor: pointer; }
+    .bf-wrap.selected .bf-card-img,
+    .bf-wrap.selected .bf-token {
+      box-shadow: 0 0 0 2px var(--gold), 0 4px 20px rgba(201,168,76,0.5);
+    }
+
     .bf-card-name {
       font-size: 0.6rem; color: var(--text-dim); text-align: center;
       max-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -650,6 +656,42 @@
     }
     .ctx-item:hover { background: rgba(255,255,255,0.08); }
     .ctx-item.danger { color: var(--red); }
+
+    /* Card Focus Panel */
+    .card-focus-panel {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: linear-gradient(135deg, #1a1230ee, #0f1a2eee);
+      border-top: 1px solid var(--gold);
+      display: flex; align-items: flex-start; gap: 16px;
+      padding: 14px 16px;
+      z-index: 20;
+      transform: translateY(100%);
+      transition: transform 0.25s ease;
+      backdrop-filter: blur(8px);
+    }
+    .card-focus-panel.visible { transform: translateY(0); }
+    .card-focus-img {
+      width: 120px; flex-shrink: 0; border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    }
+    .card-focus-info { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .card-focus-name { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .card-focus-type { font-size: 0.75rem; color: var(--text-dim); }
+    .card-focus-mana { font-size: 0.8rem; color: var(--gold-light); }
+    .card-focus-oracle { font-size: 0.72rem; color: var(--text-dim); line-height: 1.5; max-height: 60px; overflow-y: auto; }
+    .card-focus-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+    .focus-btn {
+      padding: 6px 12px; border-radius: 7px; border: 1px solid var(--card-border);
+      background: rgba(255,255,255,0.06); color: var(--text); font-size: 0.78rem;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .focus-btn:hover { background: rgba(255,255,255,0.12); border-color: var(--gold); }
+    .focus-btn.primary { background: rgba(201,168,76,0.2); border-color: var(--gold); color: var(--gold-light); font-weight: 600; }
+    .focus-btn.primary:hover { background: rgba(201,168,76,0.35); }
+    .focus-btn.danger { border-color: rgba(224,85,85,0.4); color: var(--red); }
+    .focus-btn.danger:hover { background: rgba(224,85,85,0.15); }
+    .focus-close { margin-left: auto; background: none; border: none; color: var(--text-dim); font-size: 1.1rem; cursor: pointer; padding: 0 4px; }
+    .focus-close:hover { color: var(--text); }
 
     /* Graveyard bar */
     .grave-bar {
@@ -878,7 +920,7 @@ Supported formats:
       <div class="library-badge" id="library-count">0 in library</div>
     </div>
 
-    <div class="battlefield" id="battlefield">
+    <div class="battlefield" id="battlefield" onclick="if(event.target===this||event.target.classList.contains('bf-zone')||event.target.classList.contains('bf-zone-cards'))closeFocusPanel()">
       <div class="bf-zone">
         <div class="bf-zone-label">Permanents</div>
         <div class="bf-zone-cards" id="bf-perms"></div>
@@ -886,6 +928,23 @@ Supported formats:
       <div class="bf-zone bf-zone-lands">
         <div class="bf-zone-label">Lands</div>
         <div class="bf-zone-cards" id="bf-lands"></div>
+      </div>
+    </div>
+
+    <!-- Card Focus Panel -->
+    <div class="card-focus-panel" id="card-focus-panel">
+      <img class="card-focus-img" id="focus-img" src="" alt="" />
+      <div class="card-focus-info">
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <div style="flex:1">
+            <div class="card-focus-name" id="focus-name"></div>
+            <div class="card-focus-mana" id="focus-mana"></div>
+            <div class="card-focus-type" id="focus-type"></div>
+          </div>
+          <button class="focus-close" onclick="closeFocusPanel()">✕</button>
+        </div>
+        <div class="card-focus-oracle" id="focus-oracle"></div>
+        <div class="card-focus-actions" id="focus-actions"></div>
       </div>
     </div>
 
@@ -1494,6 +1553,7 @@ let playExile = [];
 let playTurn = 1;
 let playLife = 40;
 let ctxTarget = null;
+let selectedBFId = null;
 let manaPool = { W:0, U:0, B:0, R:0, G:0, C:0 };
 
 const MANA_COLORS = ['W','U','B','R','G','C'];
@@ -1755,24 +1815,21 @@ function bfCardHTML(bfc) {
   const idStr = JSON.stringify(bfc.id);
   const tapped = bfc.tapped;
   const shortName = bfc.card.name?.split(',')[0] || bfc.card.name;
+  const selectedClass = (typeof selectedBFId !== 'undefined' && selectedBFId === bfc.id) ? ' selected' : '';
   if (img) {
-    return `<div class="bf-wrap">
+    return `<div class="bf-wrap${selectedClass}" onclick="selectBFCard(${idStr})">
       <img class="bf-card-img${tapped ? ' tapped' : ''}" src="${img}"
-        alt="${escapeHtml(bfc.card.name)}" title="${escapeHtml(bfc.card.name)}"
-        onclick="tapCard(${idStr})" />
+        alt="${escapeHtml(bfc.card.name)}" />
       <div class="bf-card-name">${escapeHtml(shortName)}</div>
-      <button class="bf-menu-btn" onclick="showCtxMenu(event,${idStr})">⋮</button>
     </div>`;
   }
-  return `<div class="bf-wrap">
-    <div class="bf-token${tapped ? ' tapped' : ''} ${tokenColorClass(bfc.card.colors)}"
-      onclick="tapCard(${idStr})">
+  return `<div class="bf-wrap${selectedClass}" onclick="selectBFCard(${idStr})">
+    <div class="bf-token${tapped ? ' tapped' : ''} ${tokenColorClass(bfc.card.colors)}">
       <div class="tok-name">${escapeHtml(bfc.card.name)}</div>
       ${bfc.card.power != null ? `<div class="tok-pt">${bfc.card.power}/${bfc.card.toughness}</div>` : ''}
       <div class="tok-type">${bfc.card.type_line?.split('—')[1]?.trim() || 'Token'}</div>
     </div>
     <div class="bf-card-name">${escapeHtml(shortName)}</div>
-    <button class="bf-menu-btn" onclick="showCtxMenu(event,${idStr})">⋮</button>
   </div>`;
 }
 
@@ -1796,6 +1853,45 @@ function renderPlayHand() {
       ${costShort ? `<div style="position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,0.75);color:${affordable?'#e8d870':'#e05555'};font-size:0.5rem;border-radius:3px;padding:1px 3px;font-weight:700">${costShort}</div>` : ''}
     </div>`;
   }).join('');
+}
+
+// === CARD FOCUS PANEL ===
+function selectBFCard(id) {
+  const bfc = playBattlefield.find(c => c.id === id);
+  if (!bfc) return;
+
+  // If clicking the already-selected card, tap it
+  if (selectedBFId === id) { tapCard(id); return; }
+
+  selectedBFId = id;
+  const card = bfc.card;
+  const img = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal || '';
+
+  document.getElementById('focus-img').src = img;
+  document.getElementById('focus-img').style.display = img ? '' : 'none';
+  document.getElementById('focus-name').textContent = card.name || 'Token';
+  document.getElementById('focus-mana').textContent = card.mana_cost || '';
+  document.getElementById('focus-type').textContent = card.type_line || '';
+  document.getElementById('focus-oracle').textContent = card.oracle_text || card.card_faces?.[0]?.oracle_text || '';
+
+  const isTapped = bfc.tapped;
+  const idStr = JSON.stringify(id);
+  document.getElementById('focus-actions').innerHTML = `
+    <button class="focus-btn primary" onclick="tapCard(${idStr});renderBattlefield();">${isTapped ? '⟳ Untap' : '↷ Tap'}</button>
+    <button class="focus-btn" onclick="returnToHand(${idStr});closeFocusPanel()">↩ Hand</button>
+    <button class="focus-btn" onclick="putOnTop(${idStr});closeFocusPanel()">⬆ Top of Library</button>
+    <button class="focus-btn danger" onclick="sendToGrave(${idStr});closeFocusPanel()">🪦 Graveyard</button>
+    <button class="focus-btn danger" onclick="sendToExile(${idStr});closeFocusPanel()">✨ Exile</button>
+  `;
+
+  document.getElementById('card-focus-panel').classList.add('visible');
+  renderBattlefield();
+}
+
+function closeFocusPanel() {
+  selectedBFId = null;
+  document.getElementById('card-focus-panel').classList.remove('visible');
+  renderBattlefield();
 }
 
 // === CONTEXT MENU ===
