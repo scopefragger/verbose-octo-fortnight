@@ -514,14 +514,191 @@
       .hand-grid { justify-content: center; }
       .decklist-textarea { min-height: 120px; max-height: 180px; }
     }
+
+    /* === MODE TOGGLE === */
+    .mode-toggle { display: flex; gap: 4px; }
+    .mode-btn {
+      padding: 5px 14px; border-radius: 20px; border: 1px solid var(--card-border);
+      background: none; color: var(--text-dim); font-size: 0.8rem; cursor: pointer; transition: all 0.2s;
+    }
+    .mode-btn.active { background: var(--gold); border-color: var(--gold); color: #1a1a2e; font-weight: 700; }
+    .mode-btn:hover:not(.active) { border-color: var(--gold); color: var(--gold); }
+
+    /* === PLAY AREA === */
+    .play-area {
+      grid-column: 2; grid-row: 1 / 3;
+      display: none; flex-direction: column;
+      overflow: hidden;
+    }
+    .play-area.active { display: flex; }
+
+    .play-controls {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 10px 14px; border-bottom: 1px solid var(--card-border);
+      background: rgba(0,0,0,0.2); flex-shrink: 0;
+    }
+    .play-controls .sep { width: 1px; height: 20px; background: var(--card-border); margin: 0 2px; }
+    .life-display { display: flex; align-items: center; gap: 4px; }
+    .life-val { font-size: 1.1rem; font-weight: 700; color: var(--red); min-width: 28px; text-align: center; }
+    .life-btn { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--card-border); background: none; color: var(--text-dim); cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .life-btn:hover { border-color: var(--red); color: var(--red); }
+    .turn-badge { font-size: 0.8rem; color: var(--text-dim); }
+    .turn-badge strong { color: var(--gold-light); }
+    .library-badge { font-size: 0.75rem; color: var(--text-dim); margin-left: auto; }
+
+    /* Battlefield */
+    .battlefield {
+      flex: 1; overflow-y: auto; display: flex; flex-direction: column;
+      gap: 0; min-height: 0;
+    }
+    .bf-zone {
+      padding: 8px 12px; min-height: 120px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .bf-zone-lands { background: rgba(42,122,64,0.05); min-height: 100px; }
+    .bf-zone-label {
+      font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px;
+      color: var(--text-dim); margin-bottom: 6px;
+    }
+    .bf-zone-cards { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+
+    .bf-wrap {
+      position: relative; width: 68px; height: 68px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .bf-card-img {
+      width: 62px; height: 86px;
+      border-radius: 5px; cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+    .bf-card-img:hover { box-shadow: 0 4px 16px rgba(201,168,76,0.4); }
+    .bf-card-img.tapped { transform: rotate(90deg); }
+    .bf-token {
+      width: 62px; height: 86px; border-radius: 5px; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      border: 2px solid; font-size: 0.6rem; text-align: center; padding: 4px;
+      transition: transform 0.2s; gap: 2px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+    .bf-token.tapped { transform: rotate(90deg); }
+    .bf-token.tok-W { background: #3a3520; border-color: #c8b870; color: #e8d890; }
+    .bf-token.tok-U { background: #152040; border-color: #4a80c8; color: #90b8e8; }
+    .bf-token.tok-B { background: #1a1228; border-color: #8060a8; color: #c0a0e0; }
+    .bf-token.tok-R { background: #2a1010; border-color: #c04040; color: #e08080; }
+    .bf-token.tok-G { background: #102010; border-color: #408040; color: #80c080; }
+    .bf-token.tok-C { background: #252525; border-color: #888; color: #ccc; }
+    .bf-token .tok-name { font-weight: 700; font-size: 0.55rem; line-height: 1.2; }
+    .bf-token .tok-pt { font-size: 0.75rem; font-weight: 700; margin-top: 2px; }
+    .bf-token .tok-type { font-size: 0.5rem; color: inherit; opacity: 0.75; }
+
+    .bf-menu-btn {
+      position: absolute; top: -4px; right: -4px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #333; border: 1px solid #555; color: #aaa;
+      font-size: 0.6rem; cursor: pointer; display: none;
+      align-items: center; justify-content: center; z-index: 5;
+    }
+    .bf-wrap:hover .bf-menu-btn { display: flex; }
+
+    /* Card context menu */
+    .card-ctx-menu {
+      position: fixed; background: #1a1530; border: 1px solid var(--card-border);
+      border-radius: 8px; z-index: 200; overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.7); display: none; min-width: 140px;
+    }
+    .ctx-item {
+      padding: 8px 14px; font-size: 0.82rem; cursor: pointer;
+      transition: background 0.15s; color: var(--text);
+    }
+    .ctx-item:hover { background: rgba(255,255,255,0.08); }
+    .ctx-item.danger { color: var(--red); }
+
+    /* Graveyard bar */
+    .grave-bar {
+      display: flex; gap: 8px; padding: 8px 14px; flex-shrink: 0;
+      border-top: 1px solid var(--card-border); background: rgba(0,0,0,0.15);
+    }
+    .grave-btn {
+      background: none; border: 1px solid var(--card-border); border-radius: 6px;
+      color: var(--text-dim); padding: 4px 12px; font-size: 0.78rem; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .grave-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+    /* Play hand strip */
+    .play-hand-strip {
+      border-top: 1px solid var(--card-border); background: rgba(0,0,0,0.25);
+      padding: 10px 12px; flex-shrink: 0;
+    }
+    .play-hand-label {
+      font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px;
+      color: var(--text-dim); margin-bottom: 8px; display: flex; gap: 8px; align-items: center;
+    }
+    .play-hand-cards {
+      display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
+    }
+    .play-hand-card {
+      width: 62px; flex-shrink: 0; cursor: pointer; border-radius: 5px;
+      overflow: hidden; transition: all 0.15s; border: 1px solid transparent;
+    }
+    .play-hand-card:hover { border-color: var(--gold); transform: translateY(-4px); }
+    .play-hand-card img { width: 100%; display: block; }
+    .play-hand-card-text {
+      width: 62px; height: 86px; background: var(--card); border: 1px solid var(--card-border);
+      border-radius: 5px; display: flex; align-items: center; justify-content: center;
+      font-size: 0.55rem; text-align: center; padding: 4px; color: var(--text-dim);
+    }
+
+    /* Token modal */
+    .token-modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 150; padding: 20px;
+    }
+    .token-modal-overlay.hidden { display: none; }
+    .token-modal-box {
+      background: #1a1530; border: 1px solid var(--card-border);
+      border-radius: 16px; width: 100%; max-width: 480px;
+      max-height: 80vh; overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.8); padding: 20px;
+    }
+    .token-modal-box h3 { font-size: 0.9rem; color: var(--gold); margin-bottom: 14px; }
+    .token-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .token-preset-btn {
+      padding: 6px 12px; border-radius: 8px; border: 1px solid var(--card-border);
+      background: var(--card); color: var(--text); font-size: 0.78rem; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .token-preset-btn:hover { border-color: var(--gold); background: rgba(201,168,76,0.1); }
+    .token-custom { display: flex; flex-direction: column; gap: 8px; }
+    .token-custom label { font-size: 0.75rem; color: var(--text-dim); }
+    .token-custom-row { display: flex; gap: 8px; }
+    .token-custom input {
+      flex: 1; background: var(--card); border: 1px solid var(--card-border);
+      border-radius: 8px; padding: 7px 10px; color: var(--text); font-size: 0.85rem;
+    }
+    .token-custom input:focus { outline: none; border-color: var(--gold); }
+
+    /* Graveyard viewer */
+    .grave-viewer-cards { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0; }
+    .grave-viewer-card { width: 80px; cursor: pointer; border-radius: 6px; overflow: hidden; }
+    .grave-viewer-card img { width: 100%; display: block; border-radius: 6px; }
+    .grave-viewer-card-text {
+      width: 80px; height: 112px; background: var(--card); border: 1px solid var(--card-border);
+      border-radius: 6px; display: flex; align-items: center; justify-content: center;
+      font-size: 0.6rem; text-align: center; padding: 4px; color: var(--text-dim);
+    }
   </style>
 </head>
 <body>
 
 <div class="header">
-  <button class="header-back" onclick="goBack()">← Back</button>
   <div class="header-title"><span>🧙</span> MTG Commander</div>
   <div id="deck-status" style="font-size:0.78rem;color:var(--text-dim)"></div>
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="mode-prepare" onclick="setMode('prepare')">Prepare</button>
+    <button class="mode-btn" id="mode-play" onclick="setMode('play')">▶ Play</button>
+  </div>
 </div>
 
 <div class="layout">
@@ -615,7 +792,7 @@ Supported formats:
   </div>
 
   <!-- BOTTOM RIGHT: Hand Simulator -->
-  <div class="hand-panel">
+  <div class="hand-panel" id="hand-panel">
     <div class="hand-toolbar">
       <h2>Opening Hand</h2>
       <span class="mulligan-count" id="mulligan-info"></span>
@@ -636,6 +813,96 @@ Supported formats:
     </div>
   </div>
 
+  <!-- PLAY AREA -->
+  <div class="play-area" id="play-area">
+    <div class="play-controls">
+      <div class="turn-badge">Turn <strong id="turn-counter">1</strong></div>
+      <div class="sep"></div>
+      <div class="life-display">
+        <button class="life-btn" onclick="changeLife(-1)">−</button>
+        <div class="life-val" id="life-counter">40</div>
+        <button class="life-btn" onclick="changeLife(1)">+</button>
+        <span style="font-size:0.72rem;color:var(--text-dim);margin-left:2px">life</span>
+      </div>
+      <div class="sep"></div>
+      <button class="btn btn-outline btn-sm" onclick="untapAll()">⟳ Untap All</button>
+      <button class="btn btn-outline btn-sm" onclick="gameDrawCard()">Draw</button>
+      <button class="btn btn-outline btn-sm" onclick="showTokenModal()" style="border-color:rgba(76,175,106,0.5);color:#4caf6a">+ Token</button>
+      <button class="btn btn-outline btn-sm" onclick="endTurn()" style="border-color:rgba(201,168,76,0.5);color:var(--gold)">End Turn →</button>
+      <button class="btn btn-outline btn-sm" onclick="startGame()" style="font-size:0.72rem">↺ New Game</button>
+      <div class="library-badge" id="library-count">0 in library</div>
+    </div>
+
+    <div class="battlefield" id="battlefield">
+      <div class="bf-zone">
+        <div class="bf-zone-label">Permanents</div>
+        <div class="bf-zone-cards" id="bf-perms"></div>
+      </div>
+      <div class="bf-zone bf-zone-lands">
+        <div class="bf-zone-label">Lands</div>
+        <div class="bf-zone-cards" id="bf-lands"></div>
+      </div>
+    </div>
+
+    <div class="grave-bar">
+      <button class="grave-btn" onclick="showGraveViewer('graveyard')">🪦 Graveyard (<span id="grave-count">0</span>)</button>
+      <button class="grave-btn" onclick="showGraveViewer('exile')">✨ Exile (<span id="exile-count">0</span>)</button>
+    </div>
+
+    <div class="play-hand-strip">
+      <div class="play-hand-label">
+        Hand (<span id="play-hand-count">0</span>)
+        <span style="font-size:0.65rem;color:var(--text-dim)">&nbsp;· click card to play</span>
+      </div>
+      <div class="play-hand-cards" id="play-hand-cards"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Token Modal -->
+<div class="token-modal-overlay hidden" id="token-modal" onclick="closeTokenModal(event)">
+  <div class="token-modal-box">
+    <h3>Add Token</h3>
+    <div class="token-presets" id="token-presets"></div>
+    <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:10px;border-top:1px solid var(--card-border);padding-top:12px">Custom Token</div>
+    <div class="token-custom">
+      <input id="custom-token-name" placeholder="Token name (e.g. 1/1 Soldier)" />
+      <div class="token-custom-row">
+        <input id="custom-token-power" placeholder="Power" style="max-width:80px" />
+        <input id="custom-token-tough" placeholder="Toughness" style="max-width:80px" />
+        <select id="custom-token-color" style="flex:1;background:var(--card);border:1px solid var(--card-border);border-radius:8px;padding:7px 10px;color:var(--text);font-size:0.85rem">
+          <option value="W">White</option>
+          <option value="U">Blue</option>
+          <option value="B">Black</option>
+          <option value="R">Red</option>
+          <option value="G" selected>Green</option>
+          <option value="C">Colorless</option>
+        </select>
+      </div>
+      <button class="btn btn-gold" onclick="addCustomToken()">Add Token</button>
+    </div>
+  </div>
+</div>
+
+<!-- Card Context Menu -->
+<div class="card-ctx-menu" id="card-ctx-menu">
+  <div class="ctx-item" onclick="ctxAction('tap')">⟳ Tap / Untap</div>
+  <div class="ctx-item" onclick="ctxAction('hand')">↩ Return to Hand</div>
+  <div class="ctx-item" onclick="ctxAction('top')">⬆ Put on Top of Library</div>
+  <div class="ctx-item danger" onclick="ctxAction('grave')">🪦 Send to Graveyard</div>
+  <div class="ctx-item danger" onclick="ctxAction('exile')">✨ Exile</div>
+</div>
+
+<!-- Graveyard/Exile Viewer -->
+<div class="modal-overlay hidden" id="grave-viewer" onclick="document.getElementById('grave-viewer').classList.add('hidden')">
+  <div class="modal" style="position:relative;max-width:540px" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="document.getElementById('grave-viewer').classList.add('hidden')">✕</button>
+    <div style="padding:16px">
+      <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin-bottom:10px" id="grave-viewer-title">Graveyard</div>
+      <div class="grave-viewer-cards" id="grave-viewer-cards"></div>
+    </div>
+  </div>
 </div>
 
 <!-- Card Detail Modal -->
@@ -1155,6 +1422,263 @@ async function deleteSavedDeck(id, name) {
   } catch {
     showToast('Delete failed', true);
   }
+}
+
+// === MODE TOGGLE ===
+function setMode(mode) {
+  const isPlay = mode === 'play';
+  document.getElementById('mode-prepare').classList.toggle('active', !isPlay);
+  document.getElementById('mode-play').classList.toggle('active', isPlay);
+  document.getElementById('stats-panel').style.display = isPlay ? 'none' : '';
+  document.getElementById('hand-panel').style.display = isPlay ? 'none' : '';
+  document.getElementById('play-area').classList.toggle('active', isPlay);
+  if (isPlay && playLibrary.length === 0 && deckLoaded) startGame();
+}
+
+// === PLAY STATE ===
+let playLibrary = [];
+let playHand = [];
+let playBattlefield = [];
+let playGraveyard = [];
+let playExile = [];
+let playTurn = 1;
+let playLife = 40;
+let ctxTarget = null;
+
+const COMMON_TOKENS = [
+  { name: '1/1 Soldier',    power:'1', toughness:'1', type_line:'Token Creature — Soldier',  colors:['W'] },
+  { name: '1/1 Spirit',     power:'1', toughness:'1', type_line:'Token Creature — Spirit',   colors:['W'], keywords:['Flying'] },
+  { name: '2/2 Cat',        power:'2', toughness:'2', type_line:'Token Creature — Cat',      colors:['W'] },
+  { name: '1/1 Faerie',     power:'1', toughness:'1', type_line:'Token Creature — Faerie',   colors:['U'], keywords:['Flying'] },
+  { name: '1/1 Goblin',     power:'1', toughness:'1', type_line:'Token Creature — Goblin',   colors:['R'] },
+  { name: '5/5 Dragon',     power:'5', toughness:'5', type_line:'Token Creature — Dragon',   colors:['R'], keywords:['Flying'] },
+  { name: '2/2 Zombie',     power:'2', toughness:'2', type_line:'Token Creature — Zombie',   colors:['B'] },
+  { name: '1/1 Saproling',  power:'1', toughness:'1', type_line:'Token Creature — Saproling',colors:['G'] },
+  { name: '3/3 Beast',      power:'3', toughness:'3', type_line:'Token Creature — Beast',    colors:['G'] },
+  { name: '2/2 Wolf',       power:'2', toughness:'2', type_line:'Token Creature — Wolf',     colors:['G'] },
+  { name: 'Treasure',       power:null, toughness:null, type_line:'Token Artifact — Treasure', colors:[] },
+  { name: 'Food',           power:null, toughness:null, type_line:'Token Artifact — Food',    colors:[] },
+  { name: 'Clue',           power:null, toughness:null, type_line:'Token Artifact — Clue',    colors:[] },
+  { name: '1/1 Thopter',   power:'1', toughness:'1', type_line:'Token Artifact Creature — Thopter', colors:[], keywords:['Flying'] },
+];
+
+function startGame() {
+  if (!deckLoaded) { showToast('Load a deck first', true); return; }
+  const pile = shuffle(buildDrawPile());
+  playHand = pile.slice(0, 7);
+  playLibrary = pile.slice(7);
+  playBattlefield = [];
+  playGraveyard = [];
+  playExile = [];
+  playTurn = 1;
+  playLife = 40;
+  renderPlayArea();
+}
+
+function gameDrawCard() {
+  if (!playLibrary.length) { showToast('Library is empty!', true); return; }
+  playHand.push(playLibrary.shift());
+  renderPlayArea();
+}
+
+function changeLife(delta) {
+  playLife += delta;
+  document.getElementById('life-counter').textContent = playLife;
+}
+
+function untapAll() {
+  playBattlefield.forEach(c => c.tapped = false);
+  renderBattlefield();
+}
+
+function endTurn() {
+  playTurn++;
+  untapAll();
+  if (playLibrary.length) playHand.push(playLibrary.shift());
+  renderPlayArea();
+  showToast(`Turn ${playTurn} — drew a card`);
+}
+
+function playCardToBattlefield(idx) {
+  const card = playHand.splice(idx, 1)[0];
+  const isLand = getCardType(card) === 'Land';
+  playBattlefield.push({ id: Date.now() + Math.random(), card, tapped: false, isToken: false, zone: isLand ? 'land' : 'perm' });
+  renderPlayArea();
+}
+
+function tapCard(id) {
+  const c = playBattlefield.find(x => x.id === id);
+  if (c) { c.tapped = !c.tapped; renderBattlefield(); }
+}
+
+function sendToGrave(id) {
+  const idx = playBattlefield.findIndex(c => c.id === id);
+  if (idx < 0) return;
+  const [c] = playBattlefield.splice(idx, 1);
+  if (!c.isToken) playGraveyard.push(c.card);
+  renderPlayArea();
+}
+
+function sendToExile(id) {
+  const idx = playBattlefield.findIndex(c => c.id === id);
+  if (idx < 0) return;
+  const [c] = playBattlefield.splice(idx, 1);
+  if (!c.isToken) playExile.push(c.card);
+  renderPlayArea();
+}
+
+function returnToHand(id) {
+  const idx = playBattlefield.findIndex(c => c.id === id);
+  if (idx < 0) return;
+  const [c] = playBattlefield.splice(idx, 1);
+  if (!c.isToken) playHand.push(c.card);
+  renderPlayArea();
+}
+
+function putOnTop(id) {
+  const idx = playBattlefield.findIndex(c => c.id === id);
+  if (idx < 0) return;
+  const [c] = playBattlefield.splice(idx, 1);
+  if (!c.isToken) playLibrary.unshift(c.card);
+  renderPlayArea();
+}
+
+function addToken(tokenData) {
+  playBattlefield.push({ id: Date.now() + Math.random(), card: tokenData, tapped: false, isToken: true, zone: 'perm' });
+  renderPlayArea();
+  document.getElementById('token-modal').classList.add('hidden');
+}
+
+function addCustomToken() {
+  const name = document.getElementById('custom-token-name').value.trim();
+  if (!name) return;
+  const power = document.getElementById('custom-token-power').value.trim() || null;
+  const toughness = document.getElementById('custom-token-tough').value.trim() || null;
+  const color = document.getElementById('custom-token-color').value;
+  addToken({ name, power, toughness, type_line: 'Token Creature', colors: [color] });
+}
+
+// === RENDER PLAY AREA ===
+function renderPlayArea() {
+  renderBattlefield();
+  renderPlayHand();
+  document.getElementById('turn-counter').textContent = playTurn;
+  document.getElementById('life-counter').textContent = playLife;
+  document.getElementById('library-count').textContent = `${playLibrary.length} in library`;
+  document.getElementById('grave-count').textContent = playGraveyard.length;
+  document.getElementById('exile-count').textContent = playExile.length;
+  document.getElementById('play-hand-count').textContent = playHand.length;
+}
+
+function renderBattlefield() {
+  const perms = playBattlefield.filter(c => c.zone === 'perm');
+  const lands = playBattlefield.filter(c => c.zone === 'land');
+  document.getElementById('bf-perms').innerHTML = perms.map(bfCardHTML).join('') || '<div style="color:var(--text-dim);font-size:0.75rem;padding:4px">Empty</div>';
+  document.getElementById('bf-lands').innerHTML = lands.map(bfCardHTML).join('') || '<div style="color:var(--text-dim);font-size:0.75rem;padding:4px">No lands played</div>';
+}
+
+function tokenColorClass(colors) {
+  if (!colors?.length) return 'tok-C';
+  return 'tok-' + colors[0];
+}
+
+function bfCardHTML(bfc) {
+  const img = bfc.card.image_uris?.small || bfc.card.card_faces?.[0]?.image_uris?.small;
+  const idStr = JSON.stringify(bfc.id);
+  const tapped = bfc.tapped;
+  if (img) {
+    return `<div class="bf-wrap">
+      <img class="bf-card-img${tapped ? ' tapped' : ''}" src="${img}"
+        alt="${escapeHtml(bfc.card.name)}" title="${escapeHtml(bfc.card.name)}"
+        onclick="tapCard(${idStr})" />
+      <button class="bf-menu-btn" onclick="showCtxMenu(event,${idStr})">⋮</button>
+    </div>`;
+  }
+  return `<div class="bf-wrap">
+    <div class="bf-token${tapped ? ' tapped' : ''} ${tokenColorClass(bfc.card.colors)}"
+      onclick="tapCard(${idStr})">
+      <div class="tok-name">${escapeHtml(bfc.card.name)}</div>
+      ${bfc.card.power != null ? `<div class="tok-pt">${bfc.card.power}/${bfc.card.toughness}</div>` : ''}
+      <div class="tok-type">${bfc.card.type_line?.split('—')[1]?.trim() || 'Token'}</div>
+    </div>
+    <button class="bf-menu-btn" onclick="showCtxMenu(event,${idStr})">⋮</button>
+  </div>`;
+}
+
+function renderPlayHand() {
+  const el = document.getElementById('play-hand-cards');
+  document.getElementById('play-hand-count').textContent = playHand.length;
+  if (!playHand.length) {
+    el.innerHTML = '<div style="color:var(--text-dim);font-size:0.78rem;padding:8px 0">No cards in hand</div>';
+    return;
+  }
+  el.innerHTML = playHand.map((card, i) => {
+    const img = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal;
+    return `<div class="play-hand-card" onclick="playCardToBattlefield(${i})" title="${escapeHtml(card.name)}">
+      ${img ? `<img src="${img}" alt="${escapeHtml(card.name)}" loading="lazy" />`
+             : `<div class="play-hand-card-text">${escapeHtml(card.name)}</div>`}
+    </div>`;
+  }).join('');
+}
+
+// === CONTEXT MENU ===
+function showCtxMenu(e, id) {
+  e.stopPropagation();
+  ctxTarget = id;
+  const menu = document.getElementById('card-ctx-menu');
+  menu.style.display = 'block';
+  const x = Math.min(e.clientX, window.innerWidth - 160);
+  const y = Math.min(e.clientY, window.innerHeight - 180);
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+}
+
+function ctxAction(action) {
+  document.getElementById('card-ctx-menu').style.display = 'none';
+  if (!ctxTarget) return;
+  if (action === 'tap')   tapCard(ctxTarget);
+  if (action === 'hand')  returnToHand(ctxTarget);
+  if (action === 'top')   putOnTop(ctxTarget);
+  if (action === 'grave') sendToGrave(ctxTarget);
+  if (action === 'exile') sendToExile(ctxTarget);
+  ctxTarget = null;
+}
+
+document.addEventListener('click', () => {
+  document.getElementById('card-ctx-menu').style.display = 'none';
+});
+
+// === TOKEN MODAL ===
+function showTokenModal() {
+  const presets = document.getElementById('token-presets');
+  presets.innerHTML = COMMON_TOKENS.map((t, i) => {
+    const pt = t.power != null ? ` ${t.power}/${t.toughness}` : '';
+    const fly = t.keywords?.includes('Flying') ? ' ✈' : '';
+    return `<button class="token-preset-btn" onclick="addToken(${escapeHtml(JSON.stringify(t))})">${t.name}${fly}</button>`;
+  }).join('');
+  document.getElementById('token-modal').classList.remove('hidden');
+}
+
+function closeTokenModal(e) {
+  if (e.target === document.getElementById('token-modal')) {
+    document.getElementById('token-modal').classList.add('hidden');
+  }
+}
+
+// === GRAVEYARD VIEWER ===
+function showGraveViewer(zone) {
+  const cards = zone === 'graveyard' ? playGraveyard : playExile;
+  document.getElementById('grave-viewer-title').textContent = zone === 'graveyard' ? '🪦 Graveyard' : '✨ Exile';
+  document.getElementById('grave-viewer-cards').innerHTML = cards.length
+    ? cards.map(card => {
+        const img = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal;
+        return `<div class="grave-viewer-card" onclick="showCardDetail('${escapeQuotes(card.name)}')">
+          ${img ? `<img src="${img}" alt="${escapeHtml(card.name)}" />`
+                : `<div class="grave-viewer-card-text">${escapeHtml(card.name)}</div>`}
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--text-dim);font-size:0.85rem">Empty</div>';
+  document.getElementById('grave-viewer').classList.remove('hidden');
 }
 
 // === COMMANDER AUTOCOMPLETE ===
