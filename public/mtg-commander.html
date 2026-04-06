@@ -1687,14 +1687,14 @@ function changeLife(delta) {
 }
 
 function untapAll() {
-  playBattlefield.forEach(c => c.tapped = false);
+  playBattlefield.forEach(c => { c.tapped = false; c.manaChosen = null; });
   clearManaPool();
   renderBattlefield();
 }
 
 function endTurn() {
   playTurn++;
-  playBattlefield.forEach(c => c.tapped = false);
+  playBattlefield.forEach(c => { c.tapped = false; c.manaChosen = null; });
   clearManaPool();
   if (playLibrary.length) playHand.push(playLibrary.shift());
   renderPlayArea();
@@ -1719,25 +1719,80 @@ function playCardToBattlefield(idx) {
   renderPlayArea();
 }
 
-function tapCard(id) {
+function tapCard(id, chosenColor) {
   const c = playBattlefield.find(x => x.id === id);
   if (!c) return;
   const wasTapped = c.tapped;
+  const mana = getLandMana(c.card);
+  const manaColors = Object.keys(mana);
+
+  // If tapping a multi-color producer without a chosen color, show picker first
+  if (!wasTapped && manaColors.length > 1 && !chosenColor) {
+    showManaChoicePicker(id, manaColors);
+    return;
+  }
+
   c.tapped = !c.tapped;
-  // Land mana tracking
-  if (c.zone === 'land') {
-    const mana = getLandMana(c.card);
-    for (const [color, amt] of Object.entries(mana)) {
-      const key = MANA_COLORS.includes(color) ? color : 'C';
-      if (!wasTapped) {
-        manaPool[key] = (manaPool[key] || 0) + amt; // tapping: add mana
+
+  if (manaColors.length > 0) {
+    if (!wasTapped) {
+      // Tapping — add mana
+      if (chosenColor) {
+        const key = MANA_COLORS.includes(chosenColor) ? chosenColor : 'C';
+        manaPool[key] = (manaPool[key] || 0) + 1;
+        c.manaChosen = key;
       } else {
-        manaPool[key] = Math.max(0, (manaPool[key] || 0) - amt); // untapping: remove
+        // Single-color producer
+        for (const [color, amt] of Object.entries(mana)) {
+          const key = MANA_COLORS.includes(color) ? color : 'C';
+          manaPool[key] = (manaPool[key] || 0) + amt;
+        }
+      }
+    } else {
+      // Untapping — remove mana that was added
+      if (c.manaChosen) {
+        manaPool[c.manaChosen] = Math.max(0, (manaPool[c.manaChosen] || 0) - 1);
+        c.manaChosen = null;
+      } else {
+        for (const [color, amt] of Object.entries(mana)) {
+          const key = MANA_COLORS.includes(color) ? color : 'C';
+          manaPool[key] = Math.max(0, (manaPool[key] || 0) - amt);
+        }
       }
     }
     renderManaPool();
   }
+
   renderBattlefield();
+  // Refresh focus panel if this card is selected
+  if (selectedBFId === id) selectBFCard(id);
+}
+
+function showManaChoicePicker(id, colors) {
+  const idStr = JSON.stringify(id);
+  const colorBtns = colors.map(color => {
+    const style = MANA_COLOR_STYLES[color] || '#aaa';
+    return `<button class="focus-btn" style="background:${style};color:#111;font-weight:800;min-width:36px"
+      onclick="tapCard(${idStr},'${color}');closeFocusPanel()">${color}</button>`;
+  }).join('');
+  // Ensure focus panel is showing this card
+  if (selectedBFId !== id) {
+    const bfc = playBattlefield.find(c => c.id === id);
+    if (bfc) {
+      const img = bfc.card.image_uris?.normal || bfc.card.card_faces?.[0]?.image_uris?.normal || '';
+      document.getElementById('focus-img').src = img;
+      document.getElementById('focus-img').style.display = img ? '' : 'none';
+      document.getElementById('focus-name').textContent = bfc.card.name || '';
+      document.getElementById('focus-type').textContent = bfc.card.type_line || '';
+      document.getElementById('focus-oracle').textContent = bfc.card.oracle_text || '';
+      document.getElementById('focus-mana').textContent = '';
+    }
+    selectedBFId = id;
+  }
+  document.getElementById('focus-name').textContent += ' — tap for:';
+  document.getElementById('focus-actions').innerHTML =
+    colorBtns + `<button class="focus-btn" onclick="closeFocusPanel()">✕ Cancel</button>`;
+  document.getElementById('card-focus-panel').classList.add('visible');
 }
 
 function sendToGrave(id) {
@@ -1889,7 +1944,7 @@ function selectBFCard(id) {
   const isTapped = bfc.tapped;
   const idStr = JSON.stringify(id);
   document.getElementById('focus-actions').innerHTML = `
-    <button class="focus-btn primary" onclick="tapCard(${idStr});renderBattlefield();">${isTapped ? '⟳ Untap' : '↷ Tap'}</button>
+    <button class="focus-btn primary" onclick="tapCard(${idStr})">${isTapped ? '⟳ Untap' : '↷ Tap'}</button>
     <button class="focus-btn" onclick="returnToHand(${idStr});closeFocusPanel()">↩ Hand</button>
     <button class="focus-btn" onclick="putOnTop(${idStr});closeFocusPanel()">⬆ Top of Library</button>
     <button class="focus-btn danger" onclick="sendToGrave(${idStr});closeFocusPanel()">🪦 Graveyard</button>
