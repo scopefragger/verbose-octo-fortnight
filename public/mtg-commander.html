@@ -79,7 +79,7 @@
       border-right: 1px solid var(--card-border);
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      overflow-y: auto;
     }
 
     .panel-header {
@@ -112,12 +112,10 @@
 
     /* === IMPORT TAB === */
     .import-area {
-      flex: 1;
       display: flex;
       flex-direction: column;
       padding: 14px;
       gap: 10px;
-      overflow: hidden;
     }
     .import-area.hidden { display: none; }
 
@@ -175,7 +173,8 @@
     .ac-item-type { font-size: 0.7rem; color: var(--text-dim); }
 
     .decklist-textarea {
-      flex: 1;
+      min-height: 180px;
+      max-height: 300px;
       background: rgba(0,0,0,0.3);
       border: 1px solid var(--card-border);
       border-radius: 8px;
@@ -183,7 +182,7 @@
       color: var(--text);
       font-family: 'Courier New', monospace;
       font-size: 0.8rem;
-      resize: none;
+      resize: vertical;
       line-height: 1.6;
     }
     .decklist-textarea:focus { outline: none; border-color: var(--gold); }
@@ -215,7 +214,13 @@
     .btn-danger { background: rgba(224,85,85,0.15); border: 1px solid rgba(224,85,85,0.4); color: var(--red); }
     .btn-danger:hover { background: rgba(224,85,85,0.25); }
 
-    .import-actions { display: flex; gap: 8px; }
+    .import-actions {
+      display: flex;
+      gap: 8px;
+      padding-top: 4px;
+      border-top: 1px solid var(--card-border);
+      flex-shrink: 0;
+    }
 
     /* === SAVED DECKS TAB === */
     .saved-area {
@@ -502,11 +507,12 @@
     ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
 
-    @media (max-width: 768px) {
+    @media (max-width: 560px) {
       .layout { grid-template-columns: 1fr; grid-template-rows: auto auto auto; height: auto; }
-      .deck-panel { grid-row: auto; border-right: none; border-bottom: 1px solid var(--card-border); max-height: 50vh; }
+      .deck-panel { grid-row: auto; border-right: none; border-bottom: 1px solid var(--card-border); }
       .stats-panel { grid-column: auto; }
       .hand-grid { justify-content: center; }
+      .decklist-textarea { min-height: 120px; max-height: 180px; }
     }
   </style>
 </head>
