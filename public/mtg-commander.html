@@ -640,6 +640,7 @@
     .play-hand-card {
       width: 62px; flex-shrink: 0; cursor: pointer; border-radius: 5px;
       overflow: hidden; transition: all 0.15s; border: 1px solid transparent;
+      position: relative;
     }
     .play-hand-card:hover { border-color: var(--gold); transform: translateY(-4px); }
     .play-hand-card img { width: 100%; display: block; }
@@ -823,6 +824,11 @@ Supported formats:
         <div class="life-val" id="life-counter">40</div>
         <button class="life-btn" onclick="changeLife(1)">+</button>
         <span style="font-size:0.72rem;color:var(--text-dim);margin-left:2px">life</span>
+      </div>
+      <div class="sep"></div>
+      <div id="mana-pool-display" style="display:flex;align-items:center;gap:4px;font-size:0.78rem;min-width:60px">
+        <span style="color:var(--text-dim);font-size:0.7rem">pool:</span>
+        <span id="mana-pool-pips" style="color:var(--text-dim);font-size:0.72rem">—</span>
       </div>
       <div class="sep"></div>
       <button class="btn btn-outline btn-sm" onclick="untapAll()">⟳ Untap All</button>
@@ -1444,6 +1450,94 @@ let playExile = [];
 let playTurn = 1;
 let playLife = 40;
 let ctxTarget = null;
+let manaPool = { W:0, U:0, B:0, R:0, G:0, C:0 };
+
+const MANA_COLORS = ['W','U','B','R','G','C'];
+const MANA_COLOR_STYLES = { W:'#e8d870', U:'#4a90d9', B:'#b090d0', R:'#e05555', G:'#4caf6a', C:'#aaa' };
+
+function getLandMana(card) {
+  // Use Scryfall's produced_mana if available
+  if (card.produced_mana?.length) {
+    const result = {};
+    card.produced_mana.forEach(c => { result[c] = (result[c] || 0) + 1; });
+    return result;
+  }
+  // Fallback: parse basic land subtype
+  const type = (card.type_line || '').toLowerCase();
+  if (type.includes('forest'))   return { G: 1 };
+  if (type.includes('plains'))   return { W: 1 };
+  if (type.includes('island'))   return { U: 1 };
+  if (type.includes('mountain')) return { R: 1 };
+  if (type.includes('swamp'))    return { B: 1 };
+  return { C: 1 };
+}
+
+function parseMana(manaCost) {
+  const result = { W:0, U:0, B:0, R:0, G:0, C:0, generic:0, X:0 };
+  if (!manaCost) return result;
+  for (const m of (manaCost.match(/\{([^}]+)\}/g) || [])) {
+    const v = m.slice(1, -1);
+    if (v === 'X') { result.X++; continue; }
+    if (/^\d+$/.test(v)) { result.generic += parseInt(v); continue; }
+    if (MANA_COLORS.includes(v)) { result[v]++; continue; }
+    if (v.includes('/')) result.generic++; // hybrid — count as generic
+  }
+  return result;
+}
+
+function canAfford(manaCost) {
+  const cost = parseMana(manaCost);
+  const pool = { ...manaPool };
+  // Pay colored requirements first
+  for (const c of MANA_COLORS) {
+    if (cost[c] > pool[c]) return false;
+    pool[c] -= cost[c];
+  }
+  // Pay generic with whatever remains
+  const remaining = Object.values(pool).reduce((s, v) => s + v, 0);
+  return remaining >= cost.generic;
+}
+
+function spendMana(manaCost) {
+  const cost = parseMana(manaCost);
+  // Pay colored
+  for (const c of MANA_COLORS) {
+    manaPool[c] = Math.max(0, manaPool[c] - cost[c]);
+  }
+  // Pay generic from remaining, draining colorless first then colors
+  let generic = cost.generic;
+  for (const c of ['C','G','R','B','U','W']) {
+    if (generic <= 0) break;
+    const spend = Math.min(generic, manaPool[c]);
+    manaPool[c] -= spend;
+    generic -= spend;
+  }
+  renderManaPool();
+}
+
+function renderManaPool() {
+  const pips = document.getElementById('mana-pool-pips');
+  const total = MANA_COLORS.reduce((s, c) => s + manaPool[c], 0);
+  if (!total) { pips.innerHTML = '<span style="color:var(--text-dim)">—</span>'; }
+  else {
+    pips.innerHTML = MANA_COLORS
+      .filter(c => manaPool[c] > 0)
+      .map(c => `<span style="color:${MANA_COLOR_STYLES[c]};font-weight:700">${manaPool[c]}${c}</span>`)
+      .join(' ');
+  }
+  // Refresh hand to update affordability indicators
+  renderPlayHand();
+}
+
+function clearManaPool() {
+  MANA_COLORS.forEach(c => manaPool[c] = 0);
+  renderManaPool();
+}
+
+function formatManaCostShort(manaCost) {
+  if (!manaCost) return '';
+  return manaCost.replace(/\{([^}]+)\}/g, (_, m) => m).slice(0, 10);
+}
 
 const COMMON_TOKENS = [
   { name: '1/1 Soldier',    power:'1', toughness:'1', type_line:'Token Creature — Soldier',  colors:['W'] },
@@ -1472,6 +1566,7 @@ function startGame() {
   playExile = [];
   playTurn = 1;
   playLife = 40;
+  clearManaPool();
   renderPlayArea();
 }
 
@@ -1488,27 +1583,56 @@ function changeLife(delta) {
 
 function untapAll() {
   playBattlefield.forEach(c => c.tapped = false);
+  clearManaPool();
   renderBattlefield();
 }
 
 function endTurn() {
   playTurn++;
-  untapAll();
+  playBattlefield.forEach(c => c.tapped = false);
+  clearManaPool();
   if (playLibrary.length) playHand.push(playLibrary.shift());
   renderPlayArea();
   showToast(`Turn ${playTurn} — drew a card`);
 }
 
 function playCardToBattlefield(idx) {
-  const card = playHand.splice(idx, 1)[0];
+  const card = playHand[idx];
   const isLand = getCardType(card) === 'Land';
+
+  if (!isLand && card.mana_cost) {
+    const cost = parseMana(card.mana_cost);
+    if (!canAfford(card.mana_cost) && cost.X === 0) {
+      showToast(`Not enough mana for ${card.name} (${formatManaCostShort(card.mana_cost)})`, true);
+      return;
+    }
+    spendMana(card.mana_cost);
+  }
+
+  playHand.splice(idx, 1);
   playBattlefield.push({ id: Date.now() + Math.random(), card, tapped: false, isToken: false, zone: isLand ? 'land' : 'perm' });
   renderPlayArea();
 }
 
 function tapCard(id) {
   const c = playBattlefield.find(x => x.id === id);
-  if (c) { c.tapped = !c.tapped; renderBattlefield(); }
+  if (!c) return;
+  const wasTapped = c.tapped;
+  c.tapped = !c.tapped;
+  // Land mana tracking
+  if (c.zone === 'land') {
+    const mana = getLandMana(c.card);
+    for (const [color, amt] of Object.entries(mana)) {
+      const key = MANA_COLORS.includes(color) ? color : 'C';
+      if (!wasTapped) {
+        manaPool[key] = (manaPool[key] || 0) + amt; // tapping: add mana
+      } else {
+        manaPool[key] = Math.max(0, (manaPool[key] || 0) - amt); // untapping: remove
+      }
+    }
+    renderManaPool();
+  }
+  renderBattlefield();
 }
 
 function sendToGrave(id) {
@@ -1614,9 +1738,15 @@ function renderPlayHand() {
   }
   el.innerHTML = playHand.map((card, i) => {
     const img = card.image_uris?.normal || card.card_faces?.[0]?.image_uris?.normal;
-    return `<div class="play-hand-card" onclick="playCardToBattlefield(${i})" title="${escapeHtml(card.name)}">
+    const isLand = getCardType(card) === 'Land';
+    const affordable = isLand || !card.mana_cost || canAfford(card.mana_cost);
+    const costShort = card.mana_cost ? formatManaCostShort(card.mana_cost) : '';
+    return `<div class="play-hand-card" onclick="playCardToBattlefield(${i})"
+        title="${escapeHtml(card.name)}${costShort ? ' · ' + costShort : ''}"
+        style="${!affordable ? 'opacity:0.4;filter:grayscale(0.6)' : ''}">
       ${img ? `<img src="${img}" alt="${escapeHtml(card.name)}" loading="lazy" />`
              : `<div class="play-hand-card-text">${escapeHtml(card.name)}</div>`}
+      ${costShort ? `<div style="position:absolute;bottom:2px;right:2px;background:rgba(0,0,0,0.75);color:${affordable?'#e8d870':'#e05555'};font-size:0.5rem;border-radius:3px;padding:1px 3px;font-weight:700">${costShort}</div>` : ''}
     </div>`;
   }).join('');
 }
