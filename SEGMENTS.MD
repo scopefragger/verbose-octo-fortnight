@@ -9,24 +9,7 @@ Single-file app — embedded CSS, HTML, and JavaScript.
 
 | # | Section | Lines | Description |
 |---|---------|-------|-------------|
-| 1 | Reset & CSS Variables | 8–28 | Global margin/padding reset, all color/spacing custom properties (`--bg`, `--gold`, `--red`, etc.) |
-| 2 | Body & Background | 30–35 | Font stack, radial gradient background, base text color |
-| 3 | Header | 37–65 | Header bar with back button, gradient title |
-| 4 | Layout Grid | 67–78 | Main two-column grid (340px sidebar + content), collapse transition |
-| 5 | Deck Panel / Sidebar | 80–93 | Sidebar flex column, scroll, opacity collapse animation |
-| 6 | Sidebar Toggle Button | 95–115 | Absolute-positioned tab to restore collapsed sidebar |
-| 7 | Panel Header & Deck Tabs | 117–143 | Tab bar (Import / Deck List / Saved), active state |
-| 8 | Import Tab | 145–256 | Deck name input, commander autocomplete inputs, decklist textarea, action buttons |
-| 9 | Saved Decks Tab | 257–278 | Saved deck list items, hover, metadata, action buttons |
-| 10 | Stats Panel | 280–344 | Stats grid (card count, avg CMC, lands), mana curve bars, color pips, type breakdown |
-| 11 | Hand Simulator Panel | 345–417 | Hand toolbar, card grid, empty state, AI critique output box |
-| 12 | Card Detail Modal | 419–468 | Fullscreen overlay for enlarged card image and details |
-| 13 | Toast Notifications | 469–486 | Fixed toast bar, show/error variants, fade animation |
-| 14 | Loading Spinner | 488–498 | Spinner keyframe animation |
 | 15 | Deck List View | 500–535 | Type-grouped card list with qty and mana cost display |
-| 16 | Scrollbar Styling | 536–540 | Custom webkit scrollbar |
-| 17 | Mobile Media Query | 542–548 | Responsive adjustments for ≤560px screens |
-| 18 | Mode Toggle Buttons | 550–557 | Prepare / Play toggle buttons |
 | 19 | Play Area | 559–565 | Play area grid positioning, hidden-by-default state |
 | 20 | Play Controls Bar | 567–580 | Turn counter, life total ± buttons, mana pool display, action buttons |
 | 21 | Battlefield & Card Zones | 581–636 | Permanents/Lands zone containers, card wrap, card image, token rendering |

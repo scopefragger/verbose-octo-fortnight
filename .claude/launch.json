@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "Express Dev Server",
-      "runtimeExecutable": "node",
+      "runtimeExecutable": "/opt/homebrew/Cellar/node/25.6.1_1/bin/node",
       "runtimeArgs": ["--watch", "index.js"],
       "port": 3000
     },
