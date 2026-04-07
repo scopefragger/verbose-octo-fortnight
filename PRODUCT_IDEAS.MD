@@ -1223,3 +1223,164 @@ This is a Telegram-based AI family assistant bot with shared calendar, reminders
 - `promote_list_to_template` sets `is_template = true` on an existing list — the simplest possible path from "I just made a great packing list" to "save it for next time"
 - Template versioning: not needed for MVP — templates are mutable; if the family needs to preserve a historical version, they can promote a copy
 - LLM-generated starter templates: use the existing Groq call with a structured prompt: "Generate a packing list template for a [trip_type] trip with [family_profile]. Return as a JSON array of item strings." — parse and insert via `addListItem` in a loop; confirm with the user before saving
+
+---
+
+### 36. Family Allowance & Pocket Money Manager
+
+**Problem:** The bot already rewards children with points and "Mickey Heads" for good behaviour and chores, but there is no financial layer — no way to manage weekly pocket money, track a child's savings, or give them visibility into how much they have. Money management is currently handled outside the bot (cash, a separate app, or just mentally) with no integration into the rewards and chores ecosystem.
+
+**Description:** A digital pocket money and savings system for children. Parents configure a weekly or monthly allowance per child. The bot automatically credits each child's "wallet" on a set schedule. Children and parents can check balances, log withdrawals (when physical cash is handed over), and set savings goals ("I'm saving up for a LEGO set"). Points earned from the rewards system (#2, #33) can optionally convert to a small bonus (e.g. 10 points = 10p), creating a direct link between behaviour and earning. A running balance and savings progress bar appear on the dashboard.
+
+**Value:** Teaches children real financial habits — earning, saving, spending — within a system they already use. Removes the "how much have I got?" question. Creates a single source of truth for all pocket money across multiple children. Directly extends two existing features (points, chores) into a richer, more motivating loop. High emotional engagement for children; high practical value for parents managing cash.
+
+**Use cases:**
+- "Set Sam's allowance to £3 every Friday" — configures weekly credit on a cron schedule
+- "Sam's balance" — child or parent checks current wallet total
+- "Sam got his pocket money — mark it as given" — logs a physical cash withdrawal, deducting from digital balance
+- "Sam wants to save up for a £25 LEGO set — set a savings goal" — creates a goal with progress tracking
+- "Convert Sam's 50 points into pocket money" — transfers bonus at configured rate (e.g. 10 points = 10p)
+- Dashboard widget: per-child balance card with savings goal progress bar and recent transactions
+
+**Integration points:**
+- Weekly allowance credit hooks into the existing cron infrastructure — new `/cron/allowance` endpoint or extend `/cron/daily`; queries `allowances` table for children with a scheduled credit date matching today
+- Points-to-money conversion calls `getKidPoints` from `services/points.js` and deducts via `addKidPoints` with a negative delta, then credits the wallet
+- Chore completion (#2) can optionally auto-credit a chore bonus to the wallet (e.g. bins = +50p) via a `chore_payment` optional column
+- New LLM tools: `set_allowance`, `get_balance`, `log_withdrawal`, `set_savings_goal`, `get_savings_goal`, `convert_points_to_money`, `list_transactions`
+- New DB tables: `allowances` (id, family_id, child_name, amount_pence int, frequency enum('weekly','monthly'), next_credit_date date, active bool), `wallets` (id, family_id, child_name, balance_pence int), `wallet_transactions` (id, wallet_id, family_id, child_name, amount_pence int, type enum('credit','withdrawal','bonus','chore'), note, created_at), `savings_goals` (id, family_id, child_name, title, target_pence int, created_at, completed_at)
+
+**Implementation notes for next agent:**
+- Store all monetary values in **pence (integer)** — never floats; avoids rounding errors
+- `wallets` table holds the running balance; `wallet_transactions` is the immutable ledger — balance is always derived as the sum of transactions but cached in `wallets.balance_pence` for fast reads; update both atomically in a Supabase transaction
+- Allowance auto-credit cron: query `allowances WHERE next_credit_date <= today AND active = true`; insert a `credit` transaction; update `next_credit_date` to `next_credit_date + 7 days` (weekly) or `+ 1 month` (monthly)
+- Savings goal progress: `(balance_pence / target_pence * 100)`; when balance crosses target, send a congratulatory Telegram message and mark `savings_goals.completed_at`
+- Dashboard widget: display balance as `£X.XX` formatted from pence; show savings goal as a thin progress bar beneath the child's name card; keep in the same card cluster as kid points to reinforce the connection
+
+---
+
+### 37. Vehicle & Home Maintenance Tracker
+
+**Problem:** Busy families own cars and homes that require recurring maintenance — MOT renewals, car services, boiler servicing, gutter cleaning, garden maintenance, appliance warranties. These are currently tracked via paper reminders, calendar notes, or not at all, resulting in missed MOTs, out-of-warranty repairs, and reactive (expensive) fixes. The bot has no concept of assets or scheduled maintenance.
+
+**Description:** An asset maintenance tracking system for the family home and vehicles. Parents register assets (e.g. "Ford Focus", "Boiler", "Dishwasher") with a next-service date and service interval. The bot proactively reminds the family when maintenance is upcoming, logs when work is done (with cost and provider notes), and maintains a service history per asset. Dashboard shows a "health panel" with upcoming maintenance tasks highlighted by urgency (overdue = red, within 30 days = amber, OK = green).
+
+**Value:** Eliminates the "when did we last service the car?" question. Prevents costly consequences of missed maintenance (failed MOT, voided warranties). Creates a shareable service history useful when selling vehicles or appliances. One of the highest-stress domestic admin pain points with no existing solution in the bot's feature set.
+
+**Use cases:**
+- "Add our car — Ford Focus, MOT due July 14th, service every 12 months" — registers asset with maintenance schedule
+- "Log that the boiler was serviced today by British Gas — £120" — records completed maintenance
+- "When is the car's next service due?" — quick lookup
+- "What maintenance is due in the next 30 days?" — upcoming tasks overview
+- "The dishwasher warranty expires in March — remind me 3 months before" — one-off warranty alert
+- Dashboard: asset cards with RAG (Red/Amber/Green) status dots showing maintenance urgency
+
+**Integration points:**
+- Upcoming maintenance alerts hook into the existing daily digest cron (`/cron/daily`) — query `maintenance_tasks WHERE next_due_date <= today + 30 days`
+- One-off alerts (warranty expiry) create standard `reminders` via the existing reminders service — no new cron logic needed for these
+- New LLM tools: `add_asset`, `list_assets`, `add_maintenance_task`, `log_maintenance_done`, `get_maintenance_history`, `get_upcoming_maintenance`
+- New DB tables: `assets` (id, family_id, name, type enum('vehicle','appliance','property','other'), notes, created_at), `maintenance_tasks` (id, asset_id, family_id, task_name, interval_days int, next_due_date date, last_done_date date, active bool), `maintenance_log` (id, task_id, asset_id, family_id, done_date date, cost_pence int, provider, notes, created_at)
+
+**Implementation notes for next agent:**
+- `next_due_date` recalculation on `log_maintenance_done`: set `last_done_date = today`, set `next_due_date = today + interval_days`; if `interval_days` is null (one-off task), mark task `active = false` after completion
+- Daily digest inclusion: add a `getUpcomingMaintenance(familyId, days = 30)` function to a new `services/maintenance.js`; call it in `routes/cron.js` alongside reminders; include only tasks due within 7 days in the digest by default (configurable)
+- MOT-specific shortcut: when `task_name` contains "MOT", add a note in the reminder "Check DVLA for SORN/tax status at the same time" — small UX detail that adds real value
+- Dashboard RAG logic: `overdue = next_due_date < today` (red), `amber = next_due_date within 30 days`, `green = >30 days`; render as coloured dot on each asset card
+- Cost tracking is optional — `cost_pence` can be null; when populated, hook into the budget tracker (#1) as a `home_maintenance` category expense automatically
+
+---
+
+### 38. Homework & Assignment Tracker
+
+**Problem:** Parents of school-age children have no visibility into what homework their children have, when it is due, or whether it has been completed. Children forget assignments or misremember deadlines. The existing calendar can store "homework due" events but has no concept of subject, child, or completion status. The school activity tracker (#6) handles clubs and pickups but not academic work.
+
+**Description:** A child-specific homework and assignment tracking system. Children or parents log homework when it is set ("Jake has a maths worksheet due Thursday and a book review due Friday"). The bot tracks each assignment by child, subject, due date, and completion status. It sends reminder nudges the evening before deadlines and a daily "homework tonight?" check if any assignments are outstanding. Completing homework earns the child points via the existing rewards system. Parents get a weekly overview of each child's academic workload.
+
+**Value:** Ends the "I don't have any homework" claim. Ensures nothing slips through before a deadline. Creates shared parental visibility so either parent can support the child. Earning points for completed homework creates an intrinsic motivation loop with immediate reward. Architecturally lightweight — primarily an LLM tools layer over a simple table.
+
+**Use cases:**
+- "Jake has maths homework due Thursday" — logs assignment with inferred subject and deadline
+- "What homework does Jake have this week?" — per-child filtered view with due dates
+- "Jake finished his maths homework" — marks as done, optionally awards points
+- Evening cron: "Reminder: Jake has a book review due tomorrow — has he started?" — 24h deadline nudge
+- "Add a history project for Maya due in two weeks — it's worth 20 points when done" — custom point value on completion
+- "What homework did Sam complete last month?" — history query for parent/child review
+
+**Integration points:**
+- Points on completion use `addKidPoints` from `services/points.js` — standard integration already used by chores and morning routine
+- Evening reminders hook into the existing `/cron/check` reminder cron — new `homework_assignments` table queried alongside `reminders`; or create standard reminders automatically when an assignment is logged (`due_date - 1 day at 6pm`)
+- New LLM tools: `add_homework`, `list_homework`, `complete_homework`, `delete_homework`, `get_homework_summary`
+- New DB tables: `homework_assignments` (id, family_id, child_name, subject, description, due_date date, points_on_completion int DEFAULT 5, completed_at timestamp, created_at)
+
+**Implementation notes for next agent:**
+- On `add_homework`, automatically create a standard reminder via `createReminder(familyId, userId, "Jake has [subject] homework due tomorrow", due_date - 1 day at 18:00)` — this reuses the entire existing reminder delivery pipeline without any new cron logic
+- `list_homework` should default to showing only incomplete assignments ordered by `due_date ASC`; add a `completed=true` filter option for history queries
+- Subject inference: the LLM can infer subject from natural language ("Jake has a maths worksheet" → subject = "Maths") — include `subject` as a required field in the tool definition with an enum of common subjects plus "Other"
+- Points default to 5 per completed assignment — configurable per assignment at creation time; parents can set higher points for bigger projects ("this is worth 20 points")
+- Weekly homework summary in the Sunday digest: group by child, list assignments due in the coming week sorted by due date — fits naturally into the existing weekly digest structure in `routes/cron.js`
+
+---
+
+### 39. Household Subscription & Bill Tracker
+
+**Problem:** The average UK household pays for 10+ recurring subscriptions and monthly bills (Netflix, Spotify, Amazon Prime, gym membership, broadband, energy, insurance). These renewal dates are forgotten, unused subscriptions linger for months, and the total monthly commitment is rarely visible. The family budget tracker (#1) logs individual expenses but has no concept of a *committed recurring cost* — something you will definitely spend each month without action.
+
+**Description:** A recurring subscription and bill registry that tracks every household commitment — monthly cost, billing date, renewal/cancellation date, and category. The bot alerts the family before each renewal (configurable lead time, default 3 days), flags subscriptions that haven't been "used" in a while (based on user feedback), and generates a monthly committed-spend summary. A dashboard panel shows all active subscriptions as a card grid with the next billing date and monthly cost.
+
+**Value:** Eliminates surprise charges. Creates visibility into total monthly committed spend in seconds ("how much are we spending on subscriptions?"). Enables informed cancellation decisions. Prevents auto-renewal of forgotten subscriptions. Complements the budget tracker (#1) perfectly — together they cover committed spend and discretionary spend. Extremely high practical value with minimal implementation complexity.
+
+**Use cases:**
+- "Add Netflix — £17.99/month, bills on the 14th" — registers subscription
+- "What subscriptions do we have?" — full list with monthly costs and next billing dates
+- "How much are we spending on subscriptions per month?" — total committed spend calculation
+- "Cancel our gym membership — remove it from the tracker" — marks as cancelled
+- 3 days before Netflix renewal: "Netflix bills in 3 days (£17.99) — heads up!" — automated alert
+- "We never use Disney+ anymore — flag it for review" — marks subscription with a review flag; appears highlighted on dashboard
+- Monthly digest: "Your subscriptions cost £127.50/month this month — 2 renewals this week"
+
+**Integration points:**
+- Renewal alerts are standard reminders: on `add_subscription`, auto-create a recurring reminder for `billing_day - 3` days each month via the existing `createReminder` function — no new cron logic
+- Monthly committed-spend total integrates with the budget tracker (#1) as a read-only "committed" budget line when that feature exists — `getSubs(familyId)` called in the budget summary
+- New LLM tools: `add_subscription`, `list_subscriptions`, `update_subscription`, `cancel_subscription`, `get_monthly_committed_spend`, `flag_for_review`
+- New DB table: `subscriptions` (id, family_id, name, category enum('streaming','music','gaming','fitness','utilities','insurance','shopping','other'), amount_pence int, billing_day int, billing_cycle enum('monthly','annual'), next_billing_date date, cancelled_at timestamp, review_flagged bool, notes, created_at)
+
+**Implementation notes for next agent:**
+- Store `billing_day` (1–31) as an integer for monthly subscriptions — `next_billing_date` is computed on each renewal alert by finding the next occurrence of `billing_day` from today
+- Annual subscriptions: store `billing_cycle = 'annual'` and `next_billing_date` as the actual renewal date — lead time alert should fire 14 days before for annual renewals (more money at stake), 3 days for monthly (configurable)
+- On `cancel_subscription`: set `cancelled_at = now()` and stop any future reminder recurrences — implement by setting the recurring reminder's `active = false` flag rather than deleting it (preserves history)
+- `get_monthly_committed_spend` returns: sum of all active monthly subscriptions + (annual subscriptions amortised monthly = annual_amount / 12); format as `£X.XX/month` with a breakdown by category
+- Dashboard card grid: sort by `next_billing_date ASC` so nearest renewals appear first; colour-code by category (streaming = purple, utilities = blue, fitness = green); `review_flagged` cards get a warning border
+
+---
+
+### 40. Bedtime Routine & Sleep Tracker
+
+**Problem:** Bedtime is the other high-friction daily moment in family life alongside the morning routine (#33). Children resist going to bed, parents lose track of actual sleep times, and there is no record of whether children are consistently getting enough sleep. Sleep deprivation in children manifests as behaviour and focus problems that affect school performance and family mood — but without tracking, parents have no data to identify patterns or discuss with a GP.
+
+**Description:** A configurable bedtime routine system and sleep log, mirroring the morning routine (#33) in structure. Parents define a per-child bedtime routine (bath, pyjamas, brush teeth, story, lights out), a target lights-out time, and a routine start time. The bot sends an evening prompt at the configured start time, walks the child through each step conversationally, and logs the actual lights-out time. Over time, the bot surfaces a simple weekly sleep summary: average bedtime, consistency score, and any nights significantly outside target. Points are awarded for on-time completion, with streak bonuses for consistent bedtimes. A "how did everyone sleep?" morning check-in optionally logs wake times for full sleep duration tracking.
+
+**Value:** Creates accountability for a notoriously difficult daily moment without adding parental workload. The bot does the chasing — parents stop nagging. Sleep data over weeks reveals patterns invisible to tired parents (e.g. consistently late on Wednesdays due to a club). Children respond better to the bot's friendly prompts than repeated parental reminders. Directly complements the morning routine (#33) to create a full-day structure system. Sleep tracking data has genuine health value and would be compelling enough to drive daily bot engagement.
+
+**Use cases:**
+- "Set Robyn's bedtime routine: bath, pyjamas, brush teeth, story — lights out by 7:30pm" — configures routine
+- Evening 7:00pm bot message: "Bedtime time Robyn! First step: have your bath 🛁" — routine prompt
+- "Robyn done bath" — parent or child marks step; bot prompts next step
+- "Lights out — Robyn's in bed" — logs actual lights-out time; awards points if on time
+- "How has Robyn's sleep been this week?" — returns average bedtime, on-time nights, and streak
+- "How did Sam sleep?" (morning check-in) — optional wake-time log for sleep duration tracking
+- Weekly digest: "Robyn's average bedtime this week was 7:35pm (5/7 nights on time). Great consistency!"
+
+**Integration points:**
+- Mirrors the morning routine (#33) architecture exactly — `bedtime_routines` and `bedtime_logs` tables parallel `morning_routines` and `routine_logs`; share the same cron dispatch pattern
+- Evening cron: extend `/cron/daily` or create `/cron/bedtime-routine`; dispatch on weekday evenings at each child's configured `routine_start_time`
+- Points on completion use `addKidPoints` from `services/points.js` — same as morning routine
+- School day detection: cross-reference `events` table for holidays/inset days (same logic as morning routine #33) — on non-school nights, optionally send a later routine prompt or skip entirely (configurable per child)
+- New LLM tools: `set_bedtime_routine`, `get_bedtime_routine`, `log_bedtime_step`, `complete_bedtime_routine`, `log_wake_time`, `get_sleep_summary`, `get_sleep_streak`
+- New DB tables: `bedtime_routines` (id, family_id, child_name, steps text[], target_lights_out time, routine_start_time time, points_on_completion int, active bool), `bedtime_logs` (id, routine_id, family_id, child_name, date date, steps_completed text[], lights_out_at timestamp, wake_time_at timestamp, on_time bool, points_awarded bool, sleep_duration_minutes int)
+
+**Implementation notes for next agent:**
+- Architecture is intentionally parallel to morning routine (#33) — implement both features together or use #33 as the template; share helper functions like `calculateStreak(logs)` and `dispatchRoutinePrompt(child, routine, bot)` in a shared `services/routineHelper.js`
+- `sleep_duration_minutes` computed as `(wake_time_at - lights_out_at) / 60` when both fields are populated — surfaced in the weekly sleep summary
+- Consistency score: `(on_time_nights / total_logged_nights) * 100` over the last 14 days — displayed as a percentage on the dashboard
+- Weekly sleep summary prompt to Groq: "Here are [child_name]'s bedtime logs for the past 7 days: [logs]. Write a brief, friendly 2-sentence sleep summary for parents highlighting average bedtime and consistency. Flag any pattern worth noting (e.g. always late on Wednesdays)."
+- Optional morning check-in: add "how did everyone sleep?" to the morning digest message — if a family member replies, the bot routes it to `log_wake_time`; no new cron logic required
+- Weekend handling: store a `weekday_only bool DEFAULT true` on `bedtime_routines`; if true, skip Saturday and Sunday prompts — parents configure at routine setup time
