@@ -9,7 +9,6 @@ Single-file app — embedded CSS, HTML, and JavaScript.
 
 | # | Section | Lines | Description |
 |---|---------|-------|-------------|
-| 5 | Decklist Parser | 1071–1086 | Regex parser for `1 Card Name` / `1x Card Name` format |
 | 6 | Scryfall Fetch | 1088–1145 | `fetchCard()` (single/fuzzy), `fetchCards()` (batch collection + miss retry), response caching |
 | 7 | Import | 1147–1194 | `importDecklist()`, `clearDeck()` — calls Scryfall, populates `deck[]` |
 | 8 | Stats | 1196–1287 | `renderStats()` — CMC average, mana curve bars, color identity pips, type breakdown |
