@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mark/Documents/Projects/telegram-assistant/.claude/hooks/self-heal.sh",
+            "timeout": 5,
+            "statusMessage": "Checking documentation gaps..."
+          }
+        ]
+      }
+    ]
+  }
+}
