@@ -5,15 +5,6 @@ Single-file app — embedded CSS, HTML, and JavaScript.
 
 ---
 
-## HTML (Lines 774–1030)
-
-| # | Section | Lines | Description |
-|---|---------|-------|-------------|
-| 12 | Card Detail Modal | 1013–1026 | Large card image + info overlay |
-| 13 | Toast Element | 1029 | Single toast notification container |
-
----
-
 ## JavaScript (Lines 1031–2157)
 
 | # | Section | Lines | Description |
@@ -33,7 +24,6 @@ Single-file app — embedded CSS, HTML, and JavaScript.
 | 13 | Mode Toggle | 1531–1545 | `setMode()` switches between Prepare/Play views; `toggleSidebar()` |
 | 14 | Play State | 1547–1641 | Play-mode variables (`playHand[]`, `playBattlefield[]`, `manaPool{}`); `parseMana()`, `canAfford()`, `spendMana()`, `renderManaPool()`, `clearManaPool()` |
 | 15 | Token Definitions | 1647–1662 | `COMMON_TOKENS` array — preset token data |
-| 16 | Play Core | 1664–1841 | `startGame()`, `gameDrawCard()`, `changeLife()`, `untapAll()`, `endTurn()`, `playCardToBattlefield()`, `tapCard()`, `showManaChoicePicker()`, `sendToGrave()`, `sendToExile()`, `returnToHand()`, `putOnTop()`, `playHandCardFromFocus()`, `discardFromHand()` |
 | 17 | Render Play Area | 1858–1923 | `renderPlayArea()`, `renderBattlefield()`, `renderPlayHand()` — HTML generation for battlefield and hand |
 | 18 | Card Focus Panel | 1925–1994 | `selectBFCard()`, `closeFocusPanel()`, `selectHandCard()` — panel population and action wiring |
 | 19 | Context Menu | 1996–2021 | `showCtxMenu()`, `ctxAction()`, global click dismissal |
