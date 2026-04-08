@@ -5,37 +5,10 @@ Single-file app — embedded CSS, HTML, and JavaScript.
 
 ---
 
-## CSS (Lines 7–772)
-
-| # | Section | Lines | Description |
-|---|---------|-------|-------------|
-| 15 | Deck List View | 500–535 | Type-grouped card list with qty and mana cost display |
-| 19 | Play Area | 559–565 | Play area grid positioning, hidden-by-default state |
-| 20 | Play Controls Bar | 567–580 | Turn counter, life total ± buttons, mana pool display, action buttons |
-| 21 | Battlefield & Card Zones | 581–636 | Permanents/Lands zone containers, card wrap, card image, token rendering |
-| 22 | Card Context Menu | 647–658 | Right-click context menu positioning and item styles |
-| 23 | Card Focus Panel | 660–695 | Bottom slide-up panel for selected card with action buttons |
-| 24 | Graveyard Bar | 696–706 | Graveyard / Exile zone counter buttons |
-| 25 | Play Hand Strip | 708–731 | Hand card strip at bottom of play area |
-| 26 | Token Modal | 733–771 | Token creation modal, preset buttons, custom P/T inputs |
-
----
-
 ## HTML (Lines 774–1030)
 
 | # | Section | Lines | Description |
 |---|---------|-------|-------------|
-| 1 | Header Bar | 776–783 | Title, deck card count, Prepare/Play mode buttons |
-| 2 | Main Layout Wrapper | 785–965 | Root grid container for all panels |
-| 3 | Sidebar — Import Pane | 796–829 | Deck name, commander/partner inputs, decklist textarea, Import/Clear buttons |
-| 4 | Sidebar — Deck List Pane | 832–838 | Save/Edit buttons, rendered card list |
-| 5 | Sidebar — Saved Decks Pane | 841–843 | Container for loaded saved deck list |
-| 6 | Stats Panel | 847–873 | Stats grid, mana curve, color pips, type bars |
-| 7 | Hand Simulator Panel | 876–895 | Draw/Mulligan toolbar, hand card grid, Groq critique output |
-| 8 | Play Area | 898–963 | Controls bar, Permanents zone, Lands zone, card focus panel, graveyard/exile bar, hand strip |
-| 9 | Card Context Menu | 966–979 | Inline context menu markup |
-| 10 | Token Modal | 982–999 | Token preset grid, custom token form |
-| 11 | Graveyard Viewer Modal | 1001–1010 | Overlay for browsing graveyard/exile |
 | 12 | Card Detail Modal | 1013–1026 | Large card image + info overlay |
 | 13 | Toast Element | 1029 | Single toast notification container |
 
