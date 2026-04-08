@@ -9,7 +9,6 @@ Single-file app — embedded CSS, HTML, and JavaScript.
 
 | # | Section | Lines | Description |
 |---|---------|-------|-------------|
-| 3 | Init | 1050–1055 | `DOMContentLoaded` — sets up autocomplete |
 | 4 | Navigation | 1057–1069 | `goBack()`, `switchTab()` |
 | 5 | Decklist Parser | 1071–1086 | Regex parser for `1 Card Name` / `1x Card Name` format |
 | 6 | Scryfall Fetch | 1088–1145 | `fetchCard()` (single/fuzzy), `fetchCards()` (batch collection + miss retry), response caching |
