@@ -35,11 +35,10 @@ export async function getFoodItems(familyId) {
 /**
  * Remove a food item by ID.
  */
-export async function removeFoodItemById(itemId) {
-  const { error } = await supabase
-    .from('food_items')
-    .delete()
-    .eq('id', itemId);
+export async function removeFoodItemById(itemId, familyId) {
+  const query = supabase.from('food_items').delete().eq('id', itemId);
+  if (familyId) query.eq('family_id', familyId);
+  const { error } = await query;
   if (error) throw error;
   return { deleted: true };
 }

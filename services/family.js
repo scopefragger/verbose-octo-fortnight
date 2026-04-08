@@ -58,14 +58,15 @@ export async function registerUser(telegramId, displayName, username) {
 }
 
 /**
- * Generate a 6-character link code. Stored temporarily in the family name
- * field as "LINK:XXXXXX" until a partner joins.
+ * Generate a 6-character link code. Stored in the dedicated link_code column.
+ * Expires after 24 hours.
  */
 export async function generateLinkCode(user) {
   const code = crypto.randomBytes(3).toString('hex').toUpperCase();
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   await supabase
     .from('families')
-    .update({ name: `LINK:${code}` })
+    .update({ link_code: code, link_code_expires_at: expires })
     .eq('id', user.family_id);
   return code;
 }
@@ -75,11 +76,12 @@ export async function generateLinkCode(user) {
  * family that owns the code.
  */
 export async function joinFamily(joiningUser, code) {
-  // Find the family with this link code
+  // Find the family with this link code (must not be expired)
   const { data: family, error: famErr } = await supabase
     .from('families')
     .select()
-    .eq('name', `LINK:${code}`)
+    .eq('link_code', code)
+    .gt('link_code_expires_at', new Date().toISOString())
     .single();
 
   if (famErr || !family) return null;
@@ -90,7 +92,7 @@ export async function joinFamily(joiningUser, code) {
     .update({ family_id: family.id })
     .eq('id', joiningUser.id);
 
-  // Clear the link code and set a proper family name
+  // Clear the link code and update the family name
   const { data: members } = await supabase
     .from('users')
     .select('display_name')
@@ -99,7 +101,7 @@ export async function joinFamily(joiningUser, code) {
   const names = members.map((m) => m.display_name).join(' & ');
   await supabase
     .from('families')
-    .update({ name: `${names} Family` })
+    .update({ name: `${names} Family`, link_code: null, link_code_expires_at: null })
     .eq('id', family.id);
 
   // Delete the old empty family

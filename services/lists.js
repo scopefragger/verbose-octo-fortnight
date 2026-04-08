@@ -85,8 +85,17 @@ export async function removeItem(familyId, listName, itemText) {
 /**
  * Remove an item directly by its ID (used by dashboard UI).
  */
-export async function removeItemById(itemId) {
-  const { error } = await supabase.from('list_items').delete().eq('id', itemId);
+export async function removeItemById(itemId, familyId) {
+  let query = supabase.from('list_items').delete().eq('id', itemId);
+  if (familyId) {
+    // Scope to lists owned by this family
+    query = supabase
+      .from('list_items')
+      .delete()
+      .eq('id', itemId)
+      .in('list_id', supabase.from('lists').select('id').eq('family_id', familyId));
+  }
+  const { error } = await query;
   if (error) throw error;
   return { deleted: true };
 }

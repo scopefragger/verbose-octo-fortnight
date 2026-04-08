@@ -956,31 +956,31 @@
           } else if (idea.theorize_status === 'complete') {
             let handoffBadge = '';
             if (idea.handoff_status === 'complete' && idea.handoff_pr_url) {
-              handoffBadge = `<a href="${esc(idea.handoff_pr_url)}" target="_blank" class="btn btn-handoff" style="font-size:12px;padding:6px 14px;text-decoration:none">&#x1F517; PR</a>`;
+              handoffBadge = `<a href="${esc(idea.handoff_pr_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-handoff" style="font-size:12px;padding:6px 14px;text-decoration:none">&#x1F517; PR</a>`;
             } else if (idea.handoff_status && idea.handoff_status !== 'failed' && idea.handoff_status !== 'complete') {
               handoffBadge = `<span class="badge badge-processing" style="font-size:11px">&#x2699; Building...</span>`;
             }
             theorizeBtn = `
               <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-                <button class="btn btn-theorize" onclick="openTheoryViewer('${idea.id}')">&#x1F4D6; View Theory</button>
-                <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="handleTheorize('${idea.id}')">&#x1F504; Re-run</button>
+                <button class="btn btn-theorize" onclick="openTheoryViewer('${esc(idea.id)}')">&#x1F4D6; View Theory</button>
+                <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="handleTheorize('${esc(idea.id)}')">&#x1F504; Re-run</button>
                 ${handoffBadge}
               </div>`;
           } else if (idea.theorize_status === 'failed') {
             theorizeBtn = `
               <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-                <button class="btn btn-theorize" onclick="handleTheorize('${idea.id}')">&#x1F9EA; Retry Theorize</button>
+                <button class="btn btn-theorize" onclick="handleTheorize('${esc(idea.id)}')">&#x1F9EA; Retry Theorize</button>
                 <span style="font-size:11px;color:var(--red)">Failed</span>
               </div>`;
           } else {
-            theorizeBtn = `<div style="margin-top:12px"><button class="btn btn-theorize" onclick="handleTheorize('${idea.id}')">&#x1F9EA; Theorize</button></div>`;
+            theorizeBtn = `<div style="margin-top:12px"><button class="btn btn-theorize" onclick="handleTheorize('${esc(idea.id)}')">&#x1F9EA; Theorize</button></div>`;
           }
         }
 
         return `<div class="idea-card status-${idea.status}" id="card-${idea.id}">
           <div class="idea-header">
             <div class="idea-title">${esc(idea.title)}</div>
-            <button class="idea-delete" onclick="deleteIdea('${idea.id}')" title="Delete">&#x1F5D1;</button>
+            <button class="idea-delete" onclick="deleteIdea('${esc(idea.id)}')" title="Delete">&#x1F5D1;</button>
           </div>
           ${idea.description ? `<div class="idea-desc">${esc(idea.description)}</div>` : ''}
           <div class="idea-meta">
@@ -1620,7 +1620,7 @@
           </div>
           ${status.handoff_pr_url ? `
             <div style="margin-bottom:16px">
-              <a href="${esc(status.handoff_pr_url)}" target="_blank" rel="noopener" style="font-size:15px;font-weight:600">
+              <a href="${esc(status.handoff_pr_url)}" target="_blank" rel="noopener noreferrer" style="font-size:15px;font-weight:600">
                 &#x1F4C4; View Prompt on GitHub
               </a>
             </div>
@@ -1637,7 +1637,7 @@
           </div>
           <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
             ${status.handoff_pr_url ? `
-              <a href="${esc(status.handoff_pr_url)}" target="_blank" class="btn btn-generate" style="text-decoration:none">&#x1F4C4; Open Prompt</a>
+              <a href="${esc(status.handoff_pr_url)}" target="_blank" rel="noopener noreferrer" class="btn btn-generate" style="text-decoration:none">&#x1F4C4; Open Prompt</a>
             ` : ''}
             <button class="btn btn-handoff" onclick="startHandoff('${ideaId}')">&#x1F504; Re-generate Prompt</button>
           </div>

@@ -32,6 +32,14 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Pre-read static HTML files once at startup to avoid per-request disk I/O
+const HTML = {
+  dashboard: fs.readFileSync(path.join(__dirname, 'public', 'dashboard.html'), 'utf-8'),
+  mtgCommander: fs.readFileSync(path.join(__dirname, 'public', 'mtg-commander.html'), 'utf-8'),
+  houseBuilder: fs.readFileSync(path.join(__dirname, 'public', 'house-builder.html'), 'utf-8'),
+  ideas: fs.readFileSync(path.join(__dirname, 'public', 'ideas.html'), 'utf-8'),
+};
+
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
@@ -83,18 +91,10 @@ app.get('/cron/weekly', requireCronSecret, async (req, res) => {
 });
 
 // Dashboard HTML page
-app.get('/dashboard', requireAuth, (req, res) => {
-  const filePath = path.join(__dirname, 'public', 'dashboard.html');
-  const html = fs.readFileSync(filePath, 'utf-8');
-  res.type('html').send(html);
-});
+app.get('/dashboard', requireAuth, (req, res) => res.type('html').send(HTML.dashboard));
 
 // MTG Commander page
-app.get('/mtg-commander', requireAuth, (req, res) => {
-  const filePath = path.join(__dirname, 'public', 'mtg-commander.html');
-  const html = fs.readFileSync(filePath, 'utf-8');
-  res.type('html').send(html);
-});
+app.get('/mtg-commander', requireAuth, (req, res) => res.type('html').send(HTML.mtgCommander));
 
 // MTG Commander API
 app.get('/api/mtg/decks', requireAuth, async (req, res) => {
@@ -197,18 +197,10 @@ Is this hand keepable? What's the game plan with these cards? What are the risks
 });
 
 // House Builder page
-app.get('/house-builder', requireAuth, (req, res) => {
-  const filePath = path.join(__dirname, 'public', 'house-builder.html');
-  const html = fs.readFileSync(filePath, 'utf-8');
-  res.type('html').send(html);
-});
+app.get('/house-builder', requireAuth, (req, res) => res.type('html').send(HTML.houseBuilder));
 
 // Ideas Lab page
-app.get('/ideas', requireAuth, (req, res) => {
-  const filePath = path.join(__dirname, 'public', 'ideas.html');
-  const html = fs.readFileSync(filePath, 'utf-8');
-  res.type('html').send(html);
-});
+app.get('/ideas', requireAuth, (req, res) => res.type('html').send(HTML.ideas));
 
 // Dashboard API — returns JSON data for the dashboard (cached to reduce Supabase load)
 let dashboardCache = { data: null, timestamp: 0 };
@@ -265,6 +257,8 @@ app.post('/api/meals', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { meal_date, meal_type } = req.body;
+    if (!meal_date || !meal_type) return res.status(400).json({ error: 'meal_date and meal_type required' });
     const meal = await setMeal(familyId, req.body, null);
     invalidateCache();
     res.json(meal);
@@ -320,6 +314,7 @@ app.post('/api/food-items', requireAuth, async (req, res) => {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
     const { name, expires_at, quantity } = req.body;
+    if (!name || !expires_at) return res.status(400).json({ error: 'name and expires_at required' });
     const item = await addFoodItem(familyId, name, expires_at, quantity);
     invalidateCache();
     res.json({ item });
@@ -331,8 +326,10 @@ app.post('/api/food-items', requireAuth, async (req, res) => {
 
 app.delete('/api/food-items', requireAuth, async (req, res) => {
   try {
+    const familyId = await getFamilyId();
     const { item_id } = req.body;
-    await removeFoodItemById(item_id);
+    if (!item_id) return res.status(400).json({ error: 'item_id required' });
+    await removeFoodItemById(item_id, familyId);
     invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
@@ -445,7 +442,8 @@ app.delete('/api/list-items', requireAuth, async (req, res) => {
 // List item delete by ID (used by dashboard checkboxes)
 app.delete('/api/list-items/:id', requireAuth, async (req, res) => {
   try {
-    await removeItemById(req.params.id);
+    const familyId = await getFamilyId();
+    await removeItemById(req.params.id, familyId);
     invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
@@ -856,6 +854,7 @@ app.post('/api/ideas', requireAuth, async (req, res) => {
   try {
     const familyId = await getFamilyId();
     if (!familyId) return res.status(404).json({ error: 'No family found' });
+    if (!req.body.title?.trim()) return res.status(400).json({ error: 'title required' });
     const idea = await addIdea(familyId, req.body, null);
     invalidateCache();
     res.json(idea);

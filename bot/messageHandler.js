@@ -63,7 +63,17 @@ export async function handleMessage(ctx) {
         // Execute each tool call
         for (const toolCall of toolCalls) {
           const functionName = toolCall.function.name;
-          const args = JSON.parse(toolCall.function.arguments);
+          let args;
+          try {
+            args = JSON.parse(toolCall.function.arguments);
+          } catch {
+            messages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: JSON.stringify({ error: `Invalid arguments for ${functionName}` }),
+            });
+            continue;
+          }
           const context = { familyId, userId: user.id, timezone };
 
           let result;

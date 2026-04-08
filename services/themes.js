@@ -85,7 +85,7 @@ export async function getTheme(familyId) {
  * Set the dashboard theme for a family.
  */
 export async function setTheme(familyId, themeKey) {
-  const key = (themeKey || '').toLowerCase().replace(/[^a-z]/g, '');
+  const key = (themeKey || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   if (!THEMES[key]) {
     throw new Error(`Unknown theme "${themeKey}". Available: ${Object.keys(THEMES).join(', ')}`);
   }

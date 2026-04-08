@@ -26,9 +26,9 @@ export async function listCountdowns(familyId) {
 
 export async function updateCountdown(countdownId, familyId, { title, target_date, background }) {
   const updates = {};
-  if (title) updates.title = title;
-  if (target_date) updates.target_date = target_date;
-  if (background) updates.background = BACKGROUNDS.includes(background) ? background : undefined;
+  if (title !== undefined) updates.title = title;
+  if (target_date !== undefined) updates.target_date = target_date;
+  if (background !== undefined) updates.background = BACKGROUNDS.includes(background) ? background : undefined;
   // Remove undefined values
   Object.keys(updates).forEach(k => updates[k] === undefined && delete updates[k]);
 

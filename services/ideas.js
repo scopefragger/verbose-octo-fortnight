@@ -13,7 +13,7 @@ async function getProjectContext() {
 
   try {
     // Fetch key files in parallel for project understanding
-    const [pkgRes, indexRes, servicesRes, migrationsRes, ideasMdRes] = await Promise.all([
+    const [pkgRes, servicesRes, migrationsRes, llmRes, ideasMdRes] = await Promise.all([
       fetch(`https://raw.githubusercontent.com/${REPO}/main/package.json`),
       fetch(`https://api.github.com/repos/${REPO}/contents/services`),
       fetch(`https://api.github.com/repos/${REPO}/contents/db/migrations`),
@@ -24,7 +24,7 @@ async function getProjectContext() {
     const pkg = await pkgRes.json().catch(() => ({}));
     const services = await servicesRes.json().catch(() => []);
     const migrations = await migrationsRes.json().catch(() => []);
-    const llmFiles = await indexRes.json().catch(() => []);
+    const llmFiles = await llmRes.json().catch(() => []);
     const productIdeas = await ideasMdRes.text().catch(() => '');
 
     const serviceNames = Array.isArray(services) ? services.map(f => f.name).join(', ') : 'unknown';
@@ -585,8 +585,10 @@ export async function suggestImprovements(ideaId) {
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [parsed];
   } catch {
-    const match = raw.match(/\[[\s\S]*\]/);
-    if (match) return JSON.parse(match[0]);
+    try {
+      const match = raw.match(/\[[\s\S]*\]/);
+      if (match) return JSON.parse(match[0]);
+    } catch { /* fall through */ }
     return [];
   }
 }

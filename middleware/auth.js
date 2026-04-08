@@ -4,6 +4,14 @@ import { supabaseAuth } from '../db/supabase.js';
 const tokenCache = new Map();
 const TOKEN_CACHE_TTL = 5 * 60 * 1000;
 
+// Evict expired entries every 10 minutes to prevent unbounded growth
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, entry] of tokenCache) {
+    if (now - entry.timestamp >= TOKEN_CACHE_TTL) tokenCache.delete(token);
+  }
+}, 10 * 60 * 1000).unref();
+
 async function verifyToken(accessToken) {
   const cached = tokenCache.get(accessToken);
   if (cached && Date.now() - cached.timestamp < TOKEN_CACHE_TTL) {
