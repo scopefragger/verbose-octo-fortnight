@@ -9,7 +9,6 @@ Single-file app — embedded CSS, HTML, and JavaScript.
 
 | # | Section | Lines | Description |
 |---|---------|-------|-------------|
-| 1 | State | 1032–1037 | `deck[]`, `hand[]`, `mulliganCount`, `cardCache` — shared prepare-mode state |
 | 2 | URL Secret | 1039–1048 | Reads `?secret=` param from URL for API auth; `apiFetch()` wrapper |
 | 3 | Init | 1050–1055 | `DOMContentLoaded` — sets up autocomplete |
 | 4 | Navigation | 1057–1069 | `goBack()`, `switchTab()` |
