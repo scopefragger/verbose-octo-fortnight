@@ -9,7 +9,6 @@ Single-file app — embedded CSS, HTML, and JavaScript.
 
 | # | Section | Lines | Description |
 |---|---------|-------|-------------|
-| 9 | Deck List | 1289–1323 | `renderDeckList()` — groups cards by type, renders sorted list |
 | 10 | Hand Simulator | 1325–1432 | `buildDrawPile()`, `shuffle()`, `drawHand()`, `mulligan()`, `keepHand()`, `critiqueHand()` (Groq), `renderHand()` |
 | 11 | Card Detail Modal | 1434–1452 | `showCardDetail()`, `closeModal()` |
 | 12 | Save / Load | 1454–1529 | `saveDeck()`, `loadSavedDecks()`, `loadDeckFromSaved()`, `deleteSavedDeck()` — REST API calls |
