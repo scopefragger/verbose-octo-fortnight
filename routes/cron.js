@@ -2,6 +2,7 @@ import { getDueReminders, markSent, listReminders, createReminder, getNextOccurr
 import { listEvents } from '../services/calendar.js';
 import { getMealsForDate } from '../services/meals.js';
 import { getAllPoints } from '../services/points.js';
+import * as choresService from '../services/chores.js';
 import { supabase } from '../db/supabase.js';
 import { formatForUser } from '../utils/time.js';
 
@@ -84,6 +85,11 @@ export async function sendDailyDigest(bot) {
       ? await getAllPoints(user.family_id)
       : [];
 
+    // Get overdue chores
+    const overdueChores = user.family_id
+      ? await choresService.getOverdueChores(user.family_id)
+      : [];
+
     // Build the enriched digest
     let message = `☀️ Good morning, ${user.display_name}! Here's your ${dayName}:\n`;
 
@@ -152,6 +158,10 @@ export async function sendDailyDigest(bot) {
       }
     } catch (weatherErr) {
       // Weather is non-critical, skip silently
+    }
+
+    if (overdueChores.length > 0) {
+      message += '\n\n⚠️ Overdue chores:\n' + overdueChores.map(c => `• ${c.title}${c.assigned_to ? ` (${c.assigned_to})` : ''}`).join('\n');
     }
 
     message += `\nHave a great day! 🎉`;

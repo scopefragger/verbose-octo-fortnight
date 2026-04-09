@@ -559,13 +559,14 @@
       padding: 12px;
       display: grid;
       grid-template-columns: 220px 1fr 1fr 1fr;
-      grid-template-rows: auto auto 1fr 1fr 1fr;
+      grid-template-rows: auto auto 1fr 1fr 1fr 1fr;
       gap: 12px;
       grid-template-areas:
         "sidebar header    header    header"
         "sidebar countdown countdown countdown"
         "sidebar today     upcoming  lists"
         "sidebar meals     foodexp   reminders"
+        "sidebar chores    chores    chores"
         "sidebar budget    budget    budget";
     }
 
@@ -2776,6 +2777,59 @@
     .food-item.removing { animation: checkOff 0.5s ease forwards; }
 
     /* === BUDGET & EXPENSES === */
+    .chores-card { grid-area: chores; }
+    .chore-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      font-size: 12px;
+      border-radius: 8px;
+      margin-bottom: 4px;
+      transition: all 0.2s;
+    }
+    .chore-item:hover { background: var(--primary-light); }
+    .chore-title { flex: 1; font-weight: 500; }
+    .chore-assigned {
+      font-size: 11px;
+      color: var(--text-light);
+      font-style: italic;
+    }
+    .chore-recurrence {
+      font-size: 10px;
+      background: var(--primary-light);
+      color: var(--primary);
+      padding: 2px 6px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+    .chore-done-btn {
+      background: var(--success);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      opacity: 0;
+      transition: all 0.2s;
+    }
+    .chore-item:hover .chore-done-btn { opacity: 1; }
+    .chore-del-btn {
+      background: none;
+      border: none;
+      color: var(--text-light);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: all 0.2s;
+    }
+    .chore-item:hover .chore-del-btn { opacity: 0.5; }
+    .chore-del-btn:hover { opacity: 1 !important; color: #e53e3e; }
+    .chore-item.completing { animation: checkOff 0.5s ease forwards; }
+
     .budget-card { grid-area: budget; }
     .budget-category-row {
       display: flex;
@@ -2954,6 +3008,7 @@
           "today upcoming"
           "lists meals"
           "foodexp reminders"
+          "chores chores"
           "budget budget";
       }
       .sidebar { display: none; }
@@ -2978,6 +3033,7 @@
           "meals"
           "foodexp"
           "reminders"
+          "chores"
           "budget";
       }
       .countdown-area { flex-direction: column; }
@@ -4211,6 +4267,21 @@
         handleReminderDone(reminderDoneBtn);
         return;
       }
+      // Chore buttons
+      if (e.target.closest('.chore-add-btn')) {
+        openChoreModal();
+        return;
+      }
+      const choreDoneBtn = e.target.closest('.chore-done-btn');
+      if (choreDoneBtn) {
+        handleCompleteChore(choreDoneBtn);
+        return;
+      }
+      const choreDelBtn = e.target.closest('.chore-del-btn');
+      if (choreDelBtn) {
+        handleDeleteChore(choreDelBtn);
+        return;
+      }
     });
 
     async function handleCheckOffItem(itemEl) {
@@ -4394,6 +4465,22 @@
           </div>
         `;
       }).join('');
+    }
+
+    function renderChores(chores) {
+      if (!chores || chores.length === 0) {
+        return '<div class="empty-state"><div class="icon">&#x2705;</div>No chores due today</div>';
+      }
+      const recurrenceLabel = { once: 'once', daily: 'daily', weekly: 'weekly', fortnightly: 'fortnightly' };
+      return chores.map(c => `
+        <div class="chore-item" data-chore-id="${c.id}">
+          <span class="chore-title">${esc(c.title)}</span>
+          ${c.assigned_to ? `<span class="chore-assigned">${esc(c.assigned_to)}</span>` : ''}
+          ${c.recurrence && c.recurrence !== 'once' ? `<span class="chore-recurrence">${esc(recurrenceLabel[c.recurrence] || c.recurrence)}</span>` : ''}
+          <button class="chore-done-btn" data-chore-id="${c.id}" data-completed-by="${esc(c.assigned_to || '')}">&#x2713; Done</button>
+          <button class="chore-del-btn" data-chore-id="${c.id}" title="Delete chore">&times;</button>
+        </div>
+      `).join('');
     }
 
     function renderBudgetExpenses(expensesData) {
@@ -4603,6 +4690,93 @@
       setTimeout(() => refreshDashboard(), 500);
     }
 
+    async function handleCompleteChore(btn) {
+      const choreId = btn.dataset.choreId;
+      const completedBy = btn.dataset.completedBy || null;
+      if (!choreId) return;
+      const row = btn.closest('.chore-item');
+      if (row) row.classList.add('completing');
+
+      try {
+        await fetch(`/api/chores/${choreId}/complete`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ completed_by: completedBy || undefined, award_points: false }),
+        });
+      } catch (err) {
+        console.error('Complete chore error:', err);
+      }
+      setTimeout(() => refreshDashboard(), 500);
+    }
+
+    async function handleDeleteChore(btn) {
+      const choreId = btn.dataset.choreId;
+      if (!choreId) return;
+      const row = btn.closest('.chore-item');
+      if (row) row.classList.add('completing');
+
+      try {
+        await fetch(`/api/chores/${choreId}`, {
+          method: 'DELETE',
+        });
+      } catch (err) {
+        console.error('Delete chore error:', err);
+      }
+      setTimeout(() => refreshDashboard(), 500);
+    }
+
+    function openChoreModal() {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      const today = new Date().toISOString().split('T')[0];
+      overlay.innerHTML = `
+        <div class="modal">
+          <h3>Add Chore</h3>
+          <label>Chore Title</label>
+          <input id="chore-title" type="text" placeholder="e.g. Hoover the living room">
+          <label>Assigned To (optional)</label>
+          <input id="chore-assigned" type="text" placeholder="e.g. Sam, Robyn">
+          <label>Recurrence</label>
+          <select id="chore-recurrence">
+            <option value="once">Once</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="fortnightly">Fortnightly</option>
+          </select>
+          <label>Due Date</label>
+          <input id="chore-due" type="date" value="${today}">
+          <div class="modal-buttons">
+            <button class="btn-cancel" id="chore-cancel">Cancel</button>
+            <button class="btn-save" id="chore-save">Add Chore</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+      overlay.querySelector('#chore-title').focus();
+
+      overlay.querySelector('#chore-cancel').onclick = () => overlay.remove();
+      overlay.querySelector('#chore-save').onclick = async () => {
+        const title = overlay.querySelector('#chore-title').value.trim();
+        const assigned_to = overlay.querySelector('#chore-assigned').value.trim() || null;
+        const recurrence = overlay.querySelector('#chore-recurrence').value;
+        const next_due = overlay.querySelector('#chore-due').value || today;
+        if (!title) { overlay.querySelector('#chore-title').focus(); return; }
+
+        try {
+          await fetch(`/api/chores`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, assigned_to, recurrence, next_due }),
+          });
+          overlay.remove();
+          refreshDashboard();
+        } catch (err) {
+          console.error('Add chore error:', err);
+        }
+      };
+    }
+
     function render(data, weather) {
       // Auto-detect theme from today's all-day events (e.g. Christmas, Halloween)
       const autoTheme = detectAutoTheme(data.today.events);
@@ -4741,6 +4915,14 @@
                   <button class="reminder-done-btn" data-reminder-id="${r.id}">&#x2713; Done</button>
                 </div>
               `).join('')}
+          </div>
+        </div>
+
+        <!-- Chores -->
+        <div class="card chores-card">
+          <div class="card-title"><span class="icon">&#x1F9F9;</span> Chores <button class="card-add-btn chore-add-btn">+ Add</button></div>
+          <div class="card-body">
+            ${renderChores(data.chores)}
           </div>
         </div>
 

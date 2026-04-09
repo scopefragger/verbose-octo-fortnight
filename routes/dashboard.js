@@ -10,6 +10,7 @@ import { getFoodItems } from '../services/foodExpiry.js';
 import { getWatchlist } from '../services/watchlist.js';
 import { getBirthdays, getUpcomingBirthdayEvents } from '../services/birthdays.js';
 import * as expensesService from '../services/expenses.js';
+import * as choresService from '../services/chores.js';
 import { formatForUser } from '../utils/time.js';
 
 /**
@@ -45,7 +46,7 @@ export async function getDashboardData(familyId) {
   const reminderPromises = members.map((m) => listReminders(m.id));
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
-  const [todayEvents, weekEvents, listsWithItems, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme, foodItems, watchlistItems, allBirthdays, recentExpenses, allBudgets, monthlySpend, ...reminderResults] = await Promise.all([
+  const [todayEvents, weekEvents, listsWithItems, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme, foodItems, watchlistItems, allBirthdays, recentExpenses, allBudgets, monthlySpend, todaysChores, ...reminderResults] = await Promise.all([
     listEvents(familyId, todayStart, todayEnd),
     listEvents(familyId, tomorrowStart, weekEndBound),
     getAllListsWithItems(familyId),
@@ -60,6 +61,7 @@ export async function getDashboardData(familyId) {
     expensesService.listExpenses(familyId, { month: currentMonth, year: currentYear }),
     expensesService.listBudgets(familyId),
     expensesService.getMonthlySpend(familyId, currentMonth, currentYear),
+    choresService.getTodaysChores(familyId),
     ...reminderPromises,
   ]);
   const allReminders = reminderResults.flat();
@@ -172,6 +174,7 @@ export async function getDashboardData(familyId) {
       const age = nextBday.getFullYear() - y;
       return { ...b, age, days_until: daysUntil };
     }).sort((a, b) => a.days_until - b.days_until),
+    chores: todaysChores || [],
     theme: dashboardTheme,
     updated_at: new Date().toISOString(),
   };

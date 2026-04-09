@@ -20,6 +20,7 @@ import { getWatchlist, addToWatchlist, markWatched, removeFromWatchlist } from '
 import { getBirthdays, addBirthday, updateBirthday, removeBirthday } from './services/birthdays.js';
 import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas } from './services/ideas.js';
 import * as expensesService from './services/expenses.js';
+import * as choresService from './services/chores.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import { logError, getErrors, clearErrors } from './utils/errorLog.js';
@@ -572,6 +573,77 @@ app.post('/api/budgets', requireAuth, async (req, res) => {
     res.json(budget);
   } catch (err) {
     logError('Budgets set', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Chores ──
+app.get('/api/chores', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { assigned_to, due_by } = req.query;
+    const items = await choresService.listChores(familyId, {
+      assigned_to: assigned_to || undefined,
+      due_by: due_by || undefined,
+    });
+    res.json({ chores: items });
+  } catch (err) {
+    logError('Chores list', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/chores', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { title, assigned_to, recurrence, next_due, points_reward } = req.body;
+    if (!title) return res.status(400).json({ error: 'title is required' });
+    const chore = await choresService.addChore(familyId, { title, assigned_to, recurrence, next_due, points_reward });
+    invalidateCache();
+    res.json(chore);
+  } catch (err) {
+    logError('Chores add', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/chores/:id/complete', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { completed_by, award_points } = req.body;
+    const result = await choresService.completeChore(familyId, req.params.id, { completed_by, award_points });
+    invalidateCache();
+    res.json(result);
+  } catch (err) {
+    logError('Chores complete', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/chores/:id', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    await choresService.deleteChore(familyId, req.params.id);
+    invalidateCache();
+    res.json({ deleted: true });
+  } catch (err) {
+    logError('Chores delete', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/chores/overdue', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const items = await choresService.getOverdueChores(familyId);
+    res.json({ chores: items });
+  } catch (err) {
+    logError('Chores overdue', err);
     res.status(500).json({ error: err.message });
   }
 });
