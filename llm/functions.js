@@ -8,6 +8,7 @@ import * as themes from '../services/themes.js';
 import { seedUKHolidays } from '../services/holidays.js';
 import * as foodExpiry from '../services/foodExpiry.js';
 import * as expenses from '../services/expenses.js';
+import * as chores from '../services/chores.js';
 import { formatForUser } from '../utils/time.js';
 import { invalidateDashboardCache } from '../utils/cache.js';
 
@@ -508,6 +509,69 @@ export const tools = [
       },
     },
   },
+  // --- Chore Rota tools ---
+  {
+    type: 'function',
+    function: {
+      name: 'add_chore',
+      description: 'Add a new chore to the family rota. Use for tasks like cleaning, hoovering, putting the bins out, washing up, etc.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Name of the chore (e.g. "Hoover the living room", "Put the bins out")' },
+          assigned_to: { type: 'string', description: 'Optional: name of the person responsible for this chore' },
+          recurrence: { type: 'string', enum: ['once', 'daily', 'weekly', 'fortnightly'], description: 'How often the chore repeats. Defaults to once.' },
+          next_due: { type: 'string', description: 'Date the chore is due in YYYY-MM-DD format. Defaults to today.' },
+          points_reward: { type: 'number', description: 'Optional: number of kid points to award when this chore is completed' },
+        },
+        required: ['title'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_chores',
+      description: 'List chores that are due. Optionally filter by person and/or due date.',
+      parameters: {
+        type: 'object',
+        properties: {
+          assigned_to: { type: 'string', description: 'Optional: filter by the person assigned to the chore' },
+          due_by: { type: 'string', description: 'Optional: only show chores due on or before this date (YYYY-MM-DD). Defaults to today.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'complete_chore',
+      description: 'Mark a chore as done. For recurring chores, automatically schedules the next occurrence.',
+      parameters: {
+        type: 'object',
+        properties: {
+          chore_id: { type: 'string', description: 'UUID of the chore to mark as done' },
+          completed_by: { type: 'string', description: 'Optional: name of the person who completed the chore' },
+          award_points: { type: 'boolean', description: 'Optional: whether to award kid points for completing this chore (if points_reward > 0)' },
+        },
+        required: ['chore_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_chore',
+      description: 'Delete a chore from the rota entirely.',
+      parameters: {
+        type: 'object',
+        properties: {
+          chore_id: { type: 'string', description: 'UUID of the chore to delete' },
+        },
+        required: ['chore_id'],
+      },
+    },
+  },
 ];
 
 /**
@@ -518,7 +582,7 @@ export async function dispatch(functionName, args, context) {
   const { familyId, userId, timezone } = context;
 
   // Invalidate dashboard cache for any write operation
-  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_expenses', 'get_monthly_spend', 'list_budgets']);
+  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_expenses', 'get_monthly_spend', 'list_budgets', 'list_chores']);
   if (!readOnlyFns.has(functionName)) {
     invalidateDashboardCache();
   }
@@ -906,6 +970,67 @@ export async function dispatch(functionName, args, context) {
     case 'delete_expense': {
       await expenses.deleteExpense(familyId, args.expense_id);
       return JSON.stringify({ success: true, deleted_id: args.expense_id });
+    }
+
+    // --- Chore Rota dispatch ---
+    case 'add_chore': {
+      const chore = await chores.addChore(familyId, {
+        title: args.title,
+        assigned_to: args.assigned_to || null,
+        recurrence: args.recurrence || 'once',
+        next_due: args.next_due || null,
+        points_reward: args.points_reward || 0,
+      });
+      return JSON.stringify({
+        success: true,
+        chore: {
+          id: chore.id,
+          title: chore.title,
+          assigned_to: chore.assigned_to,
+          recurrence: chore.recurrence,
+          next_due: chore.next_due,
+          points_reward: chore.points_reward,
+        },
+        message: `Added chore "${chore.title}"${chore.assigned_to ? ` assigned to ${chore.assigned_to}` : ''} — due ${chore.next_due}.`,
+      });
+    }
+
+    case 'list_chores': {
+      const choreList = await chores.listChores(familyId, {
+        assigned_to: args.assigned_to || undefined,
+        due_by: args.due_by || undefined,
+      });
+      return JSON.stringify({
+        chores: choreList.map(c => ({
+          id: c.id,
+          title: c.title,
+          assigned_to: c.assigned_to,
+          recurrence: c.recurrence,
+          next_due: c.next_due,
+          points_reward: c.points_reward,
+        })),
+        count: choreList.length,
+        message: choreList.length === 0 ? 'No chores due.' : `${choreList.length} chore(s) due.`,
+      });
+    }
+
+    case 'complete_chore': {
+      const result = await chores.completeChore(familyId, args.chore_id, {
+        completed_by: args.completed_by || null,
+        award_points: args.award_points || false,
+      });
+      return JSON.stringify({
+        success: true,
+        chore_title: result.chore_title,
+        completed_by: result.completed_by,
+        points_awarded: result.points_awarded,
+        message: `Marked "${result.chore_title}" as done${result.completed_by ? ` by ${result.completed_by}` : ''}${result.points_awarded > 0 ? ` — awarded ${result.points_awarded} points!` : ''}.`,
+      });
+    }
+
+    case 'delete_chore': {
+      await chores.deleteChore(familyId, args.chore_id);
+      return JSON.stringify({ success: true, deleted_id: args.chore_id });
     }
 
     default:
