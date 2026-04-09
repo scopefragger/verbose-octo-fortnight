@@ -1038,22 +1038,31 @@ if (isWebhookMode) {
 
 // Set webhook and start server
 async function start() {
+  // Always start the HTTP server first so health checks pass even if Telegram is unreachable
+  await new Promise((resolve) => app.listen(PORT, resolve));
+  console.log(`Server listening on port ${PORT}`);
+
   if (isWebhookMode) {
     const webhookUrl = process.env.WEBHOOK_URL;
-    await bot.api.setWebhook(`${webhookUrl}/bot/webhook`, {
-      secret_token: process.env.TELEGRAM_WEBHOOK_SECRET,
-    });
-    console.log(`Webhook set to ${webhookUrl}/bot/webhook`);
+    try {
+      await bot.api.setWebhook(`${webhookUrl}/bot/webhook`, {
+        secret_token: process.env.TELEGRAM_WEBHOOK_SECRET,
+      });
+      console.log(`Webhook set to ${webhookUrl}/bot/webhook`);
+    } catch (err) {
+      // Non-fatal: server is up, bot will work once Telegram becomes reachable
+      console.error('Failed to set webhook (will retry on next deploy):', err.message);
+    }
   } else {
     // Local development: use long polling
     console.log('Starting in long polling mode (local dev)...');
-    await bot.api.deleteWebhook();
-    bot.start();
+    try {
+      await bot.api.deleteWebhook();
+      bot.start();
+    } catch (err) {
+      console.error('Failed to start polling:', err.message);
+    }
   }
-
-  app.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-  });
 }
 
 start().catch(console.error);
