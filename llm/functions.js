@@ -7,6 +7,7 @@ import * as meals from '../services/meals.js';
 import * as themes from '../services/themes.js';
 import { seedUKHolidays } from '../services/holidays.js';
 import * as foodExpiry from '../services/foodExpiry.js';
+import * as expenses from '../services/expenses.js';
 import { formatForUser } from '../utils/time.js';
 import { invalidateDashboardCache } from '../utils/cache.js';
 
@@ -422,6 +423,91 @@ export const tools = [
       },
     },
   },
+  // --- Budget & Expense tools ---
+  {
+    type: 'function',
+    function: {
+      name: 'log_expense',
+      description: 'Log a family expense. Use when someone says they spent money, paid for something, or bought something for a specific amount.',
+      parameters: {
+        type: 'object',
+        properties: {
+          amount: { type: 'number', description: 'Amount spent (e.g. 45.50)' },
+          category: { type: 'string', description: 'Expense category (e.g. groceries, utilities, eating out, kids, transport, entertainment)' },
+          note: { type: 'string', description: 'Optional description of what was bought' },
+          paid_by: { type: 'string', description: 'Optional name of who paid' },
+          expense_date: { type: 'string', description: 'Date of the expense in YYYY-MM-DD format. Defaults to today if not provided.' },
+        },
+        required: ['amount', 'category'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_expenses',
+      description: 'List family expenses, optionally filtered by month, year, and/or category.',
+      parameters: {
+        type: 'object',
+        properties: {
+          month: { type: 'number', description: 'Month number (1-12). Defaults to current month if omitted.' },
+          year: { type: 'number', description: 'Year (e.g. 2026). Defaults to current year if omitted.' },
+          category: { type: 'string', description: 'Optional category to filter by.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_monthly_spend',
+      description: 'Get a summary of spending per category for a given month, including budget limits and remaining amounts.',
+      parameters: {
+        type: 'object',
+        properties: {
+          month: { type: 'number', description: 'Month number (1-12). Defaults to current month.' },
+          year: { type: 'number', description: 'Year. Defaults to current year.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'set_budget',
+      description: 'Set a monthly spending budget for a category. Creates or updates the limit for that category.',
+      parameters: {
+        type: 'object',
+        properties: {
+          category: { type: 'string', description: 'Expense category to set budget for (e.g. groceries, utilities)' },
+          monthly_limit: { type: 'number', description: 'Monthly spending limit for this category' },
+        },
+        required: ['category', 'monthly_limit'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_budgets',
+      description: 'List all monthly budget limits set for the family.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_expense',
+      description: 'Delete a logged expense by its ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          expense_id: { type: 'string', description: 'UUID of the expense to delete' },
+        },
+        required: ['expense_id'],
+      },
+    },
+  },
 ];
 
 /**
@@ -432,7 +518,7 @@ export async function dispatch(functionName, args, context) {
   const { familyId, userId, timezone } = context;
 
   // Invalidate dashboard cache for any write operation
-  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items']);
+  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_expenses', 'get_monthly_spend', 'list_budgets']);
   if (!readOnlyFns.has(functionName)) {
     invalidateDashboardCache();
   }
@@ -732,6 +818,94 @@ export async function dispatch(functionName, args, context) {
         created,
         holidays: results.map(r => `${r.title} (${r.date})`),
       });
+    }
+
+    // --- Budget & Expense dispatch ---
+    case 'log_expense': {
+      const expense = await expenses.addExpense(familyId, {
+        amount: args.amount,
+        category: args.category,
+        note: args.note || null,
+        paid_by: args.paid_by || null,
+        expense_date: args.expense_date || null,
+      }, userId);
+      return JSON.stringify({
+        success: true,
+        expense: {
+          id: expense.id,
+          amount: expense.amount,
+          category: expense.category,
+          note: expense.note,
+          paid_by: expense.paid_by,
+          expense_date: expense.expense_date,
+        },
+        message: `Logged £${expense.amount} for ${expense.category}${expense.note ? ` (${expense.note})` : ''} on ${expense.expense_date}.`,
+      });
+    }
+
+    case 'list_expenses': {
+      const now = new Date();
+      const month = args.month || (now.getMonth() + 1);
+      const year = args.year || now.getFullYear();
+      const items = await expenses.listExpenses(familyId, { month, year, category: args.category || undefined });
+      const total = items.reduce((sum, e) => sum + parseFloat(e.amount), 0);
+      return JSON.stringify({
+        expenses: items.map(e => ({
+          id: e.id,
+          amount: e.amount,
+          category: e.category,
+          note: e.note,
+          paid_by: e.paid_by,
+          expense_date: e.expense_date,
+        })),
+        total: Math.round(total * 100) / 100,
+        count: items.length,
+        period: `${year}-${String(month).padStart(2, '0')}`,
+      });
+    }
+
+    case 'get_monthly_spend': {
+      const now = new Date();
+      const month = args.month || (now.getMonth() + 1);
+      const year = args.year || now.getFullYear();
+      const summary = await expenses.getMonthlySpend(familyId, month, year);
+      const totalSpent = summary.reduce((sum, s) => sum + s.spent, 0);
+      return JSON.stringify({
+        period: `${year}-${String(month).padStart(2, '0')}`,
+        categories: summary,
+        total_spent: Math.round(totalSpent * 100) / 100,
+      });
+    }
+
+    case 'set_budget': {
+      const budget = await expenses.setBudget(familyId, {
+        category: args.category,
+        monthly_limit: args.monthly_limit,
+      });
+      return JSON.stringify({
+        success: true,
+        budget: {
+          category: budget.category,
+          monthly_limit: budget.monthly_limit,
+        },
+        message: `Budget for ${budget.category} set to £${budget.monthly_limit}/month.`,
+      });
+    }
+
+    case 'list_budgets': {
+      const budgetList = await expenses.listBudgets(familyId);
+      return JSON.stringify({
+        budgets: budgetList.map(b => ({
+          category: b.category,
+          monthly_limit: b.monthly_limit,
+        })),
+        count: budgetList.length,
+      });
+    }
+
+    case 'delete_expense': {
+      await expenses.deleteExpense(familyId, args.expense_id);
+      return JSON.stringify({ success: true, deleted_id: args.expense_id });
     }
 
     default:

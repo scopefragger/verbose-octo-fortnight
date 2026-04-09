@@ -19,6 +19,7 @@ import { createCountdown, updateCountdown, deleteCountdown } from './services/co
 import { getWatchlist, addToWatchlist, markWatched, removeFromWatchlist } from './services/watchlist.js';
 import { getBirthdays, addBirthday, updateBirthday, removeBirthday } from './services/birthdays.js';
 import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas } from './services/ideas.js';
+import * as expensesService from './services/expenses.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import { logError, getErrors, clearErrors } from './utils/errorLog.js';
