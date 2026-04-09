@@ -559,7 +559,7 @@
       padding: 12px;
       display: grid;
       grid-template-columns: 220px 1fr 1fr 1fr;
-      grid-template-rows: auto auto 1fr 1fr 1fr 1fr;
+      grid-template-rows: auto auto 1fr 1fr 1fr 1fr 1fr;
       gap: 12px;
       grid-template-areas:
         "sidebar header    header    header"
@@ -567,7 +567,8 @@
         "sidebar today     upcoming  lists"
         "sidebar meals     foodexp   reminders"
         "sidebar chores    chores    chores"
-        "sidebar budget    budget    budget";
+        "sidebar budget    budget    budget"
+        "sidebar memories  memories  memories";
     }
 
     /* Cards */
@@ -2925,6 +2926,82 @@
     .expense-del-btn:hover { opacity: 1 !important; color: #e53e3e; }
     .expense-row.removing { animation: checkOff 0.5s ease forwards; }
 
+    /* === MEMORIES === */
+    .memories-card { grid-area: memories; }
+    .memories-gallery {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-content: flex-start;
+    }
+    .memory-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: var(--primary-light);
+      flex: 0 1 calc(25% - 6px);
+      min-width: 180px;
+      font-size: 12px;
+      position: relative;
+    }
+    .memory-item:hover { background: var(--accent-light); }
+    .memory-photo-icon {
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .memory-text { flex: 1; overflow: hidden; }
+    .memory-caption {
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .memory-meta {
+      font-size: 10px;
+      color: var(--text-light);
+      margin-top: 1px;
+    }
+    .memory-cat-badge {
+      font-size: 9px;
+      background: var(--accent-light);
+      color: var(--accent);
+      padding: 1px 5px;
+      border-radius: 4px;
+      text-transform: capitalize;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .memory-del-btn {
+      background: none;
+      border: none;
+      color: var(--text-light);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .memory-item:hover .memory-del-btn { opacity: 0.5; }
+    .memory-del-btn:hover { opacity: 1 !important; color: #e53e3e; }
+    .memories-on-this-day {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .memories-on-this-day-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
     /* === MOBILE (scrollable) === */
     /* Mobile-only sections (hidden on desktop where sidebar shows them) */
     .mobile-kids { display: none; grid-area: mobilekids; }
@@ -4282,6 +4359,12 @@
         handleDeleteChore(choreDelBtn);
         return;
       }
+      // Memory delete button
+      const memDelBtn = e.target.closest('.memory-del-btn');
+      if (memDelBtn) {
+        handleDeleteMemory(memDelBtn);
+        return;
+      }
     });
 
     async function handleCheckOffItem(itemEl) {
@@ -4530,6 +4613,53 @@
       return html;
     }
 
+    function renderMemories(memoriesData) {
+      if (!memoriesData) return '<div class="empty-state"><div class="icon">&#x1F4F8;</div>No memories yet — send a photo or message to the bot!</div>';
+      const { recent, on_this_day } = memoriesData;
+
+      if ((!recent || recent.length === 0) && (!on_this_day || on_this_day.length === 0)) {
+        return '<div class="empty-state"><div class="icon">&#x1F4F8;</div>No memories yet — send a photo or message to the bot!</div>';
+      }
+
+      let html = '';
+
+      if (on_this_day && on_this_day.length > 0) {
+        html += '<div class="memories-on-this-day">';
+        html += '<div class="memories-on-this-day-title">&#x1F4F8; On This Day</div>';
+        html += '<div class="memories-gallery">';
+        html += on_this_day.map(m => `
+          <div class="memory-item" data-memory-id="${m.id}">
+            <span class="memory-photo-icon">${m.photo_file_id ? '&#x1F5BC;&#xFE0F;' : '&#x1F4C5;'}</span>
+            <div class="memory-text">
+              <div class="memory-caption">${esc(m.caption || 'A memory')}</div>
+              <div class="memory-meta">${esc(m.memory_date)}${m.photo_file_id ? ' &bull; Photo saved in Telegram' : ''}</div>
+            </div>
+            ${m.category ? `<span class="memory-cat-badge">${esc(m.category)}</span>` : ''}
+            <button class="memory-del-btn" data-memory-id="${m.id}" title="Delete memory">&times;</button>
+          </div>
+        `).join('');
+        html += '</div></div>';
+      }
+
+      if (recent && recent.length > 0) {
+        html += '<div class="memories-gallery">';
+        html += recent.map(m => `
+          <div class="memory-item" data-memory-id="${m.id}">
+            <span class="memory-photo-icon">${m.photo_file_id ? '&#x1F5BC;&#xFE0F;' : '&#x1F4C5;'}</span>
+            <div class="memory-text">
+              <div class="memory-caption">${esc(m.caption || 'A memory')}</div>
+              <div class="memory-meta">${esc(m.memory_date)}${m.photo_file_id ? ' &bull; Photo saved in Telegram' : ''}</div>
+            </div>
+            ${m.category ? `<span class="memory-cat-badge">${esc(m.category)}</span>` : ''}
+            <button class="memory-del-btn" data-memory-id="${m.id}" title="Delete memory">&times;</button>
+          </div>
+        `).join('');
+        html += '</div>';
+      }
+
+      return html;
+    }
+
     function openExpenseModal() {
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
@@ -4721,6 +4851,22 @@
         });
       } catch (err) {
         console.error('Delete chore error:', err);
+      }
+      setTimeout(() => refreshDashboard(), 500);
+    }
+
+    async function handleDeleteMemory(btn) {
+      const memoryId = btn.dataset.memoryId;
+      if (!memoryId) return;
+      const row = btn.closest('.memory-item');
+      if (row) row.style.opacity = '0.4';
+
+      try {
+        await fetch(`/api/memories/${memoryId}`, {
+          method: 'DELETE',
+        });
+      } catch (err) {
+        console.error('Delete memory error:', err);
       }
       setTimeout(() => refreshDashboard(), 500);
     }
@@ -4931,6 +5077,14 @@
           <div class="card-title"><span class="icon">&#x1F4B0;</span> Budget &amp; Expenses <button class="card-add-btn expense-add-btn">+ Log</button></div>
           <div class="card-body">
             ${renderBudgetExpenses(data.expenses)}
+          </div>
+        </div>
+
+        <!-- Memories -->
+        <div class="card memories-card">
+          <div class="card-title"><span class="icon">&#x1F4F8;</span> Memories</div>
+          <div class="card-body">
+            ${renderMemories(data.memories)}
           </div>
         </div>
       `;

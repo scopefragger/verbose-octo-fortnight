@@ -833,6 +833,64 @@ app.get('/cron/ideas', requireCronSecret, async (req, res) => {
   }
 });
 
+// ── Memories ──
+app.get('/api/memories', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { category, from_date, to_date } = req.query;
+    const items = await memoriesService.listMemories(familyId, {
+      category: category || undefined,
+      from_date: from_date || undefined,
+      to_date: to_date || undefined,
+    });
+    res.json({ memories: items });
+  } catch (err) {
+    logError('Memories list', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/memories', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { caption, photo_file_id, category, memory_date } = req.body;
+    const { data: users } = await supabase.from('users').select('id').eq('family_id', familyId).limit(1);
+    const memory = await memoriesService.addMemory(familyId, { caption, photo_file_id, category, memory_date }, users?.[0]?.id || null);
+    invalidateCache();
+    res.json(memory);
+  } catch (err) {
+    logError('Memories add', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/memories/:id', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    await memoriesService.deleteMemory(familyId, req.params.id);
+    invalidateCache();
+    res.json({ deleted: true });
+  } catch (err) {
+    logError('Memories delete', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/memories/on-this-day', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const items = await memoriesService.getOnThisDay(familyId);
+    res.json({ memories: items });
+  } catch (err) {
+    logError('Memories on-this-day', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Only register webhook route when in webhook mode
 if (isWebhookMode) {
   app.post('/bot/webhook', webhookCallback(bot, 'express'));

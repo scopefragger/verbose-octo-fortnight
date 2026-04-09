@@ -3,6 +3,7 @@ import { listEvents } from '../services/calendar.js';
 import { getMealsForDate } from '../services/meals.js';
 import { getAllPoints } from '../services/points.js';
 import * as choresService from '../services/chores.js';
+import * as memoriesService from '../services/memories.js';
 import { supabase } from '../db/supabase.js';
 import { formatForUser } from '../utils/time.js';
 
@@ -90,6 +91,11 @@ export async function sendDailyDigest(bot) {
       ? await choresService.getOverdueChores(user.family_id)
       : [];
 
+    // Get "On This Day" memories
+    const onThisDay = user.family_id
+      ? await memoriesService.getOnThisDay(user.family_id)
+      : [];
+
     // Build the enriched digest
     let message = `☀️ Good morning, ${user.display_name}! Here's your ${dayName}:\n`;
 
@@ -162,6 +168,10 @@ export async function sendDailyDigest(bot) {
 
     if (overdueChores.length > 0) {
       message += '\n\n⚠️ Overdue chores:\n' + overdueChores.map(c => `• ${c.title}${c.assigned_to ? ` (${c.assigned_to})` : ''}`).join('\n');
+    }
+
+    if (onThisDay.length > 0) {
+      message += '\n\n📸 On this day:\n' + onThisDay.map(m => `• ${m.caption || 'A memory'} (${m.memory_date})`).join('\n');
     }
 
     message += `\nHave a great day! 🎉`;
