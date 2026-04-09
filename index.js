@@ -21,6 +21,7 @@ import { getBirthdays, addBirthday, updateBirthday, removeBirthday } from './ser
 import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas } from './services/ideas.js';
 import * as expensesService from './services/expenses.js';
 import * as choresService from './services/chores.js';
+import * as memoriesService from './services/memories.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
 import { logError, getErrors, clearErrors } from './utils/errorLog.js';

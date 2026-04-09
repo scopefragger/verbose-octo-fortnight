@@ -23,9 +23,26 @@ export async function handleMessage(ctx) {
     return;
   }
 
-  const userMessage = ctx.message.text;
   const familyId = user.family_id;
   const timezone = user.timezone || 'Europe/London';
+
+  // Handle photo messages: extract file_id from highest-resolution photo
+  let userMessage = ctx.message.text || '';
+  let photoNote = '';
+  if (ctx.message.photo && ctx.message.photo.length > 0) {
+    const photo = ctx.message.photo[ctx.message.photo.length - 1];
+    const photoFileId = photo.file_id;
+    const caption = ctx.message.caption || '';
+    userMessage = caption
+      ? `${caption} [Photo attached — photo_file_id: ${photoFileId}]`
+      : `[Photo attached — photo_file_id: ${photoFileId}] The user sent a photo. If they want to save it as a memory, use save_memory with photo_file_id="${photoFileId}".`;
+    photoNote = photoFileId;
+  }
+
+  if (!userMessage) {
+    await ctx.reply("I received your message but couldn't read any text or photo from it.");
+    return;
+  }
 
   // Load conversation history with smart summarisation
   const history = await loadSmartHistory(user.id);

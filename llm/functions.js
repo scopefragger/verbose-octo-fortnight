@@ -9,6 +9,7 @@ import { seedUKHolidays } from '../services/holidays.js';
 import * as foodExpiry from '../services/foodExpiry.js';
 import * as expenses from '../services/expenses.js';
 import * as chores from '../services/chores.js';
+import * as memories from '../services/memories.js';
 import { formatForUser } from '../utils/time.js';
 import { invalidateDashboardCache } from '../utils/cache.js';
 
@@ -572,6 +573,52 @@ export const tools = [
       },
     },
   },
+  // --- Memory log tools ---
+  {
+    type: 'function',
+    function: {
+      name: 'save_memory',
+      description: 'Save a memory for the family. Use when someone says "save this memory", "remember this", "add to memories", "mark as a memory", "save this photo", or "keep this picture". Can include a caption, category, optional photo file ID, and optional date.',
+      parameters: {
+        type: 'object',
+        properties: {
+          caption: { type: 'string', description: 'Optional text caption or description for the memory' },
+          photo_file_id: { type: 'string', description: 'Optional Telegram file_id of a photo to associate with this memory' },
+          category: { type: 'string', description: 'Optional category tag (e.g. "holiday", "birthday", "christmas", "milestone")' },
+          memory_date: { type: 'string', description: 'Optional date for the memory in YYYY-MM-DD format. Defaults to today.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_memories',
+      description: 'List family memories. Use for "show me memories", "holiday memories", "memories from Christmas", "memories from last summer", etc. Optionally filter by category and/or date range.',
+      parameters: {
+        type: 'object',
+        properties: {
+          category: { type: 'string', description: 'Optional category to filter by (e.g. "holiday", "birthday")' },
+          from_date: { type: 'string', description: 'Optional start date in YYYY-MM-DD format' },
+          to_date: { type: 'string', description: 'Optional end date in YYYY-MM-DD format' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_memory',
+      description: 'Delete a memory by its ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          memory_id: { type: 'string', description: 'UUID of the memory to delete' },
+        },
+        required: ['memory_id'],
+      },
+    },
+  },
 ];
 
 /**
@@ -582,7 +629,7 @@ export async function dispatch(functionName, args, context) {
   const { familyId, userId, timezone } = context;
 
   // Invalidate dashboard cache for any write operation
-  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_expenses', 'get_monthly_spend', 'list_budgets', 'list_chores']);
+  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_expenses', 'get_monthly_spend', 'list_budgets', 'list_chores', 'list_memories']);
   if (!readOnlyFns.has(functionName)) {
     invalidateDashboardCache();
   }
@@ -1031,6 +1078,51 @@ export async function dispatch(functionName, args, context) {
     case 'delete_chore': {
       await chores.deleteChore(familyId, args.chore_id);
       return JSON.stringify({ success: true, deleted_id: args.chore_id });
+    }
+
+    // --- Memory log dispatch ---
+    case 'save_memory': {
+      const memory = await memories.addMemory(familyId, {
+        caption: args.caption || null,
+        photo_file_id: args.photo_file_id || null,
+        category: args.category || null,
+        memory_date: args.memory_date || null,
+      }, userId);
+      return JSON.stringify({
+        success: true,
+        memory: {
+          id: memory.id,
+          caption: memory.caption,
+          category: memory.category,
+          memory_date: memory.memory_date,
+          has_photo: !!memory.photo_file_id,
+        },
+        message: `Memory saved${memory.caption ? `: "${memory.caption}"` : ''}${memory.category ? ` [${memory.category}]` : ''} for ${memory.memory_date}.`,
+      });
+    }
+
+    case 'list_memories': {
+      const items = await memories.listMemories(familyId, {
+        category: args.category || undefined,
+        from_date: args.from_date || undefined,
+        to_date: args.to_date || undefined,
+      });
+      return JSON.stringify({
+        memories: items.map(m => ({
+          id: m.id,
+          caption: m.caption,
+          category: m.category,
+          memory_date: m.memory_date,
+          has_photo: !!m.photo_file_id,
+        })),
+        count: items.length,
+        message: items.length === 0 ? 'No memories found.' : `${items.length} memory/memories found.`,
+      });
+    }
+
+    case 'delete_memory': {
+      await memories.deleteMemory(familyId, args.memory_id);
+      return JSON.stringify({ success: true, deleted_id: args.memory_id });
     }
 
     default:
