@@ -9,6 +9,7 @@ import { getTheme } from '../services/themes.js';
 import { getFoodItems } from '../services/foodExpiry.js';
 import { getWatchlist } from '../services/watchlist.js';
 import { getBirthdays, getUpcomingBirthdayEvents } from '../services/birthdays.js';
+import * as expensesService from '../services/expenses.js';
 import { formatForUser } from '../utils/time.js';
 
 /**
@@ -42,7 +43,9 @@ export async function getDashboardData(familyId) {
 
   // Fetch all data in a single parallel batch
   const reminderPromises = members.map((m) => listReminders(m.id));
-  const [todayEvents, weekEvents, listsWithItems, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme, foodItems, watchlistItems, allBirthdays, ...reminderResults] = await Promise.all([
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const [todayEvents, weekEvents, listsWithItems, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme, foodItems, watchlistItems, allBirthdays, recentExpenses, allBudgets, monthlySpend, ...reminderResults] = await Promise.all([
     listEvents(familyId, todayStart, todayEnd),
     listEvents(familyId, tomorrowStart, weekEndBound),
     getAllListsWithItems(familyId),
@@ -54,6 +57,9 @@ export async function getDashboardData(familyId) {
     getFoodItems(familyId),
     getWatchlist(familyId),
     getBirthdays(familyId),
+    expensesService.listExpenses(familyId, { month: currentMonth, year: currentYear }),
+    expensesService.listBudgets(familyId),
+    expensesService.getMonthlySpend(familyId, currentMonth, currentYear),
     ...reminderPromises,
   ]);
   const allReminders = reminderResults.flat();
@@ -152,6 +158,11 @@ export async function getDashboardData(familyId) {
       days_left: Math.ceil((new Date(f.expires_at + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24)),
     })),
     watchlist: watchlistItems || [],
+    expenses: {
+      recent: (recentExpenses || []).slice(0, 5),
+      monthly_spend: monthlySpend || [],
+      budgets: allBudgets || [],
+    },
     birthdays: (allBirthdays || []).map(b => {
       const [y, m, d] = b.birth_date.split('-').map(Number);
       const now = new Date();

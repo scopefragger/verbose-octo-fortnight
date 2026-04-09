@@ -490,6 +490,92 @@ app.delete('/api/watchlist/:id', requireAuth, async (req, res) => {
   }
 });
 
+// ── Expenses & Budgets ──
+app.get('/api/expenses', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { month, year, category } = req.query;
+    const items = await expensesService.listExpenses(familyId, {
+      month: month ? parseInt(month) : undefined,
+      year: year ? parseInt(year) : undefined,
+      category: category || undefined,
+    });
+    res.json({ expenses: items });
+  } catch (err) {
+    logError('Expenses list', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/expenses', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { amount, category, note, paid_by, expense_date } = req.body;
+    if (!amount || !category) return res.status(400).json({ error: 'amount and category are required' });
+    const item = await expensesService.addExpense(familyId, { amount, category, note, paid_by, expense_date }, null);
+    invalidateCache();
+    res.json(item);
+  } catch (err) {
+    logError('Expenses add', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/expenses/:id', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    await expensesService.deleteExpense(familyId, req.params.id);
+    invalidateCache();
+    res.json({ deleted: true });
+  } catch (err) {
+    logError('Expenses delete', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/expenses/summary', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const now = new Date();
+    const summary = await expensesService.getMonthlySpend(familyId, now.getMonth() + 1, now.getFullYear());
+    res.json({ summary });
+  } catch (err) {
+    logError('Expenses summary', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/budgets', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const budgets = await expensesService.listBudgets(familyId);
+    res.json({ budgets });
+  } catch (err) {
+    logError('Budgets list', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/budgets', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { category, monthly_limit } = req.body;
+    if (!category || !monthly_limit) return res.status(400).json({ error: 'category and monthly_limit are required' });
+    const budget = await expensesService.setBudget(familyId, { category, monthly_limit });
+    invalidateCache();
+    res.json(budget);
+  } catch (err) {
+    logError('Budgets set', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Error Log ──
 app.get('/api/errors', requireAuth, async (req, res) => {
   if (req.query.secret !== process.env.CRON_SECRET) {

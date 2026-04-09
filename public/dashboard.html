@@ -559,13 +559,14 @@
       padding: 12px;
       display: grid;
       grid-template-columns: 220px 1fr 1fr 1fr;
-      grid-template-rows: auto auto 1fr 1fr;
+      grid-template-rows: auto auto 1fr 1fr 1fr;
       gap: 12px;
       grid-template-areas:
         "sidebar header    header    header"
         "sidebar countdown countdown countdown"
         "sidebar today     upcoming  lists"
-        "sidebar meals     foodexp   reminders";
+        "sidebar meals     foodexp   reminders"
+        "sidebar budget    budget    budget";
     }
 
     /* Cards */
@@ -2774,6 +2775,102 @@
     .food-del-btn:hover { opacity: 1 !important; color: #e53e3e; }
     .food-item.removing { animation: checkOff 0.5s ease forwards; }
 
+    /* === BUDGET & EXPENSES === */
+    .budget-card { grid-area: budget; }
+    .budget-category-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      font-size: 12px;
+    }
+    .budget-category-label {
+      flex: 1;
+      font-weight: 500;
+      text-transform: capitalize;
+    }
+    .budget-amounts {
+      font-size: 11px;
+      color: var(--text-light);
+      white-space: nowrap;
+    }
+    .budget-bar-wrap {
+      width: 80px;
+      height: 6px;
+      background: var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .budget-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+    .budget-bar-fill.ok { background: var(--success); }
+    .budget-bar-fill.warn { background: var(--warning); }
+    .budget-bar-fill.over { background: #e53e3e; }
+    .budget-section-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      margin: 8px 0 4px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+    }
+    .budget-section-title:first-child { margin-top: 0; border-top: none; padding-top: 0; }
+    .expense-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px;
+      font-size: 12px;
+      border-radius: 6px;
+      margin-bottom: 2px;
+    }
+    .expense-row:hover { background: var(--primary-light); }
+    .expense-amount {
+      font-weight: 600;
+      color: var(--primary);
+      white-space: nowrap;
+    }
+    .expense-cat-badge {
+      font-size: 10px;
+      background: var(--primary-light);
+      color: var(--primary);
+      padding: 1px 6px;
+      border-radius: 4px;
+      text-transform: capitalize;
+      white-space: nowrap;
+    }
+    .expense-note {
+      flex: 1;
+      color: var(--text-light);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .expense-date {
+      font-size: 10px;
+      color: var(--text-light);
+      white-space: nowrap;
+    }
+    .expense-del-btn {
+      background: none;
+      border: none;
+      color: var(--text-light);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: all 0.2s;
+    }
+    .expense-row:hover .expense-del-btn { opacity: 0.5; }
+    .expense-del-btn:hover { opacity: 1 !important; color: #e53e3e; }
+    .expense-row.removing { animation: checkOff 0.5s ease forwards; }
+
     /* === MOBILE (scrollable) === */
     /* Mobile-only sections (hidden on desktop where sidebar shows them) */
     .mobile-kids { display: none; grid-area: mobilekids; }
@@ -2856,7 +2953,8 @@
           "countdown countdown"
           "today upcoming"
           "lists meals"
-          "foodexp reminders";
+          "foodexp reminders"
+          "budget budget";
       }
       .sidebar { display: none; }
       .mobile-kids { display: block; }
@@ -2879,7 +2977,8 @@
           "lists"
           "meals"
           "foodexp"
-          "reminders";
+          "reminders"
+          "budget";
       }
       .countdown-area { flex-direction: column; }
       .card { padding: 12px; }
@@ -4096,6 +4195,16 @@
         handleDeleteFood(foodDelBtn);
         return;
       }
+      // Expense buttons
+      if (e.target.closest('.expense-add-btn')) {
+        openExpenseModal();
+        return;
+      }
+      const expDelBtn = e.target.closest('.expense-del-btn');
+      if (expDelBtn) {
+        handleDeleteExpense(expDelBtn);
+        return;
+      }
       // Reminder done button
       const reminderDoneBtn = e.target.closest('.reminder-done-btn');
       if (reminderDoneBtn) {
@@ -4285,6 +4394,129 @@
           </div>
         `;
       }).join('');
+    }
+
+    function renderBudgetExpenses(expensesData) {
+      if (!expensesData) return '<div class="empty-state"><div class="icon">&#x1F4B0;</div>No data</div>';
+      const { monthly_spend, recent, budgets } = expensesData;
+      let html = '';
+
+      // Budget progress bars
+      if (monthly_spend && monthly_spend.length > 0) {
+        html += '<div class="budget-section-title">This Month\'s Spend</div>';
+        html += monthly_spend.map(s => {
+          const pct = s.limit ? Math.min(100, Math.round((s.spent / s.limit) * 100)) : null;
+          let barClass = 'ok';
+          if (pct !== null && pct >= 100) barClass = 'over';
+          else if (pct !== null && pct >= 80) barClass = 'warn';
+          const amountStr = s.limit
+            ? `£${s.spent.toFixed(2)} / £${s.limit.toFixed(2)}`
+            : `£${s.spent.toFixed(2)}`;
+          return `
+            <div class="budget-category-row">
+              <span class="budget-category-label">${esc(s.category)}</span>
+              ${s.limit ? `<div class="budget-bar-wrap"><div class="budget-bar-fill ${barClass}" style="width:${pct}%"></div></div>` : ''}
+              <span class="budget-amounts">${amountStr}</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Recent expenses
+      if (recent && recent.length > 0) {
+        html += '<div class="budget-section-title">Recent Expenses</div>';
+        html += recent.map(e => `
+          <div class="expense-row" data-expense-id="${e.id}">
+            <span class="expense-amount">£${parseFloat(e.amount).toFixed(2)}</span>
+            <span class="expense-cat-badge">${esc(e.category)}</span>
+            <span class="expense-note">${esc(e.note || '')}</span>
+            <span class="expense-date">${esc(e.expense_date)}</span>
+            <button class="expense-del-btn" data-expense-id="${e.id}" title="Delete">&times;</button>
+          </div>
+        `).join('');
+      }
+
+      if (!html) {
+        html = '<div class="empty-state"><div class="icon">&#x1F4B0;</div>No expenses logged yet</div>';
+      }
+
+      return html;
+    }
+
+    function openExpenseModal() {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal">
+          <h3>Log Expense</h3>
+          <label>Amount (£)</label>
+          <input id="exp-amount" type="number" step="0.01" min="0" placeholder="e.g. 45.00">
+          <label>Category</label>
+          <select id="exp-category">
+            <option value="">Select category...</option>
+            <option value="groceries">Groceries</option>
+            <option value="utilities">Utilities</option>
+            <option value="eating out">Eating Out</option>
+            <option value="kids">Kids</option>
+            <option value="transport">Transport</option>
+            <option value="entertainment">Entertainment</option>
+            <option value="clothing">Clothing</option>
+            <option value="health">Health</option>
+            <option value="holidays">Holidays</option>
+            <option value="household">Household</option>
+          </select>
+          <label>Note (optional)</label>
+          <input id="exp-note" type="text" placeholder="e.g. Weekly shop">
+          <label>Paid by (optional)</label>
+          <input id="exp-paid-by" type="text" placeholder="e.g. Mum">
+          <label>Date</label>
+          <input id="exp-date" type="date">
+          <div class="modal-buttons">
+            <button class="btn-cancel" id="exp-cancel">Cancel</button>
+            <button class="btn-save" id="exp-save">Log Expense</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+      overlay.querySelector('#exp-date').value = new Date().toISOString().split('T')[0];
+      overlay.querySelector('#exp-amount').focus();
+      overlay.querySelector('#exp-cancel').onclick = () => overlay.remove();
+      overlay.querySelector('#exp-save').onclick = async () => {
+        const amount = parseFloat(overlay.querySelector('#exp-amount').value);
+        const category = overlay.querySelector('#exp-category').value;
+        const note = overlay.querySelector('#exp-note').value.trim() || null;
+        const paid_by = overlay.querySelector('#exp-paid-by').value.trim() || null;
+        const expense_date = overlay.querySelector('#exp-date').value;
+        if (!amount || !category) {
+          overlay.querySelector('#exp-amount').focus();
+          return;
+        }
+        try {
+          await fetch('/api/expenses', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount, category, note, paid_by, expense_date }),
+          });
+          overlay.remove();
+          refreshDashboard();
+        } catch (err) {
+          console.error('Add expense error:', err);
+        }
+      };
+    }
+
+    async function handleDeleteExpense(btn) {
+      const expenseId = btn.dataset.expenseId;
+      if (!expenseId) return;
+      const row = btn.closest('.expense-row');
+      if (row) row.classList.add('removing');
+      try {
+        await fetch(`/api/expenses/${expenseId}`, { method: 'DELETE' });
+        refreshDashboard();
+      } catch (err) {
+        console.error('Delete expense error:', err);
+      }
     }
 
     function openFoodModal() {
@@ -4510,6 +4742,15 @@
                 </div>
               `).join('')}
           </div>
+        </div>
+
+        <!-- Budget & Expenses -->
+        <div class="card budget-card">
+          <div class="card-title"><span class="icon">&#x1F4B0;</span> Budget &amp; Expenses <button class="card-add-btn expense-add-btn">+ Log</button></div>
+          <div class="card-body">
+            ${renderBudgetExpenses(data.expenses)}
+          </div>
+        </div>
       `;
 
       // Update apps badge
