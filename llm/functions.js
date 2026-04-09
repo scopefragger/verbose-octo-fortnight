@@ -10,6 +10,7 @@ import * as foodExpiry from '../services/foodExpiry.js';
 import * as expenses from '../services/expenses.js';
 import * as chores from '../services/chores.js';
 import * as memories from '../services/memories.js';
+import * as notes from '../services/notes.js';
 import { formatForUser } from '../utils/time.js';
 import { invalidateDashboardCache } from '../utils/cache.js';
 
@@ -619,6 +620,90 @@ export const tools = [
       },
     },
   },
+  // --- Notes / Quick Reference Cards ---
+  {
+    type: 'function',
+    function: {
+      name: 'save_note',
+      description: 'Save a named note or quick reference card for the family. Use when someone says "save a note called X", "make a note", "note that", "remember that", "store the wifi password", "save a reference card for X", etc. If a note with the same name already exists it will be updated.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Short name / title for the note (e.g. "wifi", "Netflix login", "bin day")' },
+          content: { type: 'string', description: 'The content of the note (the actual text to remember)' },
+          is_sensitive: { type: 'boolean', description: 'Mark as sensitive (e.g. passwords) — content will be masked by default on the dashboard. Defaults to false.' },
+        },
+        required: ['name', 'content'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_note',
+      description: 'Retrieve a specific note by name. Use when someone asks "what\'s the wifi password?", "show me the Netflix login", "what\'s the X note?", "show me the note called X".',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Name of the note to retrieve' },
+        },
+        required: ['name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_notes',
+      description: 'Search notes by name or content. Use when the user asks a natural-language question that might be answered by a note, e.g. "what\'s the broadband password?", "do we have a note about the car?", "find the note about school pickup".',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search term to look for in note names and content' },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_notes',
+      description: 'List all saved notes and reference cards for the family. Use when someone says "list all notes", "show me the family wiki", "what notes do we have?", "show all reference cards".',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_note',
+      description: 'Delete a saved note by its ID. Use when someone says "delete the note called X" — first list or search notes to find the ID, then delete.',
+      parameters: {
+        type: 'object',
+        properties: {
+          note_id: { type: 'string', description: 'UUID of the note to delete' },
+        },
+        required: ['note_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_note',
+      description: 'Update an existing note by ID. Use when someone says "update the note called X", "change the wifi password note", "rename the X note". First find the note ID via get_note or search_notes.',
+      parameters: {
+        type: 'object',
+        properties: {
+          note_id: { type: 'string', description: 'UUID of the note to update' },
+          name: { type: 'string', description: 'New name for the note (optional)' },
+          content: { type: 'string', description: 'New content for the note (optional)' },
+          is_sensitive: { type: 'boolean', description: 'Update sensitivity flag (optional)' },
+        },
+        required: ['note_id'],
+      },
+    },
+  },
 ];
 
 /**
@@ -629,7 +714,7 @@ export async function dispatch(functionName, args, context) {
   const { familyId, userId, timezone } = context;
 
   // Invalidate dashboard cache for any write operation
-  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_expenses', 'get_monthly_spend', 'list_budgets', 'list_chores', 'list_memories']);
+  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_expenses', 'get_monthly_spend', 'list_budgets', 'list_chores', 'list_memories', 'get_note', 'search_notes', 'list_notes']);
   if (!readOnlyFns.has(functionName)) {
     invalidateDashboardCache();
   }
@@ -1123,6 +1208,73 @@ export async function dispatch(functionName, args, context) {
     case 'delete_memory': {
       await memories.deleteMemory(familyId, args.memory_id);
       return JSON.stringify({ success: true, deleted_id: args.memory_id });
+    }
+
+    // --- Notes / Quick Reference Cards dispatch ---
+    case 'save_note': {
+      const note = await notes.saveNote(familyId, {
+        name: args.name,
+        content: args.content,
+        is_sensitive: args.is_sensitive || false,
+      }, userId);
+      return JSON.stringify({
+        success: true,
+        note: { id: note.id, name: note.name, is_sensitive: note.is_sensitive },
+        message: `Note "${note.name}" saved${note.is_sensitive ? ' (marked as sensitive)' : ''}.`,
+      });
+    }
+
+    case 'get_note': {
+      const note = await notes.getNote(familyId, args.name);
+      if (!note) {
+        return JSON.stringify({ success: false, message: `No note found called "${args.name}". Try searching with search_notes or list_notes to see what's available.` });
+      }
+      return JSON.stringify({
+        success: true,
+        note: { id: note.id, name: note.name, content: note.content, is_sensitive: note.is_sensitive, created_at: note.created_at },
+      });
+    }
+
+    case 'search_notes': {
+      const results = await notes.searchNotes(familyId, args.query);
+      if (results.length === 0) {
+        return JSON.stringify({ success: true, notes: [], message: `No notes found matching "${args.query}".` });
+      }
+      return JSON.stringify({
+        success: true,
+        notes: results.map(n => ({ id: n.id, name: n.name, content: n.content, is_sensitive: n.is_sensitive })),
+        count: results.length,
+      });
+    }
+
+    case 'list_notes': {
+      const allNotes = await notes.listNotes(familyId);
+      if (allNotes.length === 0) {
+        return JSON.stringify({ success: true, notes: [], message: 'No notes saved yet. Save one with save_note!' });
+      }
+      return JSON.stringify({
+        success: true,
+        notes: allNotes.map(n => ({ id: n.id, name: n.name, is_sensitive: n.is_sensitive, created_at: n.created_at })),
+        count: allNotes.length,
+      });
+    }
+
+    case 'delete_note': {
+      await notes.deleteNote(familyId, args.note_id);
+      return JSON.stringify({ success: true, deleted_id: args.note_id });
+    }
+
+    case 'update_note': {
+      const updated = await notes.updateNote(familyId, args.note_id, {
+        name: args.name,
+        content: args.content,
+        is_sensitive: args.is_sensitive,
+      });
+      return JSON.stringify({
+        success: true,
+        note: { id: updated.id, name: updated.name, is_sensitive: updated.is_sensitive },
+        message: `Note "${updated.name}" updated.`,
+      });
     }
 
     default:
