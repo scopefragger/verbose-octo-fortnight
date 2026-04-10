@@ -5,14 +5,6 @@ Single-file app — embedded CSS, HTML, and JavaScript.
 
 ---
 
-## JavaScript (Lines 1031–2157)
-
-| # | Section | Lines | Description |
-|---|---------|-------|-------------|
-| 23 | Utilities | 2141–2156 | `escapeHtml()`, `escapeQuotes()`, `formatManaCostShort()`, `showToast()` |
-
----
-
 ## Supporting Files
 
 | File | Description |
