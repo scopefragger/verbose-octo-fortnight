@@ -9,7 +9,6 @@ Single-file app — embedded CSS, HTML, and JavaScript.
 
 | # | Section | Lines | Description |
 |---|---------|-------|-------------|
-| 21 | Graveyard Viewer | 2040–2054 | `showGraveViewer()` — renders graveyard/exile modal content |
 | 22 | Commander Autocomplete | 2056–2139 | `setupAutocomplete()`, `fetchSuggestions()`, `selectCommander()`, `hideDropdown()` — Scryfall autocomplete for commander inputs |
 | 23 | Utilities | 2141–2156 | `escapeHtml()`, `escapeQuotes()`, `formatManaCostShort()`, `showToast()` |
 
