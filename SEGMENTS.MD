@@ -9,7 +9,6 @@ Single-file app — embedded CSS, HTML, and JavaScript.
 
 | # | Section | Lines | Description |
 |---|---------|-------|-------------|
-| 15 | Token Definitions | 1647–1662 | `COMMON_TOKENS` array — preset token data |
 | 17 | Render Play Area | 1858–1923 | `renderPlayArea()`, `renderBattlefield()`, `renderPlayHand()` — HTML generation for battlefield and hand |
 | 18 | Card Focus Panel | 1925–1994 | `selectBFCard()`, `closeFocusPanel()`, `selectHandCard()` — panel population and action wiring |
 | 19 | Context Menu | 1996–2021 | `showCtxMenu()`, `ctxAction()`, global click dismissal |
