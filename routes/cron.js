@@ -157,10 +157,15 @@ export async function sendDailyDigest(bot) {
 
     message += `\nHave a great day! 🎉`;
 
-    // Send DM to user
+    // Send DM and store message_id so the user can reply to check in
     try {
-      await bot.api.sendMessage(user.telegram_id, message);
+      const sentMsg = await bot.api.sendMessage(user.telegram_id, message);
       sent++;
+      // Fire-and-forget — non-critical
+      supabase.from('users')
+        .update({ last_digest_message_id: sentMsg.message_id })
+        .eq('id', user.id)
+        .then(({ error }) => { if (error) console.error('Failed to store digest message_id:', error.message); });
     } catch (err) {
       console.error(`Failed to send daily digest to ${user.telegram_id}:`, err.message);
     }

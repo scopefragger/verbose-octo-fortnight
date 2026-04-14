@@ -86,6 +86,19 @@ export function formatAsEvents(days) {
 }
 
 /**
+ * Fetch a single day row (or null). Used by the digest check-in reply handler.
+ */
+export async function getTodayRow(familyId, dateStr) {
+  const { data } = await supabase
+    .from('office_checkin_days')
+    .select('*')
+    .eq('family_id', familyId)
+    .eq('day_date', dateStr)
+    .maybeSingle();
+  return data;
+}
+
+/**
  * Delete a day entry by date. Scoped by both date and family_id.
  */
 export async function deleteDay(familyId, dayDate) {

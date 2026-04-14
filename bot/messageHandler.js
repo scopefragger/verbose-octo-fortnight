@@ -4,6 +4,7 @@ import { buildSystemPrompt } from '../llm/systemPrompt.js';
 import { tools, dispatch } from '../llm/functions.js';
 import { supabase } from '../db/supabase.js';
 import { summariseMessages, getCachedSummary, saveSummary } from '../llm/summarise.js';
+import { getTodayRow, upsertDay } from '../services/officeCheckin.js';
 
 const MAX_HISTORY = 30;
 const RECENT_VERBATIM = 8; // Keep last 8 messages as-is (4 exchanges)
@@ -20,6 +21,13 @@ export async function handleMessage(ctx) {
 
   if (!user) {
     await ctx.reply('Please send /start first to register!');
+    return;
+  }
+
+  // Check if this is a reply to the daily digest → office check-in shortcut
+  const replyToId = ctx.message.reply_to_message?.message_id;
+  if (replyToId && user.last_digest_message_id === replyToId) {
+    await handleDigestReply(ctx, user, (ctx.message.text || '').trim());
     return;
   }
 
@@ -195,6 +203,70 @@ function trimToTokenBudget(messages) {
     if (idx === -1) break;
     messages.splice(idx, 1);
   }
+}
+
+/**
+ * Handle a reply to the daily digest as an office check-in.
+ * Parses the reply text to determine day type, then upserts with confirmed=true.
+ */
+async function handleDigestReply(ctx, user, text) {
+  const timezone = user.timezone || 'Europe/London';
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: timezone });
+
+  // Reject weekends
+  const dow = new Date(todayStr + 'T12:00:00').getDay();
+  if (dow === 0 || dow === 6) {
+    await ctx.reply("No check-in needed — today is a weekend! 🎉");
+    return;
+  }
+
+  const existing = await getTodayRow(user.family_id, todayStr);
+  const lower = text.toLowerCase();
+
+  // Determine day type and destination from reply text
+  let dayType, destination;
+  if (lower.startsWith('travel')) {
+    dayType = 'travel';
+    destination = text.slice(6).trim() || existing?.destination || null;
+  } else if (lower === 'off' || lower.startsWith('time off') || lower === 'holiday') {
+    dayType = 'time_off';
+  } else {
+    // "in", "yes", "office", "✓", blank — confirm existing type or default to office
+    dayType = existing?.day_type || 'office';
+    destination = existing?.destination || null;
+  }
+
+  const fields = {
+    day_type:          dayType,
+    confirmed:         dayType !== 'time_off',
+    parking_booked:    existing?.parking_booked    ?? false,
+    destination:       destination,
+    flight_booked:     existing?.flight_booked     ?? false,
+    hotel_booked:      existing?.hotel_booked      ?? false,
+    expense_submitted: existing?.expense_submitted ?? false,
+    expense_received:  existing?.expense_received  ?? false,
+    notes:             existing?.notes             ?? null,
+  };
+
+  try {
+    await upsertDay(user.family_id, todayStr, fields);
+  } catch (err) {
+    await ctx.reply(`Couldn't check in: ${err.message}`);
+    return;
+  }
+
+  const dateLabel = new Date(todayStr + 'T12:00:00').toLocaleDateString('en-GB', {
+    weekday: 'short', day: 'numeric', month: 'short',
+  });
+
+  const typeLabel = dayType === 'office'   ? '🏢 Office'
+                  : dayType === 'travel'   ? `✈️ Travel${destination ? ' to ' + destination : ''}`
+                  : '🏖️ Time Off';
+
+  const wasPlanned = existing && !existing.confirmed;
+  const suffix = wasPlanned ? '' : existing ? ' (already confirmed)' : ' — logged & confirmed';
+
+  await ctx.reply(`✅ Checked in — ${typeLabel} (${dateLabel})${suffix}`);
 }
 
 /**
