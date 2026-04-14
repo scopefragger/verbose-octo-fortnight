@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Office Check-In</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f1a;
+      --surface: #1a1a2e;
+      --surface-2: #222240;
+      --surface-3: #2a2a4a;
+      --accent: #6c5ce7;
+      --accent-light: #a29bfe;
+      --accent-glow: rgba(108,92,231,0.3);
+      --green: #00b894;
+      --green-glow: rgba(0,184,148,0.2);
+      --amber: #fdcb6e;
+      --amber-glow: rgba(253,203,110,0.2);
+      --red: #e17055;
+      --red-glow: rgba(225,112,85,0.2);
+      --blue: #74b9ff;
+      --blue-glow: rgba(116,185,255,0.2);
+      --text: #dfe6e9;
+      --text-dim: #636e72;
+      --text-muted: #4a5568;
+      --border: rgba(255,255,255,0.06);
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(108,92,231,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(0,184,148,0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(116,185,255,0.05) 0%, transparent 50%);
+      z-index: 0;
+      animation: bgShift 20s ease-in-out infinite;
+    }
+    @keyframes bgShift { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+
+    /* ── Topbar ── */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 28px;
+      background: rgba(15,15,26,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .topbar-left { display: flex; align-items: center; gap: 14px; }
+    .back-btn {
+      display: flex; align-items: center; gap: 6px;
+      color: var(--text-dim); text-decoration: none;
+      font-size: 13px; font-weight: 500;
+      padding: 6px 12px; border-radius: 8px;
+      transition: all 0.2s;
+    }
+    .back-btn:hover { color: var(--text); background: var(--surface); }
+    .topbar h1 {
+      font-size: 20px; font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-light), var(--green));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      letter-spacing: -0.3px;
+    }
+    .month-nav {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .month-nav button {
+      background: var(--surface-2); border: 1px solid var(--border);
+      color: var(--text); padding: 6px 14px; border-radius: 8px;
+      font-family: inherit; font-size: 14px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .month-nav button:hover { background: var(--surface-3); }
+    .month-label { font-size: 16px; font-weight: 600; min-width: 130px; text-align: center; }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+      position: relative; z-index: 1;
+      display: flex; gap: 12px;
+      padding: 20px 28px; flex-wrap: wrap;
+    }
+    .stat-pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      padding: 10px 20px;
+      display: flex; align-items: center; gap: 8px;
+      font-size: 14px; font-weight: 500;
+    }
+    .stat-pill .val { font-weight: 700; font-size: 16px; }
+    .stat-pill.target-met   { border-color: var(--green); background: rgba(0,184,148,0.08); }
+    .stat-pill.target-miss  { border-color: var(--red);   background: rgba(225,112,85,0.08); }
+    .stat-pill.has-issues   { border-color: var(--amber); background: rgba(253,203,110,0.08); }
+
+    /* ── Calendar ── */
+    .calendar-wrap {
+      position: relative; z-index: 1;
+      padding: 0 28px 40px;
+    }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+    }
+    .cal-header {
+      text-align: center;
+      font-size: 11px; font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: 0.6px;
+      padding: 8px 0;
+    }
+    .cal-cell {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 8px;
+      min-height: 76px;
+      position: relative;
+      cursor: pointer;
+      transition: all 0.18s;
+      display: flex; flex-direction: column;
+    }
+    .cal-cell:hover { border-color: var(--accent); background: var(--surface-2); }
+    .cal-cell.empty { background: transparent; border-color: transparent; cursor: default; }
+    .cal-cell.weekend {
+      opacity: 0.35; cursor: default; pointer-events: none;
+    }
+    .cal-cell.today { box-shadow: 0 0 0 2px var(--accent); }
+
+    /* day type tints */
+    .cal-cell.type-office {
+      background: rgba(0,184,148,0.10);
+      border-color: rgba(0,184,148,0.35);
+    }
+    .cal-cell.type-office:hover { background: rgba(0,184,148,0.18); }
+    .cal-cell.type-travel {
+      background: rgba(116,185,255,0.10);
+      border-color: rgba(116,185,255,0.35);
+    }
+    .cal-cell.type-travel:hover { background: rgba(116,185,255,0.18); }
+    .cal-cell.type-time_off {
+      background: rgba(253,203,110,0.10);
+      border-color: rgba(253,203,110,0.35);
+    }
+    .cal-cell.type-time_off:hover { background: rgba(253,203,110,0.18); }
+
+    .cell-date { font-size: 13px; font-weight: 600; color: var(--text-dim); }
+    .cal-cell.type-office   .cell-date { color: var(--green); }
+    .cal-cell.type-travel   .cell-date { color: var(--blue); }
+    .cal-cell.type-time_off .cell-date { color: var(--amber); }
+
+    .cell-label {
+      font-size: 10px; font-weight: 500;
+      margin-top: 4px; text-transform: uppercase; letter-spacing: 0.4px;
+      color: var(--text-muted);
+    }
+    .cal-cell.type-office   .cell-label { color: var(--green); }
+    .cal-cell.type-travel   .cell-label { color: var(--blue); }
+    .cal-cell.type-time_off .cell-label { color: var(--amber); }
+
+    .cell-dots {
+      display: flex; gap: 4px;
+      position: absolute; bottom: 8px; right: 8px;
+    }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+    }
+    .dot.ok  { background: var(--green); }
+    .dot.bad { background: var(--red); }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: flex-end; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius) var(--radius) 0 0;
+      padding: 28px;
+      width: 100%; max-width: 520px;
+      transform: translateY(40px);
+      transition: transform 0.28s cubic-bezier(.22,1,.36,1);
+      max-height: 90vh; overflow-y: auto;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 22px;
+    }
+    .modal-title { font-size: 18px; font-weight: 700; }
+    .close-btn {
+      background: var(--surface-2); border: 1px solid var(--border);
+      color: var(--text-dim); width: 32px; height: 32px;
+      border-radius: 50%; cursor: pointer; font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+    }
+    .close-btn:hover { background: var(--surface-3); color: var(--text); }
+
+    /* Type selector */
+    .type-selector {
+      display: flex; gap: 10px; margin-bottom: 22px;
+    }
+    .type-btn {
+      flex: 1; padding: 14px 8px;
+      background: var(--surface-2); border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-dim); font-family: inherit;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+    }
+    .type-btn .type-icon { font-size: 22px; }
+    .type-btn:hover { border-color: var(--accent); color: var(--text); background: var(--surface-3); }
+    .type-btn.active-office  { border-color: var(--green); background: rgba(0,184,148,0.12); color: var(--green); }
+    .type-btn.active-travel  { border-color: var(--blue);  background: rgba(116,185,255,0.12); color: var(--blue); }
+    .type-btn.active-time_off { border-color: var(--amber); background: rgba(253,203,110,0.12); color: var(--amber); }
+
+    /* Form sections */
+    .form-section {
+      background: var(--surface-2); border-radius: var(--radius-sm);
+      padding: 16px; margin-bottom: 14px;
+      border: 1px solid var(--border);
+    }
+    .form-section-title {
+      font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.6px;
+      color: var(--text-dim); margin-bottom: 12px;
+    }
+    .checkbox-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; cursor: pointer;
+    }
+    .checkbox-row + .checkbox-row { border-top: 1px solid var(--border); }
+    .checkbox-row input[type=checkbox] {
+      width: 18px; height: 18px; accent-color: var(--accent);
+      cursor: pointer; flex-shrink: 0;
+    }
+    .checkbox-row label { font-size: 14px; cursor: pointer; user-select: none; }
+    .text-input {
+      width: 100%;
+      background: var(--surface-3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 14px;
+      color: var(--text); font-family: inherit; font-size: 14px;
+      transition: border-color 0.2s; margin-bottom: 10px;
+    }
+    .text-input:focus { outline: none; border-color: var(--accent); }
+    .text-input::placeholder { color: var(--text-muted); }
+    textarea.text-input { resize: vertical; min-height: 80px; }
+
+    /* Modal actions */
+    .modal-actions {
+      display: flex; gap: 10px; margin-top: 20px;
+    }
+    .btn {
+      padding: 10px 20px; border-radius: var(--radius-sm);
+      border: none; font-family: inherit; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      color: #fff; flex: 1;
+      box-shadow: 0 2px 12px var(--accent-glow);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px var(--accent-glow); }
+    .btn-danger {
+      background: rgba(225,112,85,0.15); border: 1px solid var(--red);
+      color: var(--red);
+    }
+    .btn-danger:hover { background: rgba(225,112,85,0.28); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+
+    /* Utility */
+    .hidden { display: none !important; }
+    .loading-ring {
+      width: 36px; height: 36px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.7s linear infinite; margin: 60px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-left">
+    <a href="/dashboard" class="back-btn">&#8592; Dashboard</a>
+    <h1>Office Check-In</h1>
+  </div>
+  <div class="month-nav">
+    <button onclick="changeMonth(-1)">&#8249;</button>
+    <span class="month-label" id="monthLabel">—</span>
+    <button onclick="changeMonth(1)">&#8250;</button>
+  </div>
+</header>
+
+<!-- STATS BAR -->
+<div class="stats-bar" id="statsBar">
+  <div class="stat-pill"><span>Loading…</span></div>
+</div>
+
+<!-- CALENDAR -->
+<div class="calendar-wrap">
+  <div class="calendar-grid" id="calGrid">
+    <div class="cal-header">Mon</div>
+    <div class="cal-header">Tue</div>
+    <div class="cal-header">Wed</div>
+    <div class="cal-header">Thu</div>
+    <div class="cal-header">Fri</div>
+    <div class="cal-header">Sat</div>
+    <div class="cal-header">Sun</div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">—</span>
+      <button class="close-btn" onclick="closeModal()">&#10005;</button>
+    </div>
+
+    <!-- Type selector -->
+    <div class="type-selector">
+      <button class="type-btn" id="btnOffice"   onclick="selectType('office')">
+        <span class="type-icon">&#127970;</span>Office
+      </button>
+      <button class="type-btn" id="btnTravel"   onclick="selectType('travel')">
+        <span class="type-icon">&#9992;&#65039;</span>Travel
+      </button>
+      <button class="type-btn" id="btnTimeOff"  onclick="selectType('time_off')">
+        <span class="type-icon">&#127958;</span>Time Off
+      </button>
+    </div>
+
+    <!-- Office section -->
+    <div class="form-section" id="sectionOffice">
+      <div class="form-section-title">Office Details</div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chkParking"> <label for="chkParking">Parking booked</label>
+      </label>
+    </div>
+
+    <!-- Travel section -->
+    <div class="form-section hidden" id="sectionTravel">
+      <div class="form-section-title">Travel Details</div>
+      <input type="text" class="text-input" id="inputDestination" placeholder="Destination (e.g. Amsterdam)">
+      <label class="checkbox-row">
+        <input type="checkbox" id="chkFlight"> <label for="chkFlight">Flight booked</label>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chkHotel"> <label for="chkHotel">Hotel booked</label>
+      </label>
+    </div>
+
+    <!-- Expenses section (office + travel only) -->
+    <div class="form-section" id="sectionExpenses">
+      <div class="form-section-title">Expenses</div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chkExpSubmitted"> <label for="chkExpSubmitted">Expense submitted</label>
+      </label>
+      <label class="checkbox-row">
+        <input type="checkbox" id="chkExpReceived"> <label for="chkExpReceived">Expense received</label>
+      </label>
+    </div>
+
+    <!-- Notes -->
+    <textarea class="text-input" id="inputNotes" placeholder="Notes (optional)…"></textarea>
+
+    <!-- Actions -->
+    <div class="modal-actions">
+      <button class="btn btn-danger hidden" id="btnRemove" onclick="removeDay()">Remove</button>
+      <button class="btn btn-primary" id="btnSave" onclick="saveDay()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ──────────────────────────────────────────────────────────────────
+const SECRET = new URLSearchParams(location.search).get('secret') || '';
+function apiUrl(path) {
+  const sep = path.includes('?') ? '&' : '?';
+  return path + (SECRET ? sep + 'secret=' + encodeURIComponent(SECRET) : '');
+}
+async function api(path, opts = {}) {
+  const res = await fetch(apiUrl(path), {
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || res.statusText);
+  return json;
+}
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ── State ────────────────────────────────────────────────────────────────────
+const MONTH_NAMES = ['January','February','March','April','May','June',
+                     'July','August','September','October','November','December'];
+let currentYear, currentMonth;
+let dayMap = {};          // { 'YYYY-MM-DD': row }
+let modalDate = null;
+let modalType = null;
+let currentStats = null;
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+(function init() {
+  const now = new Date();
+  currentYear  = now.getFullYear();
+  currentMonth = now.getMonth() + 1;
+  loadMonth();
+})();
+
+function changeMonth(delta) {
+  currentMonth += delta;
+  if (currentMonth > 12) { currentMonth = 1;  currentYear++; }
+  if (currentMonth < 1)  { currentMonth = 12; currentYear--; }
+  loadMonth();
+}
+
+async function loadMonth() {
+  document.getElementById('monthLabel').textContent =
+    MONTH_NAMES[currentMonth - 1] + ' ' + currentYear;
+  renderCalendarSkeleton();
+  try {
+    const { days, stats } = await api(
+      `/api/office-checkin?year=${currentYear}&month=${currentMonth}`
+    );
+    dayMap = {};
+    days.forEach(d => { dayMap[d.day_date] = d; });
+    currentStats = stats;
+    renderCalendar();
+    renderStats(stats);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// ── Calendar render ───────────────────────────────────────────────────────────
+function renderCalendarSkeleton() {
+  const grid = document.getElementById('calGrid');
+  // Keep header row (7 cells), replace rest
+  const headers = Array.from(grid.children).slice(0, 7);
+  grid.innerHTML = '';
+  headers.forEach(h => grid.appendChild(h));
+  for (let i = 0; i < 35; i++) {
+    const div = document.createElement('div');
+    div.className = 'cal-cell empty';
+    grid.appendChild(div);
+  }
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('calGrid');
+  const headers = Array.from(grid.children).slice(0, 7);
+  grid.innerHTML = '';
+  headers.forEach(h => grid.appendChild(h));
+
+  const today = new Date();
+  const todayStr = toDateStr(today);
+
+  // Day of week for 1st (0=Sun … 6=Sat). We want Mon=0 offset.
+  const firstDow = new Date(currentYear, currentMonth - 1, 1).getDay();
+  const offset = (firstDow + 6) % 7; // Mon-based offset
+
+  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+  // Leading empty cells
+  for (let i = 0; i < offset; i++) {
+    const div = document.createElement('div');
+    div.className = 'cal-cell empty';
+    grid.appendChild(div);
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${currentYear}-${pad(currentMonth)}-${pad(d)}`;
+    const dow = new Date(currentYear, currentMonth - 1, d).getDay(); // 0=Sun
+    const isWeekend = dow === 0 || dow === 6;
+    const row = dayMap[dateStr];
+
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell' +
+      (isWeekend ? ' weekend' : '') +
+      (dateStr === todayStr ? ' today' : '') +
+      (row ? ' type-' + row.day_type : '');
+
+    let dotsHtml = '';
+    if (row && row.day_type === 'office') {
+      dotsHtml = dot(row.parking_booked);
+    } else if (row && row.day_type === 'travel') {
+      dotsHtml = dot(row.flight_booked) + dot(row.hotel_booked);
+    }
+
+    const labelText = row
+      ? (row.day_type === 'office' ? 'Office'
+       : row.day_type === 'travel' ? (esc(row.destination) || 'Travel')
+       : 'Time Off')
+      : '';
+
+    cell.innerHTML =
+      `<span class="cell-date">${d}</span>` +
+      (labelText ? `<span class="cell-label">${labelText}</span>` : '') +
+      (dotsHtml ? `<span class="cell-dots">${dotsHtml}</span>` : '');
+
+    if (!isWeekend) {
+      cell.addEventListener('click', () => openModal(dateStr));
+    }
+    grid.appendChild(cell);
+  }
+}
+
+function dot(booked) {
+  return `<span class="dot ${booked ? 'ok' : 'bad'}"></span>`;
+}
+function pad(n) { return String(n).padStart(2, '0'); }
+function toDateStr(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+// ── Stats render ──────────────────────────────────────────────────────────────
+function renderStats(s) {
+  const bar = document.getElementById('statsBar');
+  const targetClass = s.targetMet ? 'target-met' : 'target-miss';
+  const targetIcon  = s.targetMet ? '&#10003;' : '&#10007;';
+  const issueClass  = s.bookingIssuesCount > 0 ? 'has-issues' : '';
+
+  bar.innerHTML =
+    `<div class="stat-pill">&#127970; <span class="val">${s.officeDays}</span> Office</div>` +
+    `<div class="stat-pill">&#9992;&#65039; <span class="val">${s.travelDays}</span> Travel</div>` +
+    `<div class="stat-pill ${targetClass}">&#128202; <span class="val">${s.attendancePct}%</span> / 40% ${targetIcon}</div>` +
+    (s.bookingIssuesCount
+      ? `<div class="stat-pill ${issueClass}">&#9888;&#65039; <span class="val">${s.bookingIssuesCount}</span> booking issue${s.bookingIssuesCount !== 1 ? 's' : ''}</div>`
+      : '') +
+    (s.pendingExpensesCount
+      ? `<div class="stat-pill">&#128181; <span class="val">${s.pendingExpensesCount}</span> pending expense${s.pendingExpensesCount !== 1 ? 's' : ''}</div>`
+      : '');
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function openModal(dateStr) {
+  modalDate = dateStr;
+  const row = dayMap[dateStr];
+
+  // Title
+  const d = new Date(dateStr + 'T12:00:00Z');
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  document.getElementById('modalTitle').textContent =
+    dayNames[d.getUTCDay()] + ' ' + d.getUTCDate() + ' ' +
+    MONTH_NAMES[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
+
+  // Populate from existing row or defaults
+  const type = row ? row.day_type : 'office';
+  selectType(type);
+
+  document.getElementById('chkParking').checked      = row?.parking_booked    ?? false;
+  document.getElementById('inputDestination').value  = row?.destination       ?? '';
+  document.getElementById('chkFlight').checked       = row?.flight_booked     ?? false;
+  document.getElementById('chkHotel').checked        = row?.hotel_booked      ?? false;
+  document.getElementById('chkExpSubmitted').checked = row?.expense_submitted ?? false;
+  document.getElementById('chkExpReceived').checked  = row?.expense_received  ?? false;
+  document.getElementById('inputNotes').value        = row?.notes             ?? '';
+
+  document.getElementById('btnRemove').classList.toggle('hidden', !row);
+
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  modalDate = null; modalType = null;
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+
+function selectType(type) {
+  modalType = type;
+  ['office','travel','time_off'].forEach(t => {
+    document.getElementById('btn' + t.charAt(0).toUpperCase() + t.slice(1).replace('_o','O'))
+      ?.classList.remove('active-office','active-travel','active-time_off');
+  });
+  document.getElementById('btnOffice').classList.remove('active-office','active-travel','active-time_off');
+  document.getElementById('btnTravel').classList.remove('active-office','active-travel','active-time_off');
+  document.getElementById('btnTimeOff').classList.remove('active-office','active-travel','active-time_off');
+
+  const map = { office:'btnOffice', travel:'btnTravel', time_off:'btnTimeOff' };
+  document.getElementById(map[type]).classList.add('active-' + type);
+
+  document.getElementById('sectionOffice').classList.toggle('hidden', type !== 'office');
+  document.getElementById('sectionTravel').classList.toggle('hidden', type !== 'travel');
+  document.getElementById('sectionExpenses').classList.toggle('hidden', type === 'time_off');
+}
+
+async function saveDay() {
+  if (!modalDate || !modalType) return;
+  const btn = document.getElementById('btnSave');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const body = {
+      day_type:          modalType,
+      parking_booked:    document.getElementById('chkParking').checked,
+      destination:       document.getElementById('inputDestination').value.trim() || null,
+      flight_booked:     document.getElementById('chkFlight').checked,
+      hotel_booked:      document.getElementById('chkHotel').checked,
+      expense_submitted: document.getElementById('chkExpSubmitted').checked,
+      expense_received:  document.getElementById('chkExpReceived').checked,
+      notes:             document.getElementById('inputNotes').value.trim() || null,
+    };
+    const row = await api(`/api/office-checkin/${modalDate}`, {
+      method: 'PUT', body: JSON.stringify(body),
+    });
+    dayMap[modalDate] = row;
+    closeModal();
+    // Refresh stats
+    const stats = await api(`/api/office-checkin/stats?year=${currentYear}&month=${currentMonth}`);
+    currentStats = stats;
+    renderStats(stats);
+    renderCalendar();
+  } catch (e) {
+    alert('Save failed: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save';
+  }
+}
+
+async function removeDay() {
+  if (!modalDate) return;
+  const btn = document.getElementById('btnRemove');
+  btn.disabled = true; btn.textContent = 'Removing…';
+  try {
+    await api(`/api/office-checkin/${modalDate}`, { method: 'DELETE' });
+    delete dayMap[modalDate];
+    closeModal();
+    const stats = await api(`/api/office-checkin/stats?year=${currentYear}&month=${currentMonth}`);
+    currentStats = stats;
+    renderStats(stats);
+    renderCalendar();
+  } catch (e) {
+    alert('Remove failed: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Remove';
+  }
+}
+</script>
+</body>
+</html>

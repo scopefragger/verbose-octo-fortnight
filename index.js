@@ -22,6 +22,7 @@ import { createGoal, listGoals, updateGoal, deleteGoal, addProgress, getProgress
 import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas, theorizeIdea, getTheories, retheorizeIdea, suggestImprovements, generateHandoff, executeHandoff, getHandoffStatus, TOTAL_PASSES } from './services/ideas.js';
 import { saveHouseDesign, listHouseDesigns, getHouseDesign, deleteHouseDesign } from './services/houseBuilder.js';
 import { listDecklists, getDecklist, saveDecklist, updateDecklist, deleteDecklist } from './services/mtgCommander.js';
+import { upsertDay, deleteDay, getDaysForMonth, getMonthStats } from './services/officeCheckin.js';
 import { chatCompletion } from './llm/groq.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
@@ -38,6 +39,7 @@ const HTML = {
   mtgCommander: fs.readFileSync(path.join(__dirname, 'public', 'mtg-commander.html'), 'utf-8'),
   houseBuilder: fs.readFileSync(path.join(__dirname, 'public', 'house-builder.html'), 'utf-8'),
   ideas: fs.readFileSync(path.join(__dirname, 'public', 'ideas.html'), 'utf-8'),
+  officeCheckin: fs.readFileSync(path.join(__dirname, 'public', 'office-checkin.html'), 'utf-8'),
 };
 
 const app = express();
@@ -201,6 +203,9 @@ app.get('/house-builder', requireAuth, (req, res) => res.type('html').send(HTML.
 
 // Ideas Lab page
 app.get('/ideas', requireAuth, (req, res) => res.type('html').send(HTML.ideas));
+
+// Office Check-In page
+app.get('/office-checkin', requireAuth, (req, res) => res.type('html').send(HTML.officeCheckin));
 
 // Dashboard API — returns JSON data for the dashboard (cached to reduce Supabase load)
 let dashboardCache = { data: null, timestamp: 0 };
@@ -1027,6 +1032,81 @@ app.get('/api/ideas/:id/suggestions', requireAuth, async (req, res) => {
     res.json({ suggestions });
   } catch (err) {
     logError('Suggestions', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Office Check-In ──
+
+// GET /api/office-checkin/stats?year=&month=  — stats only (must come before :date route)
+app.get('/api/office-checkin/stats', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const year  = parseInt(req.query.year,  10);
+    const month = parseInt(req.query.month, 10);
+    if (!year || !month) return res.status(400).json({ error: 'year and month are required' });
+    const stats = await getMonthStats(familyId, year, month);
+    res.json(stats);
+  } catch (err) {
+    logError('Office checkin stats', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/office-checkin?year=&month=  — days array + stats
+app.get('/api/office-checkin', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const year  = parseInt(req.query.year,  10);
+    const month = parseInt(req.query.month, 10);
+    if (!year || !month) return res.status(400).json({ error: 'year and month are required' });
+    const [days, stats] = await Promise.all([
+      getDaysForMonth(familyId, year, month),
+      getMonthStats(familyId, year, month),
+    ]);
+    res.json({ days, stats });
+  } catch (err) {
+    logError('Office checkin list', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/office-checkin/:date  — upsert a day
+app.put('/api/office-checkin/:date', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const dayDate = req.params.date;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayDate)) {
+      return res.status(400).json({ error: 'Date must be YYYY-MM-DD' });
+    }
+    const { day_type } = req.body;
+    if (!['office', 'travel', 'time_off'].includes(day_type)) {
+      return res.status(400).json({ error: 'day_type must be office, travel, or time_off' });
+    }
+    const row = await upsertDay(familyId, dayDate, req.body);
+    res.json(row);
+  } catch (err) {
+    logError('Office checkin upsert', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/office-checkin/:date  — remove a day
+app.delete('/api/office-checkin/:date', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const dayDate = req.params.date;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayDate)) {
+      return res.status(400).json({ error: 'Date must be YYYY-MM-DD' });
+    }
+    await deleteDay(familyId, dayDate);
+    res.json({ deleted: true });
+  } catch (err) {
+    logError('Office checkin delete', err);
     res.status(500).json({ error: err.message });
   }
 });
