@@ -9,6 +9,7 @@ import { getTheme } from '../services/themes.js';
 import { getFoodItems } from '../services/foodExpiry.js';
 import { getWatchlist } from '../services/watchlist.js';
 import { getBirthdays, getUpcomingBirthdayEvents } from '../services/birthdays.js';
+import { getDaysInRange, formatAsEvents } from '../services/officeCheckin.js';
 import { listGoals } from '../services/goals.js';
 import { formatForUser } from '../utils/time.js';
 
@@ -43,9 +44,10 @@ export async function getDashboardData(familyId) {
 
   // Fetch all data in a single parallel batch
   const reminderPromises = members.map((m) => listReminders(m.id));
-  const [todayEvents, weekEvents, listsWithItems, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme, foodItems, watchlistItems, allBirthdays, activeGoals, ...reminderResults] = await Promise.all([
+  const [todayEvents, weekEvents, officeCheckinDays, listsWithItems, activeCountdowns, kidPoints, todayMeals, weekMeals, dashboardTheme, foodItems, watchlistItems, allBirthdays, activeGoals, ...reminderResults] = await Promise.all([
     listEvents(familyId, todayStart, todayEnd),
     listEvents(familyId, tomorrowStart, weekEndBound),
+    getDaysInRange(familyId, todayStr, weekEndStr),
     getAllListsWithItems(familyId),
     listCountdowns(familyId),
     getAllPoints(familyId),
@@ -60,8 +62,9 @@ export async function getDashboardData(familyId) {
   ]);
   const allReminders = reminderResults.flat();
 
-  // Generate virtual birthday events and merge into today/week events
-  const birthdayEvents = getUpcomingBirthdayEvents(allBirthdays || []);
+  // Generate virtual birthday events and virtual office check-in events
+  const birthdayEvents    = getUpcomingBirthdayEvents(allBirthdays || []);
+  const officeEvents      = formatAsEvents(officeCheckinDays || []);
 
   // Format events for display
   const formatEvent = (e) => ({
@@ -74,6 +77,7 @@ export async function getDashboardData(familyId) {
     starts_at_display: e.all_day ? 'All day' : formatForUser(e.starts_at, tz),
     ends_at_display: e.ends_at ? formatForUser(e.ends_at, tz) : null,
     all_day: e.all_day,
+    is_office_checkin: e.is_office_checkin || false,
     day_label: new Date(e.starts_at).toLocaleDateString('en-US', {
       timeZone: tz,
       weekday: 'short',
@@ -99,12 +103,14 @@ export async function getDashboardData(familyId) {
       events: [
         ...todayEvents.map(formatEvent),
         ...birthdayEvents.filter(b => b.starts_at.startsWith(todayStr)).map(formatEvent),
+        ...officeEvents.filter(o => o.starts_at.startsWith(todayStr)).map(formatEvent),
       ],
     },
     week: {
       events: [
         ...weekEvents.map(formatEvent),
         ...birthdayEvents.filter(b => !b.starts_at.startsWith(todayStr)).map(formatEvent),
+        ...officeEvents.filter(o => !o.starts_at.startsWith(todayStr)).map(formatEvent),
       ].sort((a, b) => a.starts_at.localeCompare(b.starts_at)),
     },
     reminders: allReminders.map((r) => ({

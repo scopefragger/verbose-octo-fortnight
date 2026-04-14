@@ -46,6 +46,46 @@ export async function upsertDay(familyId, dayDate, fields) {
 }
 
 /**
+ * Get all logged days within an arbitrary date range (YYYY-MM-DD strings).
+ * Used by the dashboard to merge office days into the calendar view.
+ */
+export async function getDaysInRange(familyId, startDate, endDate) {
+  const { data, error } = await supabase
+    .from('office_checkin_days')
+    .select('*')
+    .eq('family_id', familyId)
+    .gte('day_date', startDate)
+    .lte('day_date', endDate)
+    .order('day_date');
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Convert office_checkin_days rows into dashboard-compatible event objects.
+ * These are virtual (no real row in the events table) — identified by is_office_checkin flag.
+ */
+export function formatAsEvents(days) {
+  return days.map(day => {
+    const emoji = day.day_type === 'office' ? '🏢'
+                : day.day_type === 'travel'  ? '✈️'
+                : '🏖️';
+    const label = day.day_type === 'office' ? 'Office'
+                : day.day_type === 'travel'  ? (day.destination || 'Travel')
+                : 'Time Off';
+    return {
+      id: `office-checkin-${day.id}`,
+      title: `${emoji} ${label}`,
+      description: day.notes || null,
+      starts_at: `${day.day_date}T09:00:00`,
+      ends_at: null,
+      all_day: true,
+      is_office_checkin: true,
+    };
+  });
+}
+
+/**
  * Delete a day entry by date. Scoped by both date and family_id.
  */
 export async function deleteDay(familyId, dayDate) {

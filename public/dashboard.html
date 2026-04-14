@@ -4581,7 +4581,7 @@
                     <h3>${esc(e.title)}</h3>
                     ${e.description ? `<p>${esc(e.description)}</p>` : ''}
                   </div>
-                  <button class="event-del-btn" data-event-id="${e.id}" title="Delete event">&times;</button>
+                  ${e.is_office_checkin ? '' : `<button class="event-del-btn" data-event-id="${e.id}" title="Delete event">&times;</button>`}
                 </div>
               `}).join('')}
           </div>
@@ -4690,7 +4690,7 @@
               <div class="dot"></div>
               <span class="time">${esc(e.starts_at_display)}</span>
               <span>${esc(e.title)}</span>
-              <button class="event-del-btn" data-event-id="${e.id}" title="Delete event">&times;</button>
+              ${e.is_office_checkin ? '' : `<button class="event-del-btn" data-event-id="${e.id}" title="Delete event">&times;</button>`}
             </div>
           `}).join('')}
         </div>
