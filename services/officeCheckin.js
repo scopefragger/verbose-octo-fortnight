@@ -1,4 +1,5 @@
 import { supabase } from '../db/supabase.js';
+import { getUKHolidays } from './holidays.js';
 
 /**
  * Upsert a day entry. Rejects weekends.
@@ -104,17 +105,33 @@ export async function getMonthStats(familyId, year, month) {
     if (dow !== 0 && dow !== 6) totalWorkingDays++;
   }
 
+  // Bank holidays that fall on a weekday in this month reduce eligible days
+  const monthPrefix = `${year}-${String(month).padStart(2, '0')}-`;
+  const bankHolidayDates = new Set(
+    getUKHolidays(year)
+      .filter(h => h.description === 'Bank Holiday' && h.date.startsWith(monthPrefix))
+      .filter(h => {
+        const dow = new Date(h.date + 'T12:00:00Z').getUTCDay();
+        return dow !== 0 && dow !== 6;
+      })
+      .map(h => h.date)
+  );
+  const bankHolidayDays = bankHolidayDates.size;
+
   const officeDays   = rows.filter(r => r.day_type === 'office').length;
   const travelDays   = rows.filter(r => r.day_type === 'travel').length;
   const timeOffDays  = rows.filter(r => r.day_type === 'time_off').length;
-  const eligibleDays = Math.max(totalWorkingDays - timeOffDays, 0);
+
+  // Travel counts as an attending day; bank holidays + time-off reduce the denominator
+  const attendingDays = officeDays + travelDays;
+  const eligibleDays  = Math.max(totalWorkingDays - timeOffDays - bankHolidayDays, 0);
 
   const attendancePct = eligibleDays > 0
-    ? Math.round(officeDays / eligibleDays * 100)
+    ? Math.round(attendingDays / eligibleDays * 100)
     : 0;
 
   const targetMet = eligibleDays > 0
-    ? (officeDays / eligibleDays) >= 0.40
+    ? (attendingDays / eligibleDays) >= 0.40
     : false;
 
   const bookingIssues = rows.filter(r => {
@@ -130,9 +147,11 @@ export async function getMonthStats(familyId, year, month) {
 
   return {
     totalWorkingDays,
+    bankHolidayDays,
     officeDays,
     travelDays,
     timeOffDays,
+    attendingDays,
     eligibleDays,
     attendancePct,
     targetMet,

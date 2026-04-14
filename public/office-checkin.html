@@ -560,7 +560,10 @@ function renderStats(s) {
   bar.innerHTML =
     `<div class="stat-pill">&#127970; <span class="val">${s.officeDays}</span> Office</div>` +
     `<div class="stat-pill">&#9992;&#65039; <span class="val">${s.travelDays}</span> Travel</div>` +
-    `<div class="stat-pill ${targetClass}">&#128202; <span class="val">${s.attendancePct}%</span> / 40% ${targetIcon}</div>` +
+    `<div class="stat-pill ${targetClass}">&#128202; <span class="val">${s.attendingDays}/${s.eligibleDays}</span> days &nbsp;${s.attendancePct}% / 40% ${targetIcon}</div>` +
+    (s.bankHolidayDays
+      ? `<div class="stat-pill">&#127981; <span class="val">${s.bankHolidayDays}</span> bank holiday${s.bankHolidayDays !== 1 ? 's' : ''}</div>`
+      : '') +
     (s.bookingIssuesCount
       ? `<div class="stat-pill ${issueClass}">&#9888;&#65039; <span class="val">${s.bookingIssuesCount}</span> booking issue${s.bookingIssuesCount !== 1 ? 's' : ''}</div>`
       : '') +
