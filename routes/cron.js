@@ -2,6 +2,7 @@ import { getDueReminders, markSent, listReminders, createReminder, getNextOccurr
 import { listEvents } from '../services/calendar.js';
 import { getMealsForDate } from '../services/meals.js';
 import { getAllPoints } from '../services/points.js';
+import { getMonthStats } from '../services/officeCheckin.js';
 import { supabase } from '../db/supabase.js';
 import { formatForUser } from '../utils/time.js';
 
@@ -206,9 +207,16 @@ export async function sendWeeklyDigest(bot) {
     const weekStart = startOfDayInTz(now, tz);
     const weekEnd = endOfDayInTz(addDays(now, 6), tz);
 
-    const events = await listEvents(user.family_id, weekStart, weekEnd);
+    const now = new Date();
+    const year  = now.getFullYear();
+    const month = now.getMonth() + 1;
 
-    if (events.length === 0) continue;
+    const [events, officeStats] = await Promise.all([
+      listEvents(user.family_id, weekStart, weekEnd),
+      getMonthStats(user.family_id, year, month).catch(() => null),
+    ]);
+
+    if (events.length === 0 && !officeStats) continue;
 
     let message = `📋 Weekly overview for ${user.display_name}:\n\n`;
 
@@ -230,6 +238,27 @@ export async function sendWeeklyDigest(bot) {
       for (const event of dayEvents) {
         const time = event.all_day ? 'All day' : formatForUser(event.starts_at, tz);
         message += `  • ${event.title} — ${time}\n`;
+      }
+      message += '\n';
+    }
+
+    // Office attendance section
+    if (officeStats && officeStats.eligibleDays > 0) {
+      const monthName = new Date(year, month - 1, 1).toLocaleString('en-US', { month: 'long' });
+      const targetIcon = officeStats.actualTargetMet ? '✅' : (officeStats.plannedTargetMet ? '🟡' : '❌');
+      message += `🏢 Office attendance — ${monthName}\n`;
+      message += `  Actual:  ${officeStats.confirmedDays}/${officeStats.eligibleDays} days (${officeStats.actualPct}%) ${targetIcon}\n`;
+      message += `  Planned: ${officeStats.plannedDays}/${officeStats.eligibleDays} days (${officeStats.plannedPct}%)\n`;
+
+      const daysNeeded = Math.ceil(officeStats.eligibleDays * 0.4) - officeStats.confirmedDays;
+      if (daysNeeded > 0 && !officeStats.actualTargetMet) {
+        message += `  Need ${daysNeeded} more confirmed day${daysNeeded !== 1 ? 's' : ''} to hit 40%\n`;
+      }
+      if (officeStats.bookingIssuesCount > 0) {
+        message += `  ⚠️ ${officeStats.bookingIssuesCount} day${officeStats.bookingIssuesCount !== 1 ? 's' : ''} with missing bookings\n`;
+      }
+      if (officeStats.pendingExpensesCount > 0) {
+        message += `  💸 ${officeStats.pendingExpensesCount} expense${officeStats.pendingExpensesCount !== 1 ? 's' : ''} submitted but not received\n`;
       }
       message += '\n';
     }
