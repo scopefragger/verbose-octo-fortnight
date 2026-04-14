@@ -147,22 +147,44 @@
     }
     .cal-cell.today { box-shadow: 0 0 0 2px var(--accent); }
 
-    /* day type tints */
+    /* day type tints — planned (unconfirmed) = lighter / dashed */
     .cal-cell.type-office {
-      background: rgba(0,184,148,0.10);
-      border-color: rgba(0,184,148,0.35);
+      background: rgba(0,184,148,0.07);
+      border-color: rgba(0,184,148,0.25);
+      border-style: dashed;
     }
-    .cal-cell.type-office:hover { background: rgba(0,184,148,0.18); }
+    .cal-cell.type-office:hover { background: rgba(0,184,148,0.14); }
     .cal-cell.type-travel {
-      background: rgba(116,185,255,0.10);
-      border-color: rgba(116,185,255,0.35);
+      background: rgba(116,185,255,0.07);
+      border-color: rgba(116,185,255,0.25);
+      border-style: dashed;
     }
-    .cal-cell.type-travel:hover { background: rgba(116,185,255,0.18); }
+    .cal-cell.type-travel:hover { background: rgba(116,185,255,0.14); }
     .cal-cell.type-time_off {
       background: rgba(253,203,110,0.10);
       border-color: rgba(253,203,110,0.35);
     }
     .cal-cell.type-time_off:hover { background: rgba(253,203,110,0.18); }
+
+    /* confirmed = solid border, stronger tint */
+    .cal-cell.type-office.confirmed {
+      background: rgba(0,184,148,0.14);
+      border-color: rgba(0,184,148,0.55);
+      border-style: solid;
+    }
+    .cal-cell.type-office.confirmed:hover { background: rgba(0,184,148,0.22); }
+    .cal-cell.type-travel.confirmed {
+      background: rgba(116,185,255,0.14);
+      border-color: rgba(116,185,255,0.55);
+      border-style: solid;
+    }
+    .cal-cell.type-travel.confirmed:hover { background: rgba(116,185,255,0.22); }
+
+    .cell-confirm-tick {
+      position: absolute; top: 6px; right: 8px;
+      font-size: 11px; color: var(--green); font-weight: 700;
+    }
+    .cal-cell.type-travel.confirmed .cell-confirm-tick { color: var(--blue); }
 
     .cell-date { font-size: 13px; font-weight: 600; color: var(--text-dim); }
     .cal-cell.type-office   .cell-date { color: var(--green); }
@@ -362,6 +384,14 @@
       </button>
     </div>
 
+    <!-- Attendance confirmation (office + travel only) -->
+    <div class="form-section" id="sectionConfirm" style="border-color: rgba(0,184,148,0.2);">
+      <label class="checkbox-row" style="padding:0;">
+        <input type="checkbox" id="chkConfirmed">
+        <label for="chkConfirmed" style="font-size:15px; font-weight:600;">&#10003; I attended this day</label>
+      </label>
+    </div>
+
     <!-- Office section -->
     <div class="form-section" id="sectionOffice">
       <div class="form-section-title">Office Details</div>
@@ -511,11 +541,15 @@ function renderCalendar() {
     const isWeekend = dow === 0 || dow === 6;
     const row = dayMap[dateStr];
 
+    const isConfirmed = row && row.confirmed &&
+      (row.day_type === 'office' || row.day_type === 'travel');
+
     const cell = document.createElement('div');
     cell.className = 'cal-cell' +
       (isWeekend ? ' weekend' : '') +
       (dateStr === todayStr ? ' today' : '') +
-      (row ? ' type-' + row.day_type : '');
+      (row ? ' type-' + row.day_type : '') +
+      (isConfirmed ? ' confirmed' : '');
 
     let dotsHtml = '';
     if (row && row.day_type === 'office') {
@@ -532,6 +566,7 @@ function renderCalendar() {
 
     cell.innerHTML =
       `<span class="cell-date">${d}</span>` +
+      (isConfirmed ? `<span class="cell-confirm-tick">&#10003;</span>` : '') +
       (labelText ? `<span class="cell-label">${labelText}</span>` : '') +
       (dotsHtml ? `<span class="cell-dots">${dotsHtml}</span>` : '');
 
@@ -553,14 +588,18 @@ function toDateStr(d) {
 // ── Stats render ──────────────────────────────────────────────────────────────
 function renderStats(s) {
   const bar = document.getElementById('statsBar');
-  const targetClass = s.targetMet ? 'target-met' : 'target-miss';
-  const targetIcon  = s.targetMet ? '&#10003;' : '&#10007;';
-  const issueClass  = s.bookingIssuesCount > 0 ? 'has-issues' : '';
+  const issueClass = s.bookingIssuesCount > 0 ? 'has-issues' : '';
+
+  const plannedClass = s.plannedTargetMet ? 'target-met' : 'target-miss';
+  const plannedIcon  = s.plannedTargetMet ? '&#10003;' : '&#10007;';
+  const actualClass  = s.actualTargetMet  ? 'target-met' : 'target-miss';
+  const actualIcon   = s.actualTargetMet  ? '&#10003;' : '&#10007;';
 
   bar.innerHTML =
     `<div class="stat-pill">&#127970; <span class="val">${s.officeDays}</span> Office</div>` +
     `<div class="stat-pill">&#9992;&#65039; <span class="val">${s.travelDays}</span> Travel</div>` +
-    `<div class="stat-pill ${targetClass}">&#128202; <span class="val">${s.attendingDays}/${s.eligibleDays}</span> days &nbsp;${s.attendancePct}% / 40% ${targetIcon}</div>` +
+    `<div class="stat-pill ${plannedClass}">&#128197; Planned <span class="val">${s.plannedPct}%</span> (${s.plannedDays}/${s.eligibleDays}) ${plannedIcon}</div>` +
+    `<div class="stat-pill ${actualClass}">&#10003; Actual <span class="val">${s.actualPct}%</span> (${s.confirmedDays}/${s.eligibleDays}) ${actualIcon}</div>` +
     (s.bankHolidayDays
       ? `<div class="stat-pill">&#127981; <span class="val">${s.bankHolidayDays}</span> bank holiday${s.bankHolidayDays !== 1 ? 's' : ''}</div>`
       : '') +
@@ -588,6 +627,7 @@ function openModal(dateStr) {
   const type = row ? row.day_type : 'office';
   selectType(type);
 
+  document.getElementById('chkConfirmed').checked    = row?.confirmed         ?? false;
   document.getElementById('chkParking').checked      = row?.parking_booked    ?? false;
   document.getElementById('inputDestination').value  = row?.destination       ?? '';
   document.getElementById('chkFlight').checked       = row?.flight_booked     ?? false;
@@ -623,6 +663,7 @@ function selectType(type) {
   const map = { office:'btnOffice', travel:'btnTravel', time_off:'btnTimeOff' };
   document.getElementById(map[type]).classList.add('active-' + type);
 
+  document.getElementById('sectionConfirm').classList.toggle('hidden', type === 'time_off');
   document.getElementById('sectionOffice').classList.toggle('hidden', type !== 'office');
   document.getElementById('sectionTravel').classList.toggle('hidden', type !== 'travel');
   document.getElementById('sectionExpenses').classList.toggle('hidden', type === 'time_off');
@@ -635,6 +676,7 @@ async function saveDay() {
   try {
     const body = {
       day_type:          modalType,
+      confirmed:         modalType !== 'time_off' && document.getElementById('chkConfirmed').checked,
       parking_booked:    document.getElementById('chkParking').checked,
       destination:       document.getElementById('inputDestination').value.trim() || null,
       flight_booked:     document.getElementById('chkFlight').checked,

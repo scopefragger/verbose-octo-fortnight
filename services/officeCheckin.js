@@ -16,7 +16,7 @@ export async function upsertDay(familyId, dayDate, fields) {
     throw new Error('Cannot log a weekend day');
   }
 
-  const { day_type, parking_booked, destination, flight_booked, hotel_booked,
+  const { day_type, confirmed, parking_booked, destination, flight_booked, hotel_booked,
           expense_submitted, expense_received, notes } = fields;
 
   const { data, error } = await supabase
@@ -26,6 +26,7 @@ export async function upsertDay(familyId, dayDate, fields) {
         family_id: familyId,
         day_date: dayDate,
         day_type,
+        confirmed: confirmed ?? false,
         parking_booked: parking_booked ?? false,
         destination: destination ?? null,
         flight_booked: flight_booked ?? false,
@@ -118,21 +119,27 @@ export async function getMonthStats(familyId, year, month) {
   );
   const bankHolidayDays = bankHolidayDates.size;
 
-  const officeDays   = rows.filter(r => r.day_type === 'office').length;
-  const travelDays   = rows.filter(r => r.day_type === 'travel').length;
-  const timeOffDays  = rows.filter(r => r.day_type === 'time_off').length;
+  const officeDays  = rows.filter(r => r.day_type === 'office').length;
+  const travelDays  = rows.filter(r => r.day_type === 'travel').length;
+  const timeOffDays = rows.filter(r => r.day_type === 'time_off').length;
 
   // Travel counts as an attending day; bank holidays + time-off reduce the denominator
-  const attendingDays = officeDays + travelDays;
-  const eligibleDays  = Math.max(totalWorkingDays - timeOffDays - bankHolidayDays, 0);
+  const plannedDays  = officeDays + travelDays;   // all logged office/travel
+  const confirmedDays = rows.filter(r =>           // actually attended
+    (r.day_type === 'office' || r.day_type === 'travel') && r.confirmed
+  ).length;
+  const eligibleDays = Math.max(totalWorkingDays - timeOffDays - bankHolidayDays, 0);
 
-  const attendancePct = eligibleDays > 0
-    ? Math.round(attendingDays / eligibleDays * 100)
-    : 0;
+  const plannedPct  = eligibleDays > 0 ? Math.round(plannedDays   / eligibleDays * 100) : 0;
+  const actualPct   = eligibleDays > 0 ? Math.round(confirmedDays / eligibleDays * 100) : 0;
 
-  const targetMet = eligibleDays > 0
-    ? (attendingDays / eligibleDays) >= 0.40
-    : false;
+  const plannedTargetMet  = eligibleDays > 0 ? (plannedDays   / eligibleDays) >= 0.40 : false;
+  const actualTargetMet   = eligibleDays > 0 ? (confirmedDays / eligibleDays) >= 0.40 : false;
+
+  // Keep these for backwards compat with anything else that reads them
+  const attendingDays = plannedDays;
+  const attendancePct = plannedPct;
+  const targetMet     = plannedTargetMet;
 
   const bookingIssues = rows.filter(r => {
     if (r.day_type === 'office')  return !r.parking_booked;
@@ -151,8 +158,15 @@ export async function getMonthStats(familyId, year, month) {
     officeDays,
     travelDays,
     timeOffDays,
-    attendingDays,
+    plannedDays,
+    confirmedDays,
     eligibleDays,
+    plannedPct,
+    actualPct,
+    plannedTargetMet,
+    actualTargetMet,
+    // kept for backwards compat
+    attendingDays,
     attendancePct,
     targetMet,
     bookingIssuesCount: bookingIssues.length,
