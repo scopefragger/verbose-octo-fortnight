@@ -209,12 +209,10 @@ export async function sendWeeklyDigest(bot) {
 
     const tz = user.timezone || 'Europe/London';
     const now = new Date();
-    const weekStart = startOfDayInTz(now, tz);
-    const weekEnd = endOfDayInTz(addDays(now, 6), tz);
-
-    const now = new Date();
     const year  = now.getFullYear();
     const month = now.getMonth() + 1;
+    const weekStart = startOfDayInTz(now, tz);
+    const weekEnd = endOfDayInTz(addDays(now, 6), tz);
 
     const [events, officeStats] = await Promise.all([
       listEvents(user.family_id, weekStart, weekEnd),
