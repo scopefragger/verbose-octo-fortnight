@@ -9,8 +9,6 @@ Single-file app — embedded CSS, HTML, and JavaScript.
 
 | # | Section | Lines | Description |
 |---|---------|-------|-------------|
-| 12 | Save / Load | 1454–1529 | `saveDeck()`, `loadSavedDecks()`, `loadDeckFromSaved()`, `deleteSavedDeck()` — REST API calls |
-| 13 | Mode Toggle | 1531–1545 | `setMode()` switches between Prepare/Play views; `toggleSidebar()` |
 | 14 | Play State | 1547–1641 | Play-mode variables (`playHand[]`, `playBattlefield[]`, `manaPool{}`); `parseMana()`, `canAfford()`, `spendMana()`, `renderManaPool()`, `clearManaPool()` |
 | 15 | Token Definitions | 1647–1662 | `COMMON_TOKENS` array — preset token data |
 | 17 | Render Play Area | 1858–1923 | `renderPlayArea()`, `renderBattlefield()`, `renderPlayHand()` — HTML generation for battlefield and hand |
