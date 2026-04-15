@@ -1,8 +1,11 @@
 import { getDueReminders, markSent, listReminders, createReminder, getNextOccurrence } from '../services/reminders.js';
 import { listEvents } from '../services/calendar.js';
-import { getMealsForDate } from '../services/meals.js';
+import { getMealsForDate, getMealsForWeek } from '../services/meals.js';
 import { getAllPoints } from '../services/points.js';
-import { getMonthStats } from '../services/officeCheckin.js';
+import { getMonthStats, getTodayRow } from '../services/officeCheckin.js';
+import { getFoodItems } from '../services/foodExpiry.js';
+import { getBirthdays } from '../services/birthdays.js';
+import { listCountdowns } from '../services/countdowns.js';
 import { supabase } from '../db/supabase.js';
 import { formatForUser } from '../utils/time.js';
 
@@ -85,6 +88,48 @@ export async function sendDailyDigest(bot) {
       ? await getAllPoints(user.family_id)
       : [];
 
+    // Get food expiry alerts (items expiring within 2 days)
+    const urgentFood = user.family_id
+      ? await getFoodItems(user.family_id)
+          .then(items => {
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() + 2);
+            cutoff.setHours(23, 59, 59);
+            return items.filter(i => new Date(i.expires_at + 'T23:59:59') <= cutoff);
+          })
+          .catch(() => [])
+      : [];
+
+    // Get birthdays for today and tomorrow
+    const allBirthdays = user.family_id
+      ? await getBirthdays(user.family_id).catch(() => [])
+      : [];
+    const tomorrowDateStr = addDays(now, 1).toLocaleDateString('en-CA', { timeZone: tz });
+    const todayMMDD = todayStr.slice(5);
+    const tomorrowMMDD = tomorrowDateStr.slice(5);
+    const thisYear = parseInt(todayStr.slice(0, 4));
+    const todayBirthdays = allBirthdays.filter(b => b.birth_date.slice(5) === todayMMDD);
+    const tomorrowBirthdays = allBirthdays.filter(b => b.birth_date.slice(5) === tomorrowMMDD);
+
+    // Get office check-in status for today (weekdays only)
+    const isWeekday = !['Saturday', 'Sunday'].includes(dayName);
+    const todayOfficeRow = (isWeekday && user.family_id)
+      ? await getTodayRow(user.family_id, todayStr).catch(() => null)
+      : null;
+
+    // Get nearest countdown (if within 30 days)
+    const nearestCountdown = user.family_id
+      ? await listCountdowns(user.family_id)
+          .then(cdowns => {
+            if (!cdowns.length) return null;
+            cdowns.sort((a, b) => a.target_date.localeCompare(b.target_date));
+            const c = cdowns[0];
+            const daysUntil = Math.ceil((new Date(c.target_date + 'T00:00:00') - new Date()) / (1000 * 60 * 60 * 24));
+            return daysUntil <= 30 ? { ...c, daysUntil } : null;
+          })
+          .catch(() => null)
+      : null;
+
     // Build the enriched digest
     let message = `☀️ Good morning, ${user.display_name}! Here's your ${dayName}:\n`;
 
@@ -110,6 +155,44 @@ export async function sendDailyDigest(bot) {
       for (const r of todayReminders) {
         message += `  • ${r.message} — ${formatForUser(r.remind_at, tz)}\n`;
       }
+    }
+
+    if (urgentFood.length > 0) {
+      message += `\n🥗 Use Up Today/Soon:\n`;
+      for (const item of urgentFood) {
+        const daysLeft = Math.ceil((new Date(item.expires_at + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24));
+        const urgency = daysLeft <= 0 ? 'EXPIRED ❌' : daysLeft === 1 ? '1 day left ⚠️' : `${daysLeft} days left`;
+        const qty = item.quantity ? ` (${item.quantity})` : '';
+        message += `  • ${item.name}${qty} — ${urgency}\n`;
+      }
+    }
+
+    for (const b of todayBirthdays) {
+      const age = thisYear - parseInt(b.birth_date.slice(0, 4));
+      message += `\n🎂 Birthday Today: ${b.name} turns ${age}! 🥳\n`;
+    }
+    for (const b of tomorrowBirthdays) {
+      const age = thisYear - parseInt(b.birth_date.slice(0, 4));
+      message += `\n🎂 Birthday Tomorrow: ${b.name} turns ${age}\n`;
+    }
+
+    if (isWeekday) {
+      if (todayOfficeRow) {
+        const typeLabel = todayOfficeRow.day_type === 'office' ? 'In office'
+          : todayOfficeRow.day_type === 'travel' ? `Travel${todayOfficeRow.destination ? ` to ${todayOfficeRow.destination}` : ''}`
+          : 'Time off';
+        const bookingNote = todayOfficeRow.day_type === 'office'
+          ? (todayOfficeRow.parking_booked ? ' — parking ✅' : ' — parking ⚠️')
+          : '';
+        message += `\n🏢 Office: ${typeLabel}${bookingNote}\n`;
+      } else {
+        message += `\n🏢 Office: No day logged yet for today\n`;
+      }
+    }
+
+    if (nearestCountdown) {
+      const bgEmoji = { fireworks: '🎆', castle: '🏰', stars: '⭐', rainbow: '🌈', beach: '🏖️', party: '🎉' }[nearestCountdown.background] || '⏳';
+      message += `\n⏳ ${nearestCountdown.title} in ${nearestCountdown.daysUntil} day${nearestCountdown.daysUntil !== 1 ? 's' : ''}! ${bgEmoji}\n`;
     }
 
     if (kidPoints.length > 0) {
@@ -213,13 +296,36 @@ export async function sendWeeklyDigest(bot) {
     const month = now.getMonth() + 1;
     const weekStart = startOfDayInTz(now, tz);
     const weekEnd = endOfDayInTz(addDays(now, 6), tz);
+    const weekStartStr = now.toLocaleDateString('en-CA', { timeZone: tz });
+    const weekEndStr = addDays(now, 6).toLocaleDateString('en-CA', { timeZone: tz });
+    const weekDates = Array.from({ length: 7 }, (_, i) =>
+      addDays(now, i).toLocaleDateString('en-CA', { timeZone: tz })
+    );
 
-    const [events, officeStats] = await Promise.all([
+    const [events, officeStats, weekBdaySource, weekFoodItems, weekMeals] = await Promise.all([
       listEvents(user.family_id, weekStart, weekEnd),
       getMonthStats(user.family_id, year, month).catch(() => null),
+      getBirthdays(user.family_id).catch(() => []),
+      getFoodItems(user.family_id).catch(() => []),
+      getMealsForWeek(user.family_id, weekStartStr, weekEndStr).catch(() => []),
     ]);
 
-    if (events.length === 0 && !officeStats) continue;
+    // Find birthdays falling within the 7-day window
+    const weekBirthdays = [];
+    for (const b of weekBdaySource) {
+      for (const d of weekDates) {
+        if (b.birth_date.slice(5) === d.slice(5)) {
+          weekBirthdays.push({ ...b, onDate: d, age: parseInt(d.slice(0, 4)) - parseInt(b.birth_date.slice(0, 4)) });
+          break;
+        }
+      }
+    }
+    weekBirthdays.sort((a, b) => a.onDate.localeCompare(b.onDate));
+
+    // Find food expiring within the 7-day window
+    const weekExpiringFood = weekFoodItems.filter(i => i.expires_at <= weekEndStr);
+
+    if (events.length === 0 && !officeStats && weekBirthdays.length === 0 && weekExpiringFood.length === 0 && weekMeals.length === 0) continue;
 
     let message = `📋 Weekly overview for ${user.display_name}:\n\n`;
 
@@ -264,6 +370,46 @@ export async function sendWeeklyDigest(bot) {
         message += `  💸 ${officeStats.pendingExpensesCount} expense${officeStats.pendingExpensesCount !== 1 ? 's' : ''} submitted but not received\n`;
       }
       message += '\n';
+    }
+
+    if (weekBirthdays.length > 0) {
+      message += `🎂 Birthdays This Week:\n`;
+      for (const b of weekBirthdays) {
+        const dayLabel = new Date(b.onDate + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' });
+        message += `  • ${b.name} — ${dayLabel} (turns ${b.age})\n`;
+      }
+      message += '\n';
+    }
+
+    if (weekExpiringFood.length > 0) {
+      message += `🥗 Food To Use This Week:\n`;
+      for (const item of weekExpiringFood) {
+        const daysLeft = Math.ceil((new Date(item.expires_at + 'T23:59:59') - new Date()) / (1000 * 60 * 60 * 24));
+        const dayLabel = new Date(item.expires_at + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+        const qty = item.quantity ? ` (${item.quantity})` : '';
+        message += `  • ${item.name}${qty} — ${dayLabel} (${daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''}` : 'today'})\n`;
+      }
+      message += '\n';
+    }
+
+    if (weekMeals.length > 0) {
+      const mealsByDay = {};
+      for (const meal of weekMeals) {
+        if (!mealsByDay[meal.meal_date]) mealsByDay[meal.meal_date] = [];
+        mealsByDay[meal.meal_date].push(meal);
+      }
+      if (Object.keys(mealsByDay).length >= 2) {
+        message += `🍽️ Meals This Week:\n`;
+        for (const d of weekDates) {
+          const dayMeals = mealsByDay[d];
+          if (!dayMeals) continue;
+          const shortDay = new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+          const dinner = dayMeals.find(m => m.meal_type === 'dinner');
+          const primary = dinner || dayMeals[0];
+          message += `  ${shortDay}: ${primary.title}\n`;
+        }
+        message += '\n';
+      }
     }
 
     try {

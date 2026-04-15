@@ -8,6 +8,9 @@ import * as themes from '../services/themes.js';
 import { seedUKHolidays } from '../services/holidays.js';
 import * as foodExpiry from '../services/foodExpiry.js';
 import * as goals from '../services/goals.js';
+import * as watchlist from '../services/watchlist.js';
+import * as birthdays from '../services/birthdays.js';
+import { upsertDay, getMonthStats } from '../services/officeCheckin.js';
 import { formatForUser } from '../utils/time.js';
 import { invalidateDashboardCache } from '../utils/cache.js';
 
@@ -514,6 +517,111 @@ export const tools = [
       },
     },
   },
+  // --- Watchlist tools ---
+  {
+    type: 'function',
+    function: {
+      name: 'get_watchlist',
+      description: 'Get the family watchlist — movies and shows to watch. By default returns only unwatched items.',
+      parameters: {
+        type: 'object',
+        properties: {
+          include_watched: { type: 'boolean', description: 'Set to true to also include already-watched items. Defaults to false.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_to_watchlist',
+      description: 'Add a movie or TV show to the family watchlist.',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Title of the movie or show' },
+          type: { type: 'string', enum: ['movie', 'show'], description: 'Whether it is a movie or a TV show. Defaults to movie.' },
+          platform: { type: 'string', description: 'Where to watch it (e.g. "Netflix", "Disney+", "Cinema"). Optional.' },
+          notes: { type: 'string', description: 'Any extra notes (e.g. "Great for kids", "Sequel to X"). Optional.' },
+        },
+        required: ['title'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'mark_watched',
+      description: 'Mark a watchlist item as watched. Call get_watchlist first to find the item ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          item_id: { type: 'string', description: 'UUID of the watchlist item to mark as watched' },
+          rating: { type: 'integer', description: 'Optional star rating out of 5 (1–5)' },
+        },
+        required: ['item_id'],
+      },
+    },
+  },
+  // --- Birthday tools ---
+  {
+    type: 'function',
+    function: {
+      name: 'list_birthdays',
+      description: 'List all family birthdays with how many days until the next one.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_birthday',
+      description: 'Add a family birthday to track. The date should be the actual birth date (year included) so the age can be calculated.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Name of the person (e.g. "Grandma", "Sam")' },
+          birth_date: { type: 'string', description: 'Date of birth in YYYY-MM-DD format (e.g. "1985-06-20")' },
+          notes: { type: 'string', description: 'Optional notes (e.g. "Likes chocolate cake", "Call in the evening")' },
+        },
+        required: ['name', 'birth_date'],
+      },
+    },
+  },
+  // --- Office check-in tools ---
+  {
+    type: 'function',
+    function: {
+      name: 'log_office_day',
+      description: 'Log a work day as office, travel, or time-off. Only works for weekdays (Mon–Fri). Use this when someone says they are in the office, working from home/travel, or taking a day off.',
+      parameters: {
+        type: 'object',
+        properties: {
+          day_date: { type: 'string', description: 'Date in YYYY-MM-DD format. Defaults to today if not given.' },
+          day_type: { type: 'string', enum: ['office', 'travel', 'time_off'], description: 'Type of day: office (going in), travel (working away), or time_off (holiday/sick/etc)' },
+          confirmed: { type: 'boolean', description: 'Whether the day is confirmed as actually attended. Defaults to false (planned).' },
+          parking_booked: { type: 'boolean', description: 'Whether parking is booked (for office days). Optional.' },
+          destination: { type: 'string', description: 'Travel destination (for travel days). Optional.' },
+          notes: { type: 'string', description: 'Any additional notes. Optional.' },
+        },
+        required: ['day_type'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_office_stats',
+      description: 'Get office attendance statistics for a month — how many days logged, percentage toward the 40% attendance target, and any booking issues.',
+      parameters: {
+        type: 'object',
+        properties: {
+          year: { type: 'integer', description: 'Year (e.g. 2026). Defaults to current year.' },
+          month: { type: 'integer', description: 'Month number 1–12. Defaults to current month.' },
+        },
+      },
+    },
+  },
 ];
 
 /**
@@ -524,7 +632,7 @@ export async function dispatch(functionName, args, context) {
   const { familyId, userId, timezone } = context;
 
   // Invalidate dashboard cache for any write operation
-  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_goals', 'get_goal_progress']);
+  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_goals', 'get_goal_progress', 'get_watchlist', 'list_birthdays', 'get_office_stats']);
   if (!readOnlyFns.has(functionName)) {
     invalidateDashboardCache();
   }
@@ -895,6 +1003,112 @@ export async function dispatch(functionName, args, context) {
           created_at: formatForUser(p.created_at, timezone),
         })),
         count: history.length,
+      });
+    }
+
+    // --- Watchlist dispatch ---
+    case 'get_watchlist': {
+      const items = await watchlist.getWatchlist(familyId, args.include_watched || false);
+      const now = new Date();
+      return JSON.stringify({
+        items: items.map(i => ({
+          id: i.id,
+          title: i.title,
+          type: i.type,
+          platform: i.platform,
+          watched: i.watched,
+          rating: i.rating,
+          notes: i.notes,
+          watched_at: i.watched_at ? formatForUser(i.watched_at, timezone) : null,
+        })),
+        count: items.length,
+      });
+    }
+
+    case 'add_to_watchlist': {
+      const item = await watchlist.addToWatchlist(familyId, args, userId);
+      return JSON.stringify({
+        success: true,
+        item: { id: item.id, title: item.title, type: item.type, platform: item.platform },
+        message: `Added "${item.title}" to the watchlist.`,
+      });
+    }
+
+    case 'mark_watched': {
+      const item = await watchlist.markWatched(args.item_id, familyId, args.rating || null);
+      return JSON.stringify({
+        success: true,
+        title: item.title,
+        rating: item.rating,
+        message: `Marked "${item.title}" as watched${item.rating ? ` (${item.rating}/5)` : ''}.`,
+      });
+    }
+
+    // --- Birthday dispatch ---
+    case 'list_birthdays': {
+      const bdayList = await birthdays.getBirthdays(familyId);
+      const now = new Date();
+      const formatted = bdayList.map(b => {
+        const [y, mo, d] = b.birth_date.split('-').map(Number);
+        const thisYear = now.getFullYear();
+        let nextBday = new Date(thisYear, mo - 1, d);
+        if (nextBday < now) nextBday = new Date(thisYear + 1, mo - 1, d);
+        const daysUntil = Math.ceil((nextBday - now) / (1000 * 60 * 60 * 24));
+        const age = nextBday.getFullYear() - y;
+        return { id: b.id, name: b.name, birth_date: b.birth_date, notes: b.notes, days_until: daysUntil, upcoming_age: age };
+      });
+      formatted.sort((a, b) => a.days_until - b.days_until);
+      return JSON.stringify({ birthdays: formatted, count: formatted.length });
+    }
+
+    case 'add_birthday': {
+      const bday = await birthdays.addBirthday(familyId, args);
+      return JSON.stringify({
+        success: true,
+        birthday: { id: bday.id, name: bday.name, birth_date: bday.birth_date },
+        message: `Added ${bday.name}'s birthday (${bday.birth_date}).`,
+      });
+    }
+
+    // --- Office check-in dispatch ---
+    case 'log_office_day': {
+      const dayDate = args.day_date || new Date().toLocaleDateString('en-CA', { timeZone: timezone });
+      const row = await upsertDay(familyId, dayDate, {
+        day_type: args.day_type,
+        confirmed: args.confirmed ?? false,
+        parking_booked: args.parking_booked ?? false,
+        destination: args.destination ?? null,
+        notes: args.notes ?? null,
+      });
+      const typeLabel = row.day_type === 'office' ? 'office' : row.day_type === 'travel' ? 'travel' : 'time off';
+      return JSON.stringify({
+        success: true,
+        day_date: row.day_date,
+        day_type: row.day_type,
+        confirmed: row.confirmed,
+        message: `Logged ${row.day_date} as ${typeLabel}.`,
+      });
+    }
+
+    case 'get_office_stats': {
+      const now = new Date();
+      const yr = args.year || now.getFullYear();
+      const mo = args.month || (now.getMonth() + 1);
+      const stats = await getMonthStats(familyId, yr, mo);
+      const monthName = new Date(yr, mo - 1, 1).toLocaleString('en-US', { month: 'long' });
+      const targetIcon = stats.actualTargetMet ? '✅' : (stats.plannedTargetMet ? '🟡' : '❌');
+      return JSON.stringify({
+        month: `${monthName} ${yr}`,
+        confirmed_days: stats.confirmedDays,
+        planned_days: stats.plannedDays,
+        eligible_days: stats.eligibleDays,
+        actual_pct: stats.actualPct,
+        planned_pct: stats.plannedPct,
+        target_met: stats.actualTargetMet,
+        target_icon: targetIcon,
+        booking_issues: stats.bookingIssuesCount,
+        pending_expenses: stats.pendingExpensesCount,
+        summary: `${monthName} ${yr}: ${stats.confirmedDays}/${stats.eligibleDays} days confirmed (${stats.actualPct}%) ${targetIcon}`,
       });
     }
 
