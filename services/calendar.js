@@ -97,6 +97,29 @@ export async function findAndDeleteEvent(familyId, { title, date }) {
 }
 
 /**
+ * Update an existing event. Only provided fields are changed.
+ * Scoped by both id and family_id to prevent cross-family modification.
+ */
+export async function updateEvent(eventId, familyId, updates) {
+  const allowed = {};
+  if (updates.title !== undefined) allowed.title = updates.title;
+  if (updates.description !== undefined) allowed.description = updates.description;
+  if (updates.starts_at !== undefined) allowed.starts_at = updates.starts_at;
+  if (updates.ends_at !== undefined) allowed.ends_at = updates.ends_at;
+  if (updates.all_day !== undefined) allowed.all_day = updates.all_day;
+
+  const { data, error } = await supabase
+    .from('events')
+    .update(allowed)
+    .eq('id', eventId)
+    .eq('family_id', familyId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
  * Get a single event by ID.
  */
 export async function getEvent(eventId) {

@@ -68,6 +68,25 @@ export const tools = [
   {
     type: 'function',
     function: {
+      name: 'update_event',
+      description: 'Update an existing calendar event — change its title, time, or description. Call list_events first to find the event ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          event_id: { type: 'string', description: 'UUID of the event to update' },
+          title: { type: 'string', description: 'New title (optional)' },
+          starts_at: { type: 'string', description: 'New start datetime in ISO 8601 format (optional)' },
+          ends_at: { type: 'string', description: 'New end datetime in ISO 8601 format (optional)' },
+          description: { type: 'string', description: 'New description (optional)' },
+          all_day: { type: 'boolean', description: 'Whether this is an all-day event (optional)' },
+        },
+        required: ['event_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'create_reminder',
       description: 'Set a personal reminder. The bot will send a Telegram message at the specified time. Can be one-off or recurring.',
       parameters: {
@@ -100,6 +119,21 @@ export const tools = [
           reminder_id: { type: 'string', description: 'UUID of the reminder to cancel' },
         },
         required: ['reminder_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'snooze_reminder',
+      description: 'Push a reminder back to a later time. Use when someone says "remind me later", "snooze that", or "remind me at X instead". Call list_reminders first to find the reminder ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          reminder_id: { type: 'string', description: 'UUID of the reminder to snooze' },
+          snooze_until: { type: 'string', description: 'New datetime in ISO 8601 format to send the reminder' },
+        },
+        required: ['reminder_id', 'snooze_until'],
       },
     },
   },
@@ -193,6 +227,20 @@ export const tools = [
   {
     type: 'function',
     function: {
+      name: 'clear_checked_items',
+      description: 'Remove only the ticked/checked items from a list, leaving unchecked items intact. Use after shopping when the family has bought everything they ticked off.',
+      parameters: {
+        type: 'object',
+        properties: {
+          list_name: { type: 'string', description: 'Name of the list to clean up (e.g. "shopping")' },
+        },
+        required: ['list_name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'get_all_lists',
       description: 'Get the names of all shared lists for the family.',
       parameters: { type: 'object', properties: {} },
@@ -232,6 +280,23 @@ export const tools = [
         type: 'object',
         properties: {
           countdown_id: { type: 'string', description: 'UUID of the countdown to delete' },
+        },
+        required: ['countdown_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_countdown',
+      description: 'Update a countdown — change its title, target date, or background. Call list_countdowns first to find the ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          countdown_id: { type: 'string', description: 'UUID of the countdown to update' },
+          title: { type: 'string', description: 'New title (optional)' },
+          target_date: { type: 'string', description: 'New target date in YYYY-MM-DD format (optional)' },
+          background: { type: 'string', description: 'New background: fireworks, castle, stars, rainbow, beach, or party (optional)' },
         },
         required: ['countdown_id'],
       },
@@ -563,6 +628,20 @@ export const tools = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'remove_from_watchlist',
+      description: 'Permanently remove an item from the watchlist. Use this when the family no longer wants to watch it. Call get_watchlist first to find the item ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          item_id: { type: 'string', description: 'UUID of the watchlist item to remove' },
+        },
+        required: ['item_id'],
+      },
+    },
+  },
   // --- Birthday tools ---
   {
     type: 'function',
@@ -585,6 +664,37 @@ export const tools = [
           notes: { type: 'string', description: 'Optional notes (e.g. "Likes chocolate cake", "Call in the evening")' },
         },
         required: ['name', 'birth_date'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_birthday',
+      description: 'Update a birthday entry — fix a name, correct the date, or update notes. Call list_birthdays first to find the ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          birthday_id: { type: 'string', description: 'UUID of the birthday entry to update' },
+          name: { type: 'string', description: 'New name (optional)' },
+          birth_date: { type: 'string', description: 'Corrected date of birth in YYYY-MM-DD format (optional)' },
+          notes: { type: 'string', description: 'Updated notes (optional)' },
+        },
+        required: ['birthday_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_birthday',
+      description: 'Remove a birthday from tracking entirely. Call list_birthdays first to find the ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          birthday_id: { type: 'string', description: 'UUID of the birthday entry to delete' },
+        },
+        required: ['birthday_id'],
       },
     },
   },
@@ -622,6 +732,14 @@ export const tools = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'get_weather',
+      description: 'Get the current weather and forecast for the family\'s location. Always call this when asked about weather, temperature, rain, or whether to bring an umbrella.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
 ];
 
 /**
@@ -632,7 +750,7 @@ export async function dispatch(functionName, args, context) {
   const { familyId, userId, timezone } = context;
 
   // Invalidate dashboard cache for any write operation
-  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_goals', 'get_goal_progress', 'get_watchlist', 'list_birthdays', 'get_office_stats']);
+  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_goals', 'get_goal_progress', 'get_watchlist', 'list_birthdays', 'get_office_stats', 'get_weather']);
   if (!readOnlyFns.has(functionName)) {
     invalidateDashboardCache();
   }
@@ -681,6 +799,20 @@ export async function dispatch(functionName, args, context) {
       return JSON.stringify({ success: true, deleted_title: deleted.title });
     }
 
+    case 'update_event': {
+      const updated = await calendar.updateEvent(args.event_id, familyId, args);
+      return JSON.stringify({
+        success: true,
+        event: {
+          id: updated.id,
+          title: updated.title,
+          starts_at: formatForUser(updated.starts_at, timezone),
+          ends_at: updated.ends_at ? formatForUser(updated.ends_at, timezone) : null,
+        },
+        message: `Updated "${updated.title}".`,
+      });
+    }
+
     case 'create_reminder': {
       const reminder = await reminders.createReminder(userId, args);
       return JSON.stringify({
@@ -707,6 +839,19 @@ export async function dispatch(functionName, args, context) {
     case 'delete_reminder': {
       await reminders.deleteReminder(args.reminder_id, userId);
       return JSON.stringify({ success: true });
+    }
+
+    case 'snooze_reminder': {
+      const snoozed = await reminders.snoozeReminder(args.reminder_id, userId, args.snooze_until);
+      return JSON.stringify({
+        success: true,
+        reminder: {
+          id: snoozed.id,
+          message: snoozed.message,
+          remind_at: formatForUser(snoozed.remind_at, timezone),
+        },
+        message: `Snoozed — will remind you at ${formatForUser(snoozed.remind_at, timezone)}.`,
+      });
     }
 
     case 'get_list': {
@@ -741,6 +886,18 @@ export async function dispatch(functionName, args, context) {
     case 'clear_list': {
       const list = await lists.clearList(familyId, args.list_name);
       return JSON.stringify({ success: true, list_name: list.name, message: 'All items removed' });
+    }
+
+    case 'clear_checked_items': {
+      const { list, removed } = await lists.clearCheckedItems(familyId, args.list_name);
+      return JSON.stringify({
+        success: true,
+        list_name: list.name,
+        removed,
+        message: removed > 0
+          ? `Removed ${removed} checked item${removed !== 1 ? 's' : ''} from the ${list.name} list.`
+          : `No checked items to remove from the ${list.name} list.`,
+      });
     }
 
     case 'create_list': {
@@ -792,6 +949,20 @@ export async function dispatch(functionName, args, context) {
     case 'delete_countdown': {
       const deleted = await countdowns.deleteCountdown(args.countdown_id, familyId);
       return JSON.stringify({ success: true, deleted_title: deleted?.title });
+    }
+
+    case 'update_countdown': {
+      const updated = await countdowns.updateCountdown(args.countdown_id, familyId, {
+        title: args.title,
+        target_date: args.target_date,
+        background: args.background,
+      });
+      const daysUntil = Math.ceil((new Date(updated.target_date + 'T00:00:00') - new Date()) / (1000 * 60 * 60 * 24));
+      return JSON.stringify({
+        success: true,
+        countdown: { id: updated.id, title: updated.title, target_date: updated.target_date, days_until: daysUntil },
+        message: `Updated countdown "${updated.title}" — ${daysUntil} day${daysUntil !== 1 ? 's' : ''} to go.`,
+      });
     }
 
     // --- Kid points dispatch ---
@@ -1006,6 +1177,63 @@ export async function dispatch(functionName, args, context) {
       });
     }
 
+    // --- Weather dispatch ---
+    case 'get_weather': {
+      const weatherUrl = 'https://api.open-meteo.com/v1/forecast?latitude=53.39&longitude=-3.02'
+        + '&current=temperature_2m,weathercode,wind_speed_10m,relative_humidity_2m'
+        + '&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max'
+        + '&forecast_days=3&timezone=Europe%2FLondon';
+      const res = await fetch(weatherUrl);
+      if (!res.ok) return JSON.stringify({ error: 'Weather service unavailable' });
+      const wd = await res.json();
+
+      const wDesc = (code) => {
+        if (code === 0) return 'Clear sky';
+        if (code <= 3) return 'Partly cloudy';
+        if (code <= 48) return 'Foggy';
+        if (code <= 57) return 'Drizzle';
+        if (code <= 65) return 'Rainy';
+        if (code <= 77) return 'Snowy';
+        if (code <= 82) return 'Rain showers';
+        if (code <= 86) return 'Snow showers';
+        return 'Thunderstorm';
+      };
+      const wEmoji = (code) => {
+        if (code === 0) return '☀️';
+        if (code <= 3) return '⛅';
+        if (code <= 48) return '🌫️';
+        if (code <= 57) return '🌦️';
+        if (code <= 65) return '🌧️';
+        if (code <= 77) return '🌨️';
+        if (code <= 82) return '🌧️';
+        if (code <= 86) return '❄️';
+        return '⛈️';
+      };
+
+      const cur = wd.current;
+      const daily = wd.daily;
+      const days = daily.time.slice(0, 3).map((date, i) => ({
+        date,
+        description: wDesc(daily.weathercode[i]),
+        emoji: wEmoji(daily.weathercode[i]),
+        max: Math.round(daily.temperature_2m_max[i]),
+        min: Math.round(daily.temperature_2m_min[i]),
+        rain_mm: daily.precipitation_sum[i],
+        rain_chance: daily.precipitation_probability_max[i],
+      }));
+
+      return JSON.stringify({
+        current: {
+          temp: Math.round(cur.temperature_2m),
+          description: wDesc(cur.weathercode),
+          emoji: wEmoji(cur.weathercode),
+          wind_kmh: Math.round(cur.wind_speed_10m),
+          humidity: cur.relative_humidity_2m,
+        },
+        forecast: days,
+      });
+    }
+
     // --- Watchlist dispatch ---
     case 'get_watchlist': {
       const items = await watchlist.getWatchlist(familyId, args.include_watched || false);
@@ -1044,6 +1272,11 @@ export async function dispatch(functionName, args, context) {
       });
     }
 
+    case 'remove_from_watchlist': {
+      await watchlist.removeFromWatchlist(args.item_id, familyId);
+      return JSON.stringify({ success: true, message: 'Removed from watchlist.' });
+    }
+
     // --- Birthday dispatch ---
     case 'list_birthdays': {
       const bdayList = await birthdays.getBirthdays(familyId);
@@ -1068,6 +1301,24 @@ export async function dispatch(functionName, args, context) {
         birthday: { id: bday.id, name: bday.name, birth_date: bday.birth_date },
         message: `Added ${bday.name}'s birthday (${bday.birth_date}).`,
       });
+    }
+
+    case 'update_birthday': {
+      const updated = await birthdays.updateBirthday(args.birthday_id, familyId, {
+        name: args.name,
+        birth_date: args.birth_date,
+        notes: args.notes,
+      });
+      return JSON.stringify({
+        success: true,
+        birthday: { id: updated.id, name: updated.name, birth_date: updated.birth_date },
+        message: `Updated ${updated.name}'s birthday.`,
+      });
+    }
+
+    case 'delete_birthday': {
+      await birthdays.removeBirthday(args.birthday_id, familyId);
+      return JSON.stringify({ success: true, message: 'Birthday removed.' });
     }
 
     // --- Office check-in dispatch ---

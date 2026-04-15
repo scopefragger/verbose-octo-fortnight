@@ -122,6 +122,22 @@ export async function clearList(familyId, listName) {
 }
 
 /**
+ * Remove only the checked (ticked) items from a list, leaving unchecked items intact.
+ * Returns the count of items removed.
+ */
+export async function clearCheckedItems(familyId, listName) {
+  const list = await getOrCreateList(familyId, listName);
+  const { data, error } = await supabase
+    .from('list_items')
+    .delete()
+    .eq('list_id', list.id)
+    .eq('checked', true)
+    .select();
+  if (error) throw error;
+  return { list, removed: (data || []).length };
+}
+
+/**
  * Get all lists for a family.
  */
 export async function getAllLists(familyId) {

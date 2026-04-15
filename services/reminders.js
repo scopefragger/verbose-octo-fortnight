@@ -63,6 +63,22 @@ export async function listReminders(userId) {
 }
 
 /**
+ * Snooze a reminder by updating its remind_at to a new time.
+ * Resets sent=false so the cron will fire it again at the new time.
+ */
+export async function snoozeReminder(reminderId, userId, newRemindAt) {
+  const { data, error } = await supabase
+    .from('reminders')
+    .update({ remind_at: newRemindAt, sent: false })
+    .eq('id', reminderId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
  * Delete a reminder by ID.
  */
 export async function deleteReminder(reminderId, userId) {

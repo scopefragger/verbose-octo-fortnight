@@ -8,7 +8,7 @@ import { getDashboardData } from './routes/dashboard.js';
 import authRoutes from './routes/auth.js';
 import { requireAuth, requireCronSecret } from './middleware/auth.js';
 import { setMeal, removeMeal, getUniqueMealTitles } from './services/meals.js';
-import { createEvent, deleteEvent } from './services/calendar.js';
+import { createEvent, deleteEvent, updateEvent } from './services/calendar.js';
 import { addItem, removeItem, removeItemById } from './services/lists.js';
 import { createReminder, deleteReminder } from './services/reminders.js';
 import { seedUKHolidays } from './services/holidays.js';
@@ -410,6 +410,20 @@ app.delete('/api/events', requireAuth, async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     logError('Event delete', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Event API — update an event
+app.put('/api/events/:id', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const event = await updateEvent(req.params.id, familyId, req.body);
+    invalidateCache();
+    res.json(event);
+  } catch (err) {
+    logError('Event update', err);
     res.status(500).json({ error: err.message });
   }
 });
