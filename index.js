@@ -23,6 +23,7 @@ import { getIdeas, addIdea, deleteIdea, processIdeaQueue, generateIdeas, theoriz
 import { saveHouseDesign, listHouseDesigns, getHouseDesign, deleteHouseDesign } from './services/houseBuilder.js';
 import { listDecklists, getDecklist, saveDecklist, updateDecklist, deleteDecklist } from './services/mtgCommander.js';
 import { upsertDay, deleteDay, getDaysForMonth, getMonthStats } from './services/officeCheckin.js';
+import { getBinSchedule, upsertBinSchedule } from './services/binSchedule.js';
 import { chatCompletion } from './llm/groq.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
@@ -725,6 +726,36 @@ app.delete('/api/birthdays/:id', requireAuth, async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     logError('Birthday remove', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Bin Schedule ──
+app.get('/api/bin-schedule', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const schedule = await getBinSchedule(familyId);
+    res.json(schedule || {});
+  } catch (err) {
+    logError('Bin schedule get', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/bin-schedule', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { collection_day, bins, reference_date } = req.body;
+    if (collection_day === undefined || !bins || !reference_date) {
+      return res.status(400).json({ error: 'collection_day, bins, and reference_date are required' });
+    }
+    const schedule = await upsertBinSchedule(familyId, { collection_day, bins, reference_date });
+    invalidateCache();
+    res.json(schedule);
+  } catch (err) {
+    logError('Bin schedule upsert', err);
     res.status(500).json({ error: err.message });
   }
 });

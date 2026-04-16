@@ -11,6 +11,7 @@ import * as goals from '../services/goals.js';
 import * as watchlist from '../services/watchlist.js';
 import * as birthdays from '../services/birthdays.js';
 import { upsertDay, getMonthStats } from '../services/officeCheckin.js';
+import { upsertBinSchedule, getBinSchedule, getNextCollection } from '../services/binSchedule.js';
 import { formatForUser } from '../utils/time.js';
 import { invalidateDashboardCache } from '../utils/cache.js';
 
@@ -740,6 +741,43 @@ export const tools = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  // --- Bin collection tools ---
+  {
+    type: 'function',
+    function: {
+      name: 'setup_bin_schedule',
+      description: 'Configure the family\'s bin collection schedule. Ask the user: what day bins are collected, which bin goes out on the next upcoming collection day (this becomes bins[0] with that date as reference_date), and what the other bin(s) are in rotation order.',
+      parameters: {
+        type: 'object',
+        properties: {
+          collection_day: { type: 'integer', description: 'Day of week: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday' },
+          bins: {
+            type: 'array',
+            description: 'Bins in rotation order, starting with the one collected on reference_date',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'e.g. "General waste", "Recycling", "Garden waste"' },
+                colour: { type: 'string', description: 'e.g. "black", "blue", "green"' },
+                emoji: { type: 'string', description: 'e.g. "🗑️", "♻️", "🌿"' },
+              },
+              required: ['name', 'colour', 'emoji'],
+            },
+          },
+          reference_date: { type: 'string', description: 'YYYY-MM-DD date when bins[0] is/was collected — anchors the rotation' },
+        },
+        required: ['collection_day', 'bins', 'reference_date'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_next_bin',
+      description: 'Get the next bin collection — which bin it is and how many days until collection. Always call this for live data rather than guessing.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
 ];
 
 /**
@@ -750,7 +788,7 @@ export async function dispatch(functionName, args, context) {
   const { familyId, userId, timezone } = context;
 
   // Invalidate dashboard cache for any write operation
-  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_goals', 'get_goal_progress', 'get_watchlist', 'list_birthdays', 'get_office_stats', 'get_weather']);
+  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_goals', 'get_goal_progress', 'get_watchlist', 'list_birthdays', 'get_office_stats', 'get_weather', 'get_next_bin']);
   if (!readOnlyFns.has(functionName)) {
     invalidateDashboardCache();
   }
@@ -1360,6 +1398,40 @@ export async function dispatch(functionName, args, context) {
         booking_issues: stats.bookingIssuesCount,
         pending_expenses: stats.pendingExpensesCount,
         summary: `${monthName} ${yr}: ${stats.confirmedDays}/${stats.eligibleDays} days confirmed (${stats.actualPct}%) ${targetIcon}`,
+      });
+    }
+
+    // --- Bin collection dispatch ---
+    case 'setup_bin_schedule': {
+      const schedule = await upsertBinSchedule(familyId, {
+        collection_day: args.collection_day,
+        bins: args.bins,
+        reference_date: args.reference_date,
+      });
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const binList = schedule.bins.map((b, i) => `${i + 1}. ${b.emoji} ${b.name} (${b.colour})`).join(', ');
+      return JSON.stringify({
+        success: true,
+        collection_day: dayNames[schedule.collection_day],
+        bins: schedule.bins,
+        reference_date: schedule.reference_date,
+        message: `Bin schedule saved! Collecting every ${dayNames[schedule.collection_day]}, alternating: ${binList}. Starting with ${schedule.bins[0].name} on ${schedule.reference_date}.`,
+      });
+    }
+
+    case 'get_next_bin': {
+      const info = await getNextCollection(familyId);
+      if (!info) {
+        return JSON.stringify({ error: 'No bin schedule configured yet. Use setup_bin_schedule to set one up.' });
+      }
+      const whenStr = info.isToday ? 'today' : info.isTomorrow ? 'tomorrow' : `in ${info.daysUntil} days (${info.collectionDate})`;
+      return JSON.stringify({
+        bin: info.bin,
+        collection_date: info.collectionDate,
+        days_until: info.daysUntil,
+        is_today: info.isToday,
+        is_tomorrow: info.isTomorrow,
+        message: `${info.bin.emoji} ${info.bin.name} bin — collected ${whenStr}.`,
       });
     }
 

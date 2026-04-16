@@ -6,6 +6,7 @@ import { getMonthStats, getTodayRow } from '../services/officeCheckin.js';
 import { getFoodItems } from '../services/foodExpiry.js';
 import { getBirthdays } from '../services/birthdays.js';
 import { listCountdowns } from '../services/countdowns.js';
+import { getNextCollection } from '../services/binSchedule.js';
 import { supabase } from '../db/supabase.js';
 import { formatForUser } from '../utils/time.js';
 
@@ -130,6 +131,11 @@ export async function sendDailyDigest(bot) {
           .catch(() => null)
       : null;
 
+    // Get next bin collection (non-critical)
+    const binInfo = user.family_id
+      ? await getNextCollection(user.family_id, now).catch(() => null)
+      : null;
+
     // Build the enriched digest
     let message = `☀️ Good morning, ${user.display_name}! Here's your ${dayName}:\n`;
 
@@ -193,6 +199,12 @@ export async function sendDailyDigest(bot) {
     if (nearestCountdown) {
       const bgEmoji = { fireworks: '🎆', castle: '🏰', stars: '⭐', rainbow: '🌈', beach: '🏖️', party: '🎉' }[nearestCountdown.background] || '⏳';
       message += `\n⏳ ${nearestCountdown.title} in ${nearestCountdown.daysUntil} day${nearestCountdown.daysUntil !== 1 ? 's' : ''}! ${bgEmoji}\n`;
+    }
+
+    if (binInfo?.isToday) {
+      message += `\n🗑️ Bin day today: put out the ${binInfo.bin.emoji} ${binInfo.bin.name} bin!\n`;
+    } else if (binInfo?.isTomorrow) {
+      message += `\n🗑️ Bins out tomorrow: ${binInfo.bin.emoji} ${binInfo.bin.name} bin — don't forget!\n`;
     }
 
     if (kidPoints.length > 0) {
