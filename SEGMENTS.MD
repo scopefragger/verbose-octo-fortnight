@@ -5,21 +5,6 @@ Single-file app — embedded CSS, HTML, and JavaScript.
 
 ---
 
-## JavaScript (Lines 1031–2157)
-
-| # | Section | Lines | Description |
-|---|---------|-------|-------------|
-| 14 | Play State | 1547–1641 | Play-mode variables (`playHand[]`, `playBattlefield[]`, `manaPool{}`); `parseMana()`, `canAfford()`, `spendMana()`, `renderManaPool()`, `clearManaPool()` |
-| 15 | Token Definitions | 1647–1662 | `COMMON_TOKENS` array — preset token data |
-| 17 | Render Play Area | 1858–1923 | `renderPlayArea()`, `renderBattlefield()`, `renderPlayHand()` — HTML generation for battlefield and hand |
-| 18 | Card Focus Panel | 1925–1994 | `selectBFCard()`, `closeFocusPanel()`, `selectHandCard()` — panel population and action wiring |
-| 19 | Context Menu | 1996–2021 | `showCtxMenu()`, `ctxAction()`, global click dismissal |
-| 20 | Token Modal | 2023–2038 | `showTokenModal()`, `closeTokenModal()`, `addToken()` |
-| 21 | Graveyard Viewer | 2040–2054 | `showGraveViewer()` — renders graveyard/exile modal content |
-| 22 | Commander Autocomplete | 2056–2139 | `setupAutocomplete()`, `fetchSuggestions()`, `selectCommander()`, `hideDropdown()` — Scryfall autocomplete for commander inputs |
-| 23 | Utilities | 2141–2156 | `escapeHtml()`, `escapeQuotes()`, `formatManaCostShort()`, `showToast()` |
-
----
 
 ## Supporting Files
 
