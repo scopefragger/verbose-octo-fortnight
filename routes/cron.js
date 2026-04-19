@@ -138,6 +138,14 @@ export async function sendDailyDigest() {
       ? await getNextCollection(user.family_id, now).catch(() => null)
       : null;
 
+    // Get yesterday's calorie log (only if food was logged)
+    const yesterdayStr = addDays(now, -1).toLocaleDateString('en-CA', { timeZone: tz });
+    const [yesterdayEntries, nutritionGoal, weeklyAvg] = await Promise.all([
+      user.family_id ? getDailyLog(user.family_id, user.id, yesterdayStr).catch(() => []) : Promise.resolve([]),
+      user.family_id ? getNutritionGoal(user.family_id, user.id).catch(() => null) : Promise.resolve(null),
+      user.family_id ? getWeeklyAverage(user.family_id, user.id, yesterdayStr).catch(() => null) : Promise.resolve(null),
+    ]);
+
     // Build the enriched digest
     let message = `☀️ Good morning, ${user.display_name}! Here's your ${dayName}:\n`;
 
@@ -250,6 +258,27 @@ export async function sendDailyDigest() {
       }
     } catch (weatherErr) {
       // Weather is non-critical, skip silently
+    }
+
+    // Yesterday's calorie summary (only if food was logged)
+    if (yesterdayEntries.length > 0) {
+      const total = yesterdayEntries.reduce((s, e) => s + (e.calories || 0), 0);
+      const goalCal = nutritionGoal?.daily_calories || null;
+      message += `\n🥗 Yesterday's Calories:\n`;
+      if (goalCal) {
+        const diff = total - goalCal;
+        const emoji = diff <= 0 ? '✅' : diff <= 200 ? '🟡' : '🔴';
+        message += `  ${total.toLocaleString()} / ${goalCal.toLocaleString()} kcal ${emoji}`;
+        message += diff <= 0 ? ` — ${Math.abs(diff)} under goal\n` : ` — ${diff} over goal\n`;
+      } else {
+        message += `  ${total.toLocaleString()} kcal\n`;
+      }
+      if (weeklyAvg && weeklyAvg.days_with_data > 0) {
+        const avgVsGoal = goalCal ? weeklyAvg.average_calories - goalCal : null;
+        const avgNote = avgVsGoal === null ? '' : avgVsGoal <= 0
+          ? ` (${Math.abs(avgVsGoal)} under goal ✅)` : ` (${avgVsGoal} over)`;
+        message += `  7-day avg: ${weeklyAvg.average_calories.toLocaleString()} kcal/day${avgNote}\n`;
+      }
     }
 
     message += `\nHave a great day! 🎉`;
