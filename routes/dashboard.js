@@ -11,6 +11,7 @@ import { getWatchlist } from '../services/watchlist.js';
 import { getBirthdays, getUpcomingBirthdayEvents } from '../services/birthdays.js';
 import { getDaysInRange, formatAsEvents } from '../services/officeCheckin.js';
 import { listGoals } from '../services/goals.js';
+import { getDailySummary, getNutritionGoal } from '../services/foodLog.js';
 import { formatForUser } from '../utils/time.js';
 
 /**
@@ -61,6 +62,22 @@ export async function getDashboardData(familyId) {
     ...reminderPromises,
   ]);
   const allReminders = reminderResults.flat();
+
+  // Food log summaries — fetched separately to avoid destructuring complexity
+  const foodLogToday = await Promise.all(
+    members.map(async (m) => {
+      const [summary, goal] = await Promise.all([
+        getDailySummary(familyId, m.id, todayStr).catch(() => ({ total_calories: 0, entry_count: 0 })),
+        getNutritionGoal(familyId, m.id).catch(() => null),
+      ]);
+      return {
+        display_name:    m.display_name,
+        total_calories:  summary.total_calories,
+        entry_count:     summary.entry_count,
+        goal_calories:   goal?.daily_calories ?? null,
+      };
+    })
+  );
 
   // Generate virtual birthday events and virtual office check-in events
   const birthdayEvents    = getUpcomingBirthdayEvents(allBirthdays || []);
@@ -177,6 +194,7 @@ export async function getDashboardData(familyId) {
       status: g.status,
       created_at: g.created_at,
     })),
+    food_log_today: foodLogToday,
     theme: dashboardTheme,
     updated_at: new Date().toISOString(),
   };

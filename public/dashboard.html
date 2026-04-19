@@ -566,7 +566,7 @@
         "sidebar countdown countdown countdown"
         "sidebar today     upcoming  lists"
         "sidebar meals     foodexp   reminders"
-        "sidebar goals     goals     goals";
+        "sidebar goals     goals     foodlog";
     }
 
     /* Cards */
@@ -1735,6 +1735,7 @@
     .meals-card { grid-area: meals; }
     .foodexp-card { grid-area: foodexp; }
     .goals-card { grid-area: goals; }
+    .foodlog-card { grid-area: foodlog; }
     /* Apps button (bottom-left, next to settings) */
     .apps-btn {
       position: fixed;
@@ -2902,7 +2903,8 @@
           "today upcoming"
           "lists meals"
           "foodexp reminders"
-          "goals goals";
+          "goals goals"
+          "foodlog foodlog";
       }
       .sidebar { display: none; }
       .mobile-kids { display: block; }
@@ -2926,7 +2928,8 @@
           "meals"
           "foodexp"
           "reminders"
-          "goals";
+          "goals"
+          "foodlog";
       }
       .countdown-area { flex-direction: column; }
       .card { padding: 12px; }
@@ -3015,6 +3018,11 @@
         <div class="app-icon">&#x1F3AF;</div>
         <div class="app-name">Family Goals</div>
         <div class="app-desc">Set & track goals</div>
+      </div>
+      <div class="app-tile" onclick="toggleAppsDrawer(); window.location.href='/food-log' + (window._urlSecret ? '?secret=' + window._urlSecret : '');">
+        <div class="app-icon">&#x1F957;</div>
+        <div class="app-name">Food Log</div>
+        <div class="app-desc">Track daily calories</div>
       </div>
       <div class="app-tile" onclick="toggleAppsDrawer(); window.location.href='/office-checkin' + (window._urlSecret ? '?secret=' + window._urlSecret : '');">
         <div class="app-icon">&#x1F3E2;</div>
@@ -4393,6 +4401,31 @@
       }).join('');
     }
 
+    function renderFoodLog(members) {
+      if (!members || members.length === 0) {
+        return '<div class="empty-state" style="font-size:12px">No data yet</div>';
+      }
+      return members.map(m => {
+        const pct = m.goal_calories ? Math.min(100, Math.round((m.total_calories / m.goal_calories) * 100)) : null;
+        const barColor = pct === null ? '#6c5ce7' : pct >= 100 ? '#e17055' : pct >= 90 ? '#fdcb6e' : '#00b894';
+        return `
+          <div style="margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+              <span style="font-size:12px;font-weight:600;">${esc(m.display_name)}</span>
+              <span style="font-size:11px;color:var(--text-light);">${m.total_calories.toLocaleString()}${m.goal_calories ? ' / ' + m.goal_calories.toLocaleString() : ''} kcal</span>
+            </div>
+            ${pct !== null ? `
+              <div style="height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;">
+                <div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px;transition:width 0.4s;"></div>
+              </div>
+              <div style="font-size:10px;color:var(--text-light);margin-top:2px;text-align:right;">
+                ${pct >= 100 ? (m.total_calories - m.goal_calories).toLocaleString() + ' kcal over' : (m.goal_calories - m.total_calories).toLocaleString() + ' remaining'}
+              </div>` : ''}
+            ${m.entry_count === 0 ? '<div style="font-size:11px;color:var(--text-light);font-style:italic;margin-top:2px;">Nothing logged yet</div>' : ''}
+          </div>`;
+      }).join('');
+    }
+
     function openFoodModal() {
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
@@ -4646,6 +4679,17 @@
           <div class="card-title"><span class="icon">&#x1F3AF;</span> Family Goals</div>
           <div class="card-body">
             ${renderGoals(data.goals)}
+          </div>
+        </div>
+
+        <!-- Food Log Today -->
+        <div class="card foodlog-card">
+          <div class="card-title">
+            <span class="icon">&#x1F957;</span> Calories Today
+            <a href="/food-log${_urlSecret ? '?secret=' + encodeURIComponent(_urlSecret) : ''}" style="margin-left:auto;font-size:10px;color:var(--text-light);text-decoration:none;background:rgba(255,255,255,0.08);padding:2px 7px;border-radius:4px;" target="_self">Open Log</a>
+          </div>
+          <div class="card-body">
+            ${renderFoodLog(data.food_log_today)}
           </div>
         </div>
       `;

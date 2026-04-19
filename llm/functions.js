@@ -12,6 +12,7 @@ import * as watchlist from '../services/watchlist.js';
 import * as birthdays from '../services/birthdays.js';
 import { upsertDay, getMonthStats } from '../services/officeCheckin.js';
 import { upsertBinSchedule, getBinSchedule, getNextCollection } from '../services/binSchedule.js';
+import * as foodLog from '../services/foodLog.js';
 import { formatForUser } from '../utils/time.js';
 import { invalidateDashboardCache } from '../utils/cache.js';
 
@@ -778,6 +779,51 @@ export const tools = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'log_food',
+      description: 'Log a food or drink item for the current user. Use this when someone says they ate or drank something. Estimate calories if not provided.',
+      parameters: {
+        type: 'object',
+        properties: {
+          food_name: { type: 'string',  description: 'Name of the food or drink (e.g. "Banana", "Chicken sandwich", "Latte")' },
+          meal_type: { type: 'string',  enum: ['breakfast', 'lunch', 'dinner', 'snack'], description: 'Which meal this belongs to' },
+          calories:  { type: 'integer', description: 'Calories (kcal). Estimate if not provided.' },
+          notes:     { type: 'string',  description: 'Optional notes (e.g. "homemade", "large portion")' },
+          logged_at: { type: 'string',  description: 'Date in YYYY-MM-DD format. Omit for today.' },
+        },
+        required: ['food_name', 'meal_type'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_daily_nutrition',
+      description: 'Get the food log and calorie total for a specific date. Shows what has been eaten and total vs goal.',
+      parameters: {
+        type: 'object',
+        properties: {
+          date: { type: 'string', description: 'Date in YYYY-MM-DD format. Omit for today.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_food_log_entry',
+      description: 'Remove a food log entry by its ID. Call get_daily_nutrition first to find the entry ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          entry_id: { type: 'string', description: 'UUID of the food log entry to delete' },
+        },
+        required: ['entry_id'],
+      },
+    },
+  },
 ];
 
 /**
@@ -788,7 +834,7 @@ export async function dispatch(functionName, args, context) {
   const { familyId, userId, timezone } = context;
 
   // Invalidate dashboard cache for any write operation
-  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_goals', 'get_goal_progress', 'get_watchlist', 'list_birthdays', 'get_office_stats', 'get_weather', 'get_next_bin']);
+  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_goals', 'get_goal_progress', 'get_watchlist', 'list_birthdays', 'get_office_stats', 'get_weather', 'get_next_bin', 'get_daily_nutrition']);
   if (!readOnlyFns.has(functionName)) {
     invalidateDashboardCache();
   }
@@ -1433,6 +1479,45 @@ export async function dispatch(functionName, args, context) {
         is_tomorrow: info.isTomorrow,
         message: `${info.bin.emoji} ${info.bin.name} bin — collected ${whenStr}.`,
       });
+    }
+
+    // --- Food Log dispatch ---
+    case 'log_food': {
+      const date = args.logged_at || new Date().toLocaleDateString('en-CA', { timeZone: timezone });
+      const entry = await foodLog.logFood(familyId, userId, { ...args, logged_at: date });
+      const calNote = entry.calories ? ` (${entry.calories} kcal)` : '';
+      return JSON.stringify({
+        success: true,
+        entry: { id: entry.id, food_name: entry.food_name, meal_type: entry.meal_type, calories: entry.calories, logged_at: entry.logged_at },
+        message: `Logged ${entry.food_name}${calNote} as ${entry.meal_type} on ${entry.logged_at}.`,
+      });
+    }
+
+    case 'get_daily_nutrition': {
+      const date = args.date || new Date().toLocaleDateString('en-CA', { timeZone: timezone });
+      const [entries, goal] = await Promise.all([
+        foodLog.getDailyLog(familyId, userId, date),
+        foodLog.getNutritionGoal(familyId, userId),
+      ]);
+      const total = entries.reduce((s, e) => s + (e.calories || 0), 0);
+      const goalCal = goal?.daily_calories;
+      const remaining = goalCal ? goalCal - total : null;
+      return JSON.stringify({
+        date,
+        entries: entries.map(e => ({ id: e.id, food_name: e.food_name, meal_type: e.meal_type, calories: e.calories, notes: e.notes })),
+        total_calories: total,
+        daily_goal: goalCal || null,
+        calories_remaining: remaining,
+        message: remaining !== null
+          ? `${total} kcal logged on ${date} — ${remaining >= 0 ? remaining + ' kcal remaining' : Math.abs(remaining) + ' kcal over goal'}.`
+          : `${total} kcal logged on ${date}${goalCal ? '' : ' (no goal set)'}.`,
+      });
+    }
+
+    case 'delete_food_log_entry': {
+      const deleted = await foodLog.deleteLogEntry(args.entry_id, familyId, userId);
+      if (!deleted) return JSON.stringify({ success: false, error: 'Entry not found or does not belong to you.' });
+      return JSON.stringify({ success: true, message: `Removed "${deleted.food_name}" from the log.` });
     }
 
     default:

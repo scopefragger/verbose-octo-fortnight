@@ -23,6 +23,7 @@ import { saveHouseDesign, listHouseDesigns, getHouseDesign, deleteHouseDesign } 
 import { listDecklists, getDecklist, saveDecklist, updateDecklist, deleteDecklist } from './services/mtgCommander.js';
 import { upsertDay, deleteDay, getDaysForMonth, getMonthStats } from './services/officeCheckin.js';
 import { getBinSchedule, upsertBinSchedule } from './services/binSchedule.js';
+import { logFood, getDailyLog, getDailySummary, deleteLogEntry, getNutritionGoal, setNutritionGoal } from './services/foodLog.js';
 import { chatCompletion } from './llm/groq.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
@@ -40,6 +41,7 @@ const HTML = {
   houseBuilder: fs.readFileSync(path.join(__dirname, 'public', 'house-builder.html'), 'utf-8'),
   ideas: fs.readFileSync(path.join(__dirname, 'public', 'ideas.html'), 'utf-8'),
   officeCheckin: fs.readFileSync(path.join(__dirname, 'public', 'office-checkin.html'), 'utf-8'),
+  foodLog: fs.readFileSync(path.join(__dirname, 'public', 'food-log.html'), 'utf-8'),
 };
 
 const app = express();
@@ -254,6 +256,26 @@ async function getFamilyId() {
     .select('id')
     .limit(1);
   return families?.[0]?.id;
+}
+
+// Resolve internal users.id from session auth (via auth_user_id) or fall back to first family member
+async function getUserId(familyId, req) {
+  if (req.authMode === 'session' && req.authUser?.id) {
+    const { data } = await supabase
+      .from('users')
+      .select('id')
+      .eq('family_id', familyId)
+      .eq('auth_user_id', req.authUser.id)
+      .single();
+    if (data) return data.id;
+  }
+  const { data } = await supabase
+    .from('users')
+    .select('id')
+    .eq('family_id', familyId)
+    .limit(1)
+    .single();
+  return data?.id ?? null;
 }
 
 // Meal API — create or update a meal
@@ -1150,6 +1172,102 @@ app.delete('/api/office-checkin/:date', requireAuth, async (req, res) => {
     res.json({ deleted: true });
   } catch (err) {
     logError('Office checkin delete', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Food Log ──
+
+app.get('/food-log', requireAuth, (req, res) => res.type('html').send(HTML.foodLog));
+
+app.get('/api/food-log', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const userId = await getUserId(familyId, req);
+    if (!userId) return res.status(404).json({ error: 'No user found' });
+
+    const date = req.query.date || new Date().toLocaleDateString('en-CA');
+    const [entries, goal] = await Promise.all([
+      getDailyLog(familyId, userId, date),
+      getNutritionGoal(familyId, userId),
+    ]);
+    const summary = {
+      total_calories: entries.reduce((s, e) => s + (e.calories || 0), 0),
+      entry_count:    entries.length,
+    };
+    res.json({ date, entries, summary, goal });
+  } catch (err) {
+    logError('Food log fetch', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/food-log', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const userId = await getUserId(familyId, req);
+    if (!userId) return res.status(404).json({ error: 'No user found' });
+
+    const { food_name, meal_type } = req.body;
+    if (!food_name?.trim()) return res.status(400).json({ error: 'food_name required' });
+    if (!meal_type) return res.status(400).json({ error: 'meal_type required' });
+
+    const entry = await logFood(familyId, userId, req.body);
+    res.json({ entry });
+  } catch (err) {
+    logError('Food log add', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/food-log/:id', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const userId = await getUserId(familyId, req);
+    if (!userId) return res.status(404).json({ error: 'No user found' });
+
+    const deleted = await deleteLogEntry(req.params.id, familyId, userId);
+    if (!deleted) return res.status(404).json({ error: 'Entry not found or not yours' });
+    res.json({ deleted: true });
+  } catch (err) {
+    logError('Food log delete', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/nutrition-goals', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const userId = await getUserId(familyId, req);
+    if (!userId) return res.status(404).json({ error: 'No user found' });
+
+    const goal = await getNutritionGoal(familyId, userId);
+    res.json({ goal });
+  } catch (err) {
+    logError('Nutrition goal fetch', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/nutrition-goals', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const userId = await getUserId(familyId, req);
+    if (!userId) return res.status(404).json({ error: 'No user found' });
+
+    const { daily_calories } = req.body;
+    if (!daily_calories || isNaN(parseInt(daily_calories))) {
+      return res.status(400).json({ error: 'daily_calories required' });
+    }
+    const goal = await setNutritionGoal(familyId, userId, { daily_calories: parseInt(daily_calories) });
+    res.json({ goal });
+  } catch (err) {
+    logError('Nutrition goal set', err);
     res.status(500).json({ error: err.message });
   }
 });
