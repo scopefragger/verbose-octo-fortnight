@@ -23,7 +23,7 @@ import { saveHouseDesign, listHouseDesigns, getHouseDesign, deleteHouseDesign } 
 import { listDecklists, getDecklist, saveDecklist, updateDecklist, deleteDecklist } from './services/mtgCommander.js';
 import { upsertDay, deleteDay, getDaysForMonth, getMonthStats } from './services/officeCheckin.js';
 import { getBinSchedule, upsertBinSchedule } from './services/binSchedule.js';
-import { logFood, getDailyLog, getDailySummary, deleteLogEntry, getNutritionGoal, setNutritionGoal } from './services/foodLog.js';
+import { logFood, getDailyLog, getDailySummary, deleteLogEntry, getNutritionGoal, setNutritionGoal, getWeeklyAverage } from './services/foodLog.js';
 import { chatCompletion } from './llm/groq.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
@@ -1188,15 +1188,16 @@ app.get('/api/food-log', requireAuth, async (req, res) => {
     if (!userId) return res.status(404).json({ error: 'No user found' });
 
     const date = req.query.date || new Date().toLocaleDateString('en-CA');
-    const [entries, goal] = await Promise.all([
+    const [entries, goal, weekly] = await Promise.all([
       getDailyLog(familyId, userId, date),
       getNutritionGoal(familyId, userId),
+      getWeeklyAverage(familyId, userId, date),
     ]);
     const summary = {
       total_calories: entries.reduce((s, e) => s + (e.calories || 0), 0),
       entry_count:    entries.length,
     };
-    res.json({ date, entries, summary, goal });
+    res.json({ date, entries, summary, goal, weekly });
   } catch (err) {
     logError('Food log fetch', err);
     res.status(500).json({ error: err.message });

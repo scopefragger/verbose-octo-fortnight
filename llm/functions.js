@@ -1495,22 +1495,29 @@ export async function dispatch(functionName, args, context) {
 
     case 'get_daily_nutrition': {
       const date = args.date || new Date().toLocaleDateString('en-CA', { timeZone: timezone });
-      const [entries, goal] = await Promise.all([
+      const [entries, goal, weekly] = await Promise.all([
         foodLog.getDailyLog(familyId, userId, date),
         foodLog.getNutritionGoal(familyId, userId),
+        foodLog.getWeeklyAverage(familyId, userId, date),
       ]);
       const total = entries.reduce((s, e) => s + (e.calories || 0), 0);
       const goalCal = goal?.daily_calories;
       const remaining = goalCal ? goalCal - total : null;
+      const weeklyVsGoal = goalCal ? weekly.average_calories - goalCal : null;
       return JSON.stringify({
         date,
         entries: entries.map(e => ({ id: e.id, food_name: e.food_name, meal_type: e.meal_type, calories: e.calories, notes: e.notes })),
         total_calories: total,
         daily_goal: goalCal || null,
         calories_remaining: remaining,
-        message: remaining !== null
-          ? `${total} kcal logged on ${date} — ${remaining >= 0 ? remaining + ' kcal remaining' : Math.abs(remaining) + ' kcal over goal'}.`
-          : `${total} kcal logged on ${date}${goalCal ? '' : ' (no goal set)'}.`,
+        weekly_average_calories: weekly.average_calories,
+        weekly_vs_goal: weeklyVsGoal,
+        message: [
+          remaining !== null
+            ? `${total} kcal today — ${remaining >= 0 ? remaining + ' kcal remaining' : Math.abs(remaining) + ' kcal over goal'}.`
+            : `${total} kcal logged today.`,
+          `7-day average: ${weekly.average_calories} kcal/day${weeklyVsGoal !== null ? ` (${weeklyVsGoal >= 0 ? '+' : ''}${weeklyVsGoal} vs goal)` : ''}.`,
+        ].join(' '),
       });
     }
 

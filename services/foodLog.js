@@ -76,6 +76,35 @@ export async function getNutritionGoal(familyId, userId) {
   return data;
 }
 
+export async function getWeeklyAverage(familyId, userId, todayDate) {
+  // Fetch last 7 days including today
+  const start = new Date(todayDate + 'T12:00:00');
+  start.setDate(start.getDate() - 6);
+  const startDate = start.toLocaleDateString('en-CA');
+
+  const { data, error } = await supabase
+    .from('food_logs')
+    .select('logged_at, calories')
+    .eq('family_id', familyId)
+    .eq('user_id', userId)
+    .gte('logged_at', startDate)
+    .lte('logged_at', todayDate);
+
+  if (error) throw error;
+
+  // Sum calories per day, then average over 7 days
+  const byDay = {};
+  for (const row of data || []) {
+    byDay[row.logged_at] = (byDay[row.logged_at] || 0) + (row.calories || 0);
+  }
+  const total = Object.values(byDay).reduce((s, v) => s + v, 0);
+  return {
+    average_calories: Math.round(total / 7),
+    days_with_data:   Object.keys(byDay).length,
+    start_date:       startDate,
+  };
+}
+
 export async function setNutritionGoal(familyId, userId, { daily_calories }) {
   const { data, error } = await supabase
     .from('nutrition_goals')
