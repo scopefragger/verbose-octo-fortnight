@@ -7,6 +7,7 @@ import { getFoodItems } from '../services/foodExpiry.js';
 import { getBirthdays } from '../services/birthdays.js';
 import { listCountdowns } from '../services/countdowns.js';
 import { getNextCollection } from '../services/binSchedule.js';
+import { getDailyLog, getDailySummary, getWeeklyAverage, getNutritionGoal } from '../services/foodLog.js';
 import { supabase } from '../db/supabase.js';
 import { formatForUser } from '../utils/time.js';
 import { sendMessage } from '../bot/whatsapp.js';
@@ -473,4 +474,81 @@ function addDays(date, days) {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
+}
+
+/**
+ * Send an evening calorie recap to each user who logged food today.
+ * Skips silently if the user logged nothing — no nag messages.
+ * Called by cron-job.org hitting GET /cron/calorie-recap (e.g. 8pm daily).
+ */
+export async function sendCalorieRecap() {
+  const users = await getAllUsers();
+  let sent = 0;
+
+  for (const user of users) {
+    if (!user.whatsapp_number || !user.family_id) continue;
+
+    const tz = user.timezone || 'Europe/London';
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+
+    try {
+      const [entries, goal, weekly] = await Promise.all([
+        getDailyLog(user.family_id, user.id, todayStr),
+        getNutritionGoal(user.family_id, user.id),
+        getWeeklyAverage(user.family_id, user.id, todayStr),
+      ]);
+
+      // Only send if the user actually logged something today
+      if (!entries.length) continue;
+
+      const total = entries.reduce((s, e) => s + (e.calories || 0), 0);
+      const goalCal = goal?.daily_calories || null;
+
+      let message = `🥗 Calorie recap for today, ${user.display_name}!\n\n`;
+
+      // Today's total vs goal
+      if (goalCal) {
+        const diff = total - goalCal;
+        const statusEmoji = diff <= 0 ? '✅' : diff <= 200 ? '🟡' : '🔴';
+        message += `Today: ${total.toLocaleString()} / ${goalCal.toLocaleString()} kcal ${statusEmoji}\n`;
+        message += diff <= 0
+          ? `  ${Math.abs(diff).toLocaleString()} kcal under goal 👏\n`
+          : `  ${diff.toLocaleString()} kcal over goal\n`;
+      } else {
+        message += `Today: ${total.toLocaleString()} kcal\n`;
+      }
+
+      // Per-meal breakdown
+      const MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'snack'];
+      const MEAL_EMOJI = { breakfast: '☀️', lunch: '🌤️', dinner: '🌙', snack: '🍎' };
+      const byMeal = {};
+      for (const e of entries) {
+        if (!byMeal[e.meal_type]) byMeal[e.meal_type] = [];
+        byMeal[e.meal_type].push(e);
+      }
+      message += '\n';
+      for (const meal of MEAL_ORDER) {
+        if (!byMeal[meal]) continue;
+        const mealTotal = byMeal[meal].reduce((s, e) => s + (e.calories || 0), 0);
+        const items = byMeal[meal].map(e => e.food_name).join(', ');
+        message += `${MEAL_EMOJI[meal]} ${meal.charAt(0).toUpperCase() + meal.slice(1)}: ${mealTotal} kcal — ${items}\n`;
+      }
+
+      // 7-day average
+      if (weekly.days_with_data > 0) {
+        const avgVsGoal = goalCal ? weekly.average_calories - goalCal : null;
+        const avgNote = avgVsGoal === null ? '' : avgVsGoal <= 0
+          ? ` (${Math.abs(avgVsGoal)} under goal ✅)`
+          : ` (${avgVsGoal} over goal)`;
+        message += `\n📊 7-day average: ${weekly.average_calories.toLocaleString()} kcal/day${avgNote}\n`;
+      }
+
+      await sendMessage(user.whatsapp_number, message);
+      sent++;
+    } catch (err) {
+      console.error(`Failed to send calorie recap to ${user.whatsapp_number}:`, err.message);
+    }
+  }
+
+  return { users: users.length, sent };
 }
