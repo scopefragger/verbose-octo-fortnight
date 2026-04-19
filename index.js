@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
-import { webhookCallback } from 'grammy';
-import { bot } from './bot/bot.js';
+import { handleWhatsAppMessage } from './bot/whatsappHandler.js';
+import { verifySignature } from './bot/whatsapp.js';
 import { checkReminders, sendDailyDigest, sendWeeklyDigest } from './routes/cron.js';
 import { getDashboardData } from './routes/dashboard.js';
 import authRoutes from './routes/auth.js';
@@ -47,7 +47,6 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 const PORT = process.env.PORT || 3000;
-const isWebhookMode = Boolean(process.env.WEBHOOK_URL);
 
 // Auth routes (login page, login/logout/refresh API — no auth required)
 app.use(authRoutes);
@@ -63,7 +62,7 @@ app.get('/health', (_req, res) => {
 // Cron endpoint for reminder delivery
 app.get('/cron/check', requireCronSecret, async (req, res) => {
   try {
-    const result = await checkReminders(bot);
+    const result = await checkReminders();
     res.json(result);
   } catch (err) {
     logError('cron-check', err);
@@ -74,7 +73,7 @@ app.get('/cron/check', requireCronSecret, async (req, res) => {
 // Daily digest — called by cron-job.org at 8am
 app.get('/cron/daily', requireCronSecret, async (req, res) => {
   try {
-    const result = await sendDailyDigest(bot);
+    const result = await sendDailyDigest();
     res.json(result);
   } catch (err) {
     logError('daily-digest', err);
@@ -85,7 +84,7 @@ app.get('/cron/daily', requireCronSecret, async (req, res) => {
 // Weekly digest — called by cron-job.org every Sunday
 app.get('/cron/weekly', requireCronSecret, async (req, res) => {
   try {
-    const result = await sendWeeklyDigest(bot);
+    const result = await sendWeeklyDigest();
     res.json(result);
   } catch (err) {
     logError('weekly-digest', err);
@@ -1156,38 +1155,68 @@ app.delete('/api/office-checkin/:date', requireAuth, async (req, res) => {
   }
 });
 
-// Only register webhook route when in webhook mode
-if (isWebhookMode) {
-  app.post('/bot/webhook', webhookCallback(bot, 'express'));
-}
+// ── WhatsApp Webhook ──
 
-// Set webhook and start server
+// Meta verification challenge (one-time setup via Meta Developer Console)
+app.get('/bot/webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode === 'subscribe' && token === process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) {
+    console.log('WhatsApp webhook verified');
+    return res.status(200).send(challenge);
+  }
+  res.sendStatus(403);
+});
+
+// Incoming WhatsApp messages
+app.post('/bot/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  // Verify signature
+  const rawBody = req.body.toString('utf-8');
+  const valid = await verifySignature(rawBody, req.headers['x-hub-signature-256']);
+  if (!valid) return res.sendStatus(401);
+
+  let payload;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return res.sendStatus(400);
+  }
+
+  // Acknowledge immediately — Meta requires 200 within 5s
+  res.sendStatus(200);
+
+  try {
+    const entry = payload.entry?.[0];
+    const change = entry?.changes?.[0]?.value;
+    if (!change?.messages?.length) return;
+
+    const message = change.messages[0];
+    if (message.type !== 'text') return; // Only handle text messages for now
+
+    const from = message.from;
+    const text = message.text?.body || '';
+    const messageId = message.id;
+    const displayName = change.contacts?.[0]?.profile?.name || 'Friend';
+
+    // Group detection: WhatsApp group IDs end with @g.us
+    const isGroup = from.endsWith('@g.us');
+    const groupId = isGroup ? from : null;
+    const actualFrom = isGroup
+      ? (change.contacts?.[0]?.wa_id || from)
+      : from;
+
+    await handleWhatsAppMessage({ from: actualFrom, text, messageId, displayName, isGroup, groupId });
+  } catch (err) {
+    console.error('WhatsApp webhook error:', err);
+  }
+});
+
 async function start() {
-  // Always start the HTTP server first so health checks pass even if Telegram is unreachable
   await new Promise((resolve) => app.listen(PORT, resolve));
   console.log(`Server listening on port ${PORT}`);
-
-  if (isWebhookMode) {
-    const webhookUrl = process.env.WEBHOOK_URL;
-    try {
-      await bot.api.setWebhook(`${webhookUrl}/bot/webhook`, {
-        secret_token: process.env.TELEGRAM_WEBHOOK_SECRET,
-      });
-      console.log(`Webhook set to ${webhookUrl}/bot/webhook`);
-    } catch (err) {
-      // Non-fatal: server is up, bot will work once Telegram becomes reachable
-      console.error('Failed to set webhook (will retry on next deploy):', err.message);
-    }
-  } else {
-    // Local development: use long polling
-    console.log('Starting in long polling mode (local dev)...');
-    try {
-      await bot.api.deleteWebhook();
-      bot.start();
-    } catch (err) {
-      console.error('Failed to start polling:', err.message);
-    }
-  }
+  console.log('WhatsApp webhook ready at /bot/webhook');
 }
 
 start().catch(console.error);

@@ -58,6 +58,58 @@ export async function registerUser(telegramId, displayName, username) {
 }
 
 /**
+ * Look up a user by their WhatsApp number. Returns null if not found.
+ */
+export async function getUserByWhatsAppNumber(number) {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*, families(*)')
+    .eq('whatsapp_number', number)
+    .single();
+
+  if (error && error.code === 'PGRST116') return null;
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Register a new WhatsApp user. Joins existing family or creates one.
+ */
+export async function registerWhatsAppUser(number, displayName) {
+  let family;
+  const { data: existing } = await supabase
+    .from('families')
+    .select('id, name')
+    .limit(1)
+    .single();
+
+  if (existing) {
+    family = existing;
+  } else {
+    const { data: newFamily, error: famErr } = await supabase
+      .from('families')
+      .insert({ name: `${displayName}'s Family` })
+      .select()
+      .single();
+    if (famErr) throw famErr;
+    family = newFamily;
+  }
+
+  const { data: user, error: userErr } = await supabase
+    .from('users')
+    .insert({
+      whatsapp_number: number,
+      display_name: displayName,
+      family_id: family.id,
+    })
+    .select('*, families(*)')
+    .single();
+  if (userErr) throw userErr;
+
+  return user;
+}
+
+/**
  * Generate a 6-character link code. Stored in the dedicated link_code column.
  * Expires after 24 hours.
  */

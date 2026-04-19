@@ -9,23 +9,24 @@ import { listCountdowns } from '../services/countdowns.js';
 import { getNextCollection } from '../services/binSchedule.js';
 import { supabase } from '../db/supabase.js';
 import { formatForUser } from '../utils/time.js';
+import { sendMessage } from '../bot/whatsapp.js';
 
 /**
  * Check for due reminders and send them via Telegram.
  * Called by cron-job.org hitting GET /cron/check.
  */
-export async function checkReminders(bot) {
+export async function checkReminders() {
   const due = await getDueReminders();
   let sent = 0;
 
   for (const reminder of due) {
-    const telegramId = reminder.users?.telegram_id;
-    if (!telegramId) continue;
+    const waNumber = reminder.users?.whatsapp_number;
+    if (!waNumber) continue;
 
     try {
       const recurLabel = reminder.recurrence ? ` (${reminder.recurrence})` : '';
-      await bot.api.sendMessage(
-        telegramId,
+      await sendMessage(
+        waNumber,
         `⏰ Reminder${recurLabel}: ${reminder.message}`
       );
       await markSent(reminder.id);
@@ -54,7 +55,7 @@ export async function checkReminders(bot) {
  * Send a daily morning digest at 8am.
  * Shows today's events and pending reminders for each family member.
  */
-export async function sendDailyDigest(bot) {
+export async function sendDailyDigest() {
   const users = await getAllUsers();
   let sent = 0;
   const familyDigests = new Map(); // familyId -> digest message (for group chat)
@@ -253,16 +254,18 @@ export async function sendDailyDigest(bot) {
     message += `\nHave a great day! 🎉`;
 
     // Send DM and store message_id so the user can reply to check in
+    if (!user.whatsapp_number) continue;
     try {
-      const sentMsg = await bot.api.sendMessage(user.telegram_id, message);
+      const wamid = await sendMessage(user.whatsapp_number, message);
       sent++;
-      // Fire-and-forget — non-critical
-      supabase.from('users')
-        .update({ last_digest_message_id: sentMsg.message_id })
-        .eq('id', user.id)
-        .then(({ error }) => { if (error) console.error('Failed to store digest message_id:', error.message); });
+      if (wamid) {
+        supabase.from('users')
+          .update({ last_digest_message_id: wamid })
+          .eq('id', user.id)
+          .then(({ error }) => { if (error) console.error('Failed to store digest message_id:', error.message); });
+      }
     } catch (err) {
-      console.error(`Failed to send daily digest to ${user.telegram_id}:`, err.message);
+      console.error(`Failed to send daily digest to ${user.whatsapp_number}:`, err.message);
     }
 
     // Store family digest for group chat (use first user's digest per family)
@@ -271,17 +274,17 @@ export async function sendDailyDigest(bot) {
     }
   }
 
-  // Send digest to family group chats
+  // Send digest to family WhatsApp group chats
   for (const [familyId, digest] of familyDigests) {
     try {
       const { data: family } = await supabase
         .from('families')
-        .select('group_chat_id')
+        .select('whatsapp_group_id')
         .eq('id', familyId)
         .single();
 
-      if (family?.group_chat_id) {
-        await bot.api.sendMessage(family.group_chat_id, digest);
+      if (family?.whatsapp_group_id) {
+        await sendMessage(family.whatsapp_group_id, digest);
       }
     } catch (err) {
       console.error(`Failed to send group digest for family ${familyId}:`, err.message);
@@ -295,7 +298,7 @@ export async function sendDailyDigest(bot) {
  * Send a weekly digest every Sunday.
  * Shows key events for the upcoming week.
  */
-export async function sendWeeklyDigest(bot) {
+export async function sendWeeklyDigest() {
   const users = await getAllUsers();
   let sent = 0;
 
@@ -424,11 +427,12 @@ export async function sendWeeklyDigest(bot) {
       }
     }
 
+    if (!user.whatsapp_number) continue;
     try {
-      await bot.api.sendMessage(user.telegram_id, message);
+      await sendMessage(user.whatsapp_number, message);
       sent++;
     } catch (err) {
-      console.error(`Failed to send weekly digest to ${user.telegram_id}:`, err.message);
+      console.error(`Failed to send weekly digest to ${user.whatsapp_number}:`, err.message);
     }
   }
 
@@ -441,7 +445,7 @@ export async function sendWeeklyDigest(bot) {
 async function getAllUsers() {
   const { data, error } = await supabase
     .from('users')
-    .select('id, telegram_id, display_name, family_id, timezone');
+    .select('id, whatsapp_number, display_name, family_id, timezone');
   if (error) throw error;
   return data;
 }

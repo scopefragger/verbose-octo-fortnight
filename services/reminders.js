@@ -100,7 +100,7 @@ export async function deleteReminder(reminderId, userId) {
 export async function getDueReminders() {
   const { data, error } = await supabase
     .from('reminders')
-    .select('id, message, remind_at, user_id, recurrence, users(telegram_id, display_name)')
+    .select('id, message, remind_at, user_id, recurrence, users(whatsapp_number, display_name)')
     .eq('sent', false)
     .lte('remind_at', new Date().toISOString())
     .order('remind_at');
