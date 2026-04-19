@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { handleWhatsAppMessage } from './bot/whatsappHandler.js';
-import { checkReminders, sendDailyDigest, sendWeeklyDigest, sendCalorieRecap } from './routes/cron.js';
+import { checkReminders, sendDailyDigest, sendWeeklyDigest } from './routes/cron.js';
 import { getDashboardData } from './routes/dashboard.js';
 import authRoutes from './routes/auth.js';
 import { requireAuth, requireCronSecret } from './middleware/auth.js';
@@ -79,17 +79,6 @@ app.get('/cron/daily', requireCronSecret, async (req, res) => {
   } catch (err) {
     logError('daily-digest', err);
     res.status(500).json({ error: 'digest failed' });
-  }
-});
-
-// Evening calorie recap — called by cron-job.org at e.g. 8pm daily
-app.get('/cron/calorie-recap', requireCronSecret, async (req, res) => {
-  try {
-    const result = await sendCalorieRecap();
-    res.json(result);
-  } catch (err) {
-    logError('calorie-recap', err);
-    res.status(500).json({ error: 'recap failed' });
   }
 });
 
