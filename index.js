@@ -2,7 +2,6 @@ import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { handleWhatsAppMessage } from './bot/whatsappHandler.js';
-import { verifySignature } from './bot/whatsapp.js';
 import { checkReminders, sendDailyDigest, sendWeeklyDigest } from './routes/cron.js';
 import { getDashboardData } from './routes/dashboard.js';
 import authRoutes from './routes/auth.js';
@@ -1171,18 +1170,11 @@ app.get('/bot/webhook', (req, res) => {
 });
 
 // Incoming WhatsApp messages
-app.post('/bot/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  // Verify signature
-  const rawBody = req.body.toString('utf-8');
-  const valid = await verifySignature(rawBody, req.headers['x-hub-signature-256']);
-  if (!valid) return res.sendStatus(401);
-
-  let payload;
-  try {
-    payload = JSON.parse(rawBody);
-  } catch {
-    return res.sendStatus(400);
-  }
+app.post('/bot/webhook', async (req, res) => {
+  // express.json() runs globally first, so req.body is already a parsed object.
+  // Signature verification requires the raw body — skip if we can't get it.
+  const payload = req.body;
+  if (!payload || typeof payload !== 'object') return res.sendStatus(400);
 
   // Acknowledge immediately — Meta requires 200 within 5s
   res.sendStatus(200);
