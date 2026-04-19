@@ -5,3 +5,6 @@ ALTER TABLE families ADD COLUMN IF NOT EXISTS whatsapp_group_id VARCHAR(50);
 
 CREATE UNIQUE INDEX IF NOT EXISTS users_whatsapp_number_idx ON users (whatsapp_number)
   WHERE whatsapp_number IS NOT NULL;
+
+-- telegram_id was NOT NULL but WhatsApp users won't have one
+ALTER TABLE users ALTER COLUMN telegram_id DROP NOT NULL;
