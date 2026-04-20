@@ -55,29 +55,32 @@ Do NOT run for:
 - Documentation-only changes
 - Trivial one-liner tweaks (e.g. fixing a typo in a string)
 
-### How to Run (3 Steps — All Inside Claude Code)
+### How to Run
 
-**Step 1 — Independent reviews (parallel).** Read each persona file and spawn all 5 Haiku agents
-in a single message (parallel tool calls). Pass the full persona prompt + the task description:
+Use the `/validate` skill:
 
 ```
-Agent(model="haiku", description="Cecile review", prompt="<contents of validators/personas/cecile.md>\n\nTASK TO REVIEW:\n<task description>")
-Agent(model="haiku", description="Enriqua review", prompt="<contents of validators/personas/enriqua.md>\n\nTASK TO REVIEW:\n<task description>")
-Agent(model="haiku", description="Mike review", prompt="<contents of validators/personas/mike.md>\n\nTASK TO REVIEW:\n<task description>")
-Agent(model="haiku", description="Bob review", prompt="<contents of validators/personas/bob.md>\n\nTASK TO REVIEW:\n<task description>")
-Agent(model="haiku", description="Dan review", prompt="<contents of validators/personas/dan.md>\n\nTASK TO REVIEW:\n<task description>")
+/validate <task description>
 ```
 
-**Step 2 — Discussion round (parallel).** Spawn all 5 personas again in a single message. This
-time each receives ALL peer responses from Step 1 (labelled by name), plus their own persona
-prompt. Instruct each to: agree with nuance, raise new concerns triggered by peer input, or
-state "No further concerns from [role] perspective." (Under 250 words each.)
+The skill reads all five persona files, runs independent reviews, loops the discussion until all
+personas reach resolution (not a fixed number of rounds), then runs synthesis — and presents the
+Final Agreed Plan with any STOP/WAIT flags automatically.
 
-**Step 3 — Synthesis (single agent).** Spawn one final Haiku agent with a neutral facilitator
-role. Provide all 10 outputs (5 × Round 1 + 5 × Round 2). Instruct it to produce:
-1. Top 3 cross-cutting concerns all personas agree must be addressed
-2. Concrete recommended implementation approach that resolves tensions
-3. Any STOP/WAIT flags — things that must be resolved before any code is written
+#### Protocol detail (reference)
+
+**Round 1 — Independent reviews (parallel).** 5 Haiku agents spawned simultaneously, each
+receiving their full persona prompt + the task description. Each returns a <300-word review and
+a GO / CONDITIONAL GO / STOP verdict.
+
+**Discussion loop (parallel, repeating).** All 5 personas are re-spawned in parallel, each
+receiving their persona prompt, the task, and the full accumulated discussion history so far.
+Each may raise new concerns, respond to peer input, or state "No further concerns from [role]
+perspective." The loop continues until ALL five personas have declared no further concerns.
+
+**Synthesis (single agent).** One neutral facilitator Haiku agent receives all rounds' outputs
+and produces: (1) top 3 cross-cutting concerns, (2) concrete recommended implementation
+approach, (3) STOP/WAIT flags.
 
 ### What to Do with the Output
 
