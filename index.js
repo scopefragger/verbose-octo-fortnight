@@ -1273,6 +1273,39 @@ app.post('/api/nutrition-goals', requireAuth, async (req, res) => {
   }
 });
 
+app.post('/api/food-log/lookup', requireAuth, async (req, res) => {
+  try {
+    const { query } = req.body;
+    if (!query?.trim()) return res.status(400).json({ error: 'query required' });
+
+    const messages = [
+      {
+        role: 'system',
+        content: 'You are a nutrition expert. Estimate the calories for the described food or meal. Respond with valid JSON only, no markdown or explanation: {"food_name": "...", "calories": 000, "serving": "description of portion size assumed", "confidence": "high|medium|low"}',
+      },
+      { role: 'user', content: query.trim().slice(0, 300) },
+    ];
+
+    const result = await chatCompletion(messages);
+    const text = result.choices[0].message.content.trim().replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+    const data = JSON.parse(text);
+
+    if (!data.calories || isNaN(Number(data.calories))) {
+      return res.status(422).json({ error: 'Could not estimate calories' });
+    }
+
+    res.json({
+      food_name: data.food_name || query.trim(),
+      calories: Math.round(Number(data.calories)),
+      serving: data.serving || null,
+      confidence: data.confidence || 'medium',
+    });
+  } catch (err) {
+    logError('Food lookup', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── WhatsApp Webhook ──
 
 // Meta verification challenge (one-time setup via Meta Developer Console)
