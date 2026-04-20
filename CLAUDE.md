@@ -21,6 +21,73 @@ A family assistant with four surfaces: **Telegram bot** (natural language), **TV
 
 ---
 
+## PRE-IMPLEMENTATION VALIDATOR PROTOCOL — MANDATORY
+
+> **THIS IS NOT OPTIONAL.** Before writing, editing, or deleting ANY code for a new feature or
+> significant change, you MUST run the 5-persona validator panel and incorporate their agreed plan.
+> No exceptions. The validators run as Haiku sub-agents inside Claude Code.
+
+### What It Does
+
+Five expert AI personas independently review the task, then discuss each other's findings, then a
+synthesis agent produces a final agreed design plan. This catches security gaps, UX problems,
+architecture issues, and misunderstood requirements *before* any code is committed.
+
+The 5 personas are defined in `validators/personas/`:
+
+| File | Persona | Role |
+|---|---|---|
+| `cecile.md` | Cecile | BISO — security, threat modeling, data protection |
+| `enriqua.md` | Enriqua | Senior UX Expert — mobile, conversational, end-user flows |
+| `mike.md` | Mike | Staff Engineer — system design, scalability, architecture |
+| `bob.md` | Bob | Director of Product — customer need, scope, real-family value |
+| `dan.md` | Dan | Senior Data Engineer — schema design, migrations, data patterns |
+
+### When to Run
+
+Run the validator for:
+- Any new feature (new route, service, bot tool, migration, or frontend capability)
+- Any change touching authentication, data schema, or the LLM system prompt
+- Any task where requirements are ambiguous or cross multiple domains
+
+Do NOT run for:
+- Pure bug fixes where correct behaviour is unambiguous
+- Documentation-only changes
+- Trivial one-liner tweaks (e.g. fixing a typo in a string)
+
+### How to Run (3 Steps — All Inside Claude Code)
+
+**Step 1 — Independent reviews (parallel).** Read each persona file and spawn all 5 Haiku agents
+in a single message (parallel tool calls). Pass the full persona prompt + the task description:
+
+```
+Agent(model="haiku", description="Cecile review", prompt="<contents of validators/personas/cecile.md>\n\nTASK TO REVIEW:\n<task description>")
+Agent(model="haiku", description="Enriqua review", prompt="<contents of validators/personas/enriqua.md>\n\nTASK TO REVIEW:\n<task description>")
+Agent(model="haiku", description="Mike review", prompt="<contents of validators/personas/mike.md>\n\nTASK TO REVIEW:\n<task description>")
+Agent(model="haiku", description="Bob review", prompt="<contents of validators/personas/bob.md>\n\nTASK TO REVIEW:\n<task description>")
+Agent(model="haiku", description="Dan review", prompt="<contents of validators/personas/dan.md>\n\nTASK TO REVIEW:\n<task description>")
+```
+
+**Step 2 — Discussion round (parallel).** Spawn all 5 personas again in a single message. This
+time each receives ALL peer responses from Step 1 (labelled by name), plus their own persona
+prompt. Instruct each to: agree with nuance, raise new concerns triggered by peer input, or
+state "No further concerns from [role] perspective." (Under 250 words each.)
+
+**Step 3 — Synthesis (single agent).** Spawn one final Haiku agent with a neutral facilitator
+role. Provide all 10 outputs (5 × Round 1 + 5 × Round 2). Instruct it to produce:
+1. Top 3 cross-cutting concerns all personas agree must be addressed
+2. Concrete recommended implementation approach that resolves tensions
+3. Any STOP/WAIT flags — things that must be resolved before any code is written
+
+### What to Do with the Output
+
+1. Present the **FINAL AGREED PLAN** to the user.
+2. If there are STOP/WAIT flags, surface them to the user and wait for resolution before coding.
+3. Use the top concerns to shape your implementation approach.
+4. Do not skip or abbreviate the protocol — the Haiku model is fast and cheap.
+
+---
+
 ## Repository Layout
 
 ```
