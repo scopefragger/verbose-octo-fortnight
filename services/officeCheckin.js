@@ -161,15 +161,14 @@ export async function getMonthStats(familyId, year, month) {
 
   // Bank holidays that fall on a weekday in this month reduce eligible days
   const monthPrefix = `${year}-${String(month).padStart(2, '0')}-`;
-  const bankHolidayDates = new Set(
-    getUKHolidays(year)
-      .filter(h => h.description === 'Bank Holiday' && h.date.startsWith(monthPrefix))
-      .filter(h => {
-        const dow = new Date(h.date + 'T12:00:00Z').getUTCDay();
-        return dow !== 0 && dow !== 6;
-      })
-      .map(h => h.date)
-  );
+  const bankHolidayEntries = getUKHolidays(year)
+    .filter(h => h.description === 'Bank Holiday' && h.date.startsWith(monthPrefix))
+    .filter(h => {
+      const dow = new Date(h.date + 'T12:00:00Z').getUTCDay();
+      return dow !== 0 && dow !== 6;
+    });
+  const bankHolidayDates = new Set(bankHolidayEntries.map(h => h.date));
+  const bankHolidayMap = Object.fromEntries(bankHolidayEntries.map(h => [h.date, h.title]));
   const bankHolidayDays = bankHolidayDates.size;
 
   const officeDays  = rows.filter(r => r.day_type === 'office').length;
@@ -208,6 +207,7 @@ export async function getMonthStats(familyId, year, month) {
   return {
     totalWorkingDays,
     bankHolidayDays,
+    bankHolidayMap,
     officeDays,
     travelDays,
     timeOffDays,

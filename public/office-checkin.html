@@ -210,6 +210,24 @@
     .dot.ok  { background: var(--green); }
     .dot.bad { background: var(--red); }
 
+    /* Bank holiday cells */
+    .cal-cell.bank-holiday {
+      background: rgba(253,203,110,0.05);
+      border-color: rgba(253,203,110,0.22);
+    }
+    .cal-cell.bank-holiday:hover { background: rgba(253,203,110,0.12); border-color: rgba(253,203,110,0.45); }
+    .cal-cell.bank-holiday .cell-date { color: var(--amber); }
+    .cell-bh-name {
+      font-size: 9px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.3px;
+      color: var(--amber); opacity: 0.85; margin-top: 3px; line-height: 1.3;
+    }
+    /* Small badge when a logged day overlaps a bank holiday */
+    .cell-bh-badge {
+      position: absolute; top: 6px; left: 8px;
+      font-size: 10px; line-height: 1;
+    }
+
     /* ── Modal ── */
     .modal-overlay {
       position: fixed; inset: 0; z-index: 200;
@@ -367,7 +385,10 @@
 <div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
   <div class="modal" id="modal">
     <div class="modal-header">
-      <span class="modal-title" id="modalTitle">—</span>
+      <div>
+        <span class="modal-title" id="modalTitle">—</span>
+        <div id="modalBHLabel" style="font-size:12px;color:var(--amber);margin-top:3px;display:none;">🎑 Bank Holiday</div>
+      </div>
       <button class="close-btn" onclick="closeModal()">&#10005;</button>
     </div>
 
@@ -462,6 +483,7 @@ const MONTH_NAMES = ['January','February','March','April','May','June',
                      'July','August','September','October','November','December'];
 let currentYear, currentMonth;
 let dayMap = {};          // { 'YYYY-MM-DD': row }
+let bankHolidayMap = {};  // { 'YYYY-MM-DD': 'Holiday Name' }
 let modalDate = null;
 let modalType = null;
 let currentStats = null;
@@ -491,6 +513,7 @@ async function loadMonth() {
     );
     dayMap = {};
     days.forEach(d => { dayMap[d.day_date] = d; });
+    bankHolidayMap = stats.bankHolidayMap || {};
     currentStats = stats;
     renderCalendar();
     renderStats(stats);
@@ -540,6 +563,7 @@ function renderCalendar() {
     const dow = new Date(currentYear, currentMonth - 1, d).getDay(); // 0=Sun
     const isWeekend = dow === 0 || dow === 6;
     const row = dayMap[dateStr];
+    const bhName = bankHolidayMap[dateStr] || null;
 
     const isConfirmed = row && row.confirmed &&
       (row.day_type === 'office' || row.day_type === 'travel');
@@ -548,7 +572,7 @@ function renderCalendar() {
     cell.className = 'cal-cell' +
       (isWeekend ? ' weekend' : '') +
       (dateStr === todayStr ? ' today' : '') +
-      (row ? ' type-' + row.day_type : '') +
+      (row ? ' type-' + row.day_type : (bhName ? ' bank-holiday' : '')) +
       (isConfirmed ? ' confirmed' : '');
 
     let dotsHtml = '';
@@ -567,7 +591,9 @@ function renderCalendar() {
     cell.innerHTML =
       `<span class="cell-date">${d}</span>` +
       (isConfirmed ? `<span class="cell-confirm-tick">&#10003;</span>` : '') +
+      (bhName && row ? `<span class="cell-bh-badge">🎑</span>` : '') +
       (labelText ? `<span class="cell-label">${labelText}</span>` : '') +
+      (bhName && !row ? `<span class="cell-bh-name">${esc(bhName)}</span>` : '') +
       (dotsHtml ? `<span class="cell-dots">${dotsHtml}</span>` : '');
 
     if (!isWeekend) {
@@ -637,6 +663,15 @@ function openModal(dateStr) {
   document.getElementById('inputNotes').value        = row?.notes             ?? '';
 
   document.getElementById('btnRemove').classList.toggle('hidden', !row);
+
+  const bhLabel = document.getElementById('modalBHLabel');
+  const bhName = bankHolidayMap[dateStr];
+  if (bhName) {
+    bhLabel.textContent = `🎑 ${bhName}`;
+    bhLabel.style.display = 'block';
+  } else {
+    bhLabel.style.display = 'none';
+  }
 
   document.getElementById('modalOverlay').classList.add('open');
 }
