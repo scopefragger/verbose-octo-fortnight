@@ -1,4 +1,5 @@
 import { supabase } from '../db/supabase.js';
+import { chatCompletion } from '../llm/groq.js';
 
 const VALID_MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
 
@@ -122,4 +123,61 @@ export async function setNutritionGoal(familyId, userId, { daily_calories }) {
 
   if (error) throw error;
   return data;
+}
+
+export async function lookupFoodCalories(query) {
+  const messages = [
+    {
+      role: 'system',
+      content: 'You are a nutrition expert. Estimate the calories for the described food or meal. Respond with valid JSON only, no markdown or explanation: {"food_name": "...", "calories": 000, "serving": "description of portion size assumed", "confidence": "high|medium|low"}',
+    },
+    { role: 'user', content: query.trim().slice(0, 300) },
+  ];
+
+  const result = await chatCompletion(messages);
+  const text = result.choices[0].message.content.trim().replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+  const data = JSON.parse(text);
+
+  if (!data.calories || isNaN(Number(data.calories))) {
+    throw new Error('Could not estimate calories');
+  }
+
+  return {
+    food_name:  data.food_name || query.trim(),
+    calories:   Math.round(Number(data.calories)),
+    serving:    data.serving || null,
+    confidence: data.confidence || 'medium',
+  };
+}
+
+export async function deleteLastFoodEntry(familyId, userId) {
+  const { data: latest, error: fetchErr } = await supabase
+    .from('food_logs')
+    .select('id, food_name')
+    .eq('family_id', familyId)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (fetchErr && fetchErr.code === 'PGRST116') return null;
+  if (fetchErr) throw fetchErr;
+
+  return deleteLogEntry(latest.id, familyId, userId);
+}
+
+export async function deleteFoodEntryByName(familyId, userId, foodName) {
+  const { data: matches, error: fetchErr } = await supabase
+    .from('food_logs')
+    .select('id, food_name, logged_at')
+    .eq('family_id', familyId)
+    .eq('user_id', userId)
+    .ilike('food_name', `%${foodName.trim()}%`)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (fetchErr) throw fetchErr;
+  if (!matches || matches.length === 0) return null;
+
+  return deleteLogEntry(matches[0].id, familyId, userId);
 }

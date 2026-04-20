@@ -814,13 +814,13 @@ export const tools = [
     type: 'function',
     function: {
       name: 'delete_food_log_entry',
-      description: 'Remove a food log entry by its ID. Call get_daily_nutrition first to find the entry ID.',
+      description: 'Remove a food log entry. Use food_name to delete by name (e.g. "banana"), or set delete_last to true to remove the most recently logged item.',
       parameters: {
         type: 'object',
         properties: {
-          entry_id: { type: 'string', description: 'UUID of the food log entry to delete' },
+          food_name:   { type: 'string',  description: 'Name (or partial name) of the food entry to delete.' },
+          delete_last: { type: 'boolean', description: 'Set to true to delete the most recently logged entry.' },
         },
-        required: ['entry_id'],
       },
     },
   },
@@ -1495,35 +1495,30 @@ export async function dispatch(functionName, args, context) {
 
     case 'get_daily_nutrition': {
       const date = args.date || new Date().toLocaleDateString('en-CA', { timeZone: timezone });
-      const [entries, goal, weekly] = await Promise.all([
+      const [entries, weekly] = await Promise.all([
         foodLog.getDailyLog(familyId, userId, date),
-        foodLog.getNutritionGoal(familyId, userId),
         foodLog.getWeeklyAverage(familyId, userId, date),
       ]);
       const total = entries.reduce((s, e) => s + (e.calories || 0), 0);
-      const goalCal = goal?.daily_calories;
-      const remaining = goalCal ? goalCal - total : null;
-      const weeklyVsGoal = goalCal ? weekly.average_calories - goalCal : null;
       return JSON.stringify({
         date,
         entries: entries.map(e => ({ id: e.id, food_name: e.food_name, meal_type: e.meal_type, calories: e.calories, notes: e.notes })),
         total_calories: total,
-        daily_goal: goalCal || null,
-        calories_remaining: remaining,
         weekly_average_calories: weekly.average_calories,
-        weekly_vs_goal: weeklyVsGoal,
-        message: [
-          remaining !== null
-            ? `${total} kcal today — ${remaining >= 0 ? remaining + ' kcal remaining' : Math.abs(remaining) + ' kcal over goal'}.`
-            : `${total} kcal logged today.`,
-          `7-day average: ${weekly.average_calories} kcal/day${weeklyVsGoal !== null ? ` (${weeklyVsGoal >= 0 ? '+' : ''}${weeklyVsGoal} vs goal)` : ''}.`,
-        ].join(' '),
+        message: `${total} kcal logged today. 7-day average: ${weekly.average_calories} kcal/day.`,
       });
     }
 
     case 'delete_food_log_entry': {
-      const deleted = await foodLog.deleteLogEntry(args.entry_id, familyId, userId);
-      if (!deleted) return JSON.stringify({ success: false, error: 'Entry not found or does not belong to you.' });
+      let deleted = null;
+      if (args.delete_last) {
+        deleted = await foodLog.deleteLastFoodEntry(familyId, userId);
+      } else if (args.food_name) {
+        deleted = await foodLog.deleteFoodEntryByName(familyId, userId, args.food_name);
+      } else {
+        return JSON.stringify({ success: false, error: 'Provide food_name or set delete_last to true.' });
+      }
+      if (!deleted) return JSON.stringify({ success: false, error: 'No matching entry found.' });
       return JSON.stringify({ success: true, message: `Removed "${deleted.food_name}" from the log.` });
     }
 

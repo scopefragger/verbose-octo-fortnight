@@ -190,7 +190,7 @@ Delete operations must always scope by both `id` AND `family_id` to prevent cros
 - Every table that belongs to a family must have a `family_id UUID REFERENCES families(id) ON DELETE CASCADE`.
 - New columns use `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
 
-Current highest migration: **025** (`025_family_link_code.sql`)
+Current highest migration: **029** (`029_food_log.sql`). Note: there are duplicate numbers in the sequence (two `026_*` and two `027_*` files) — do not renumber existing files; start the next migration at `030`.
 
 ---
 

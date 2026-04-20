@@ -23,7 +23,7 @@ import { saveHouseDesign, listHouseDesigns, getHouseDesign, deleteHouseDesign } 
 import { listDecklists, getDecklist, saveDecklist, updateDecklist, deleteDecklist } from './services/mtgCommander.js';
 import { upsertDay, deleteDay, getDaysForMonth, getMonthStats } from './services/officeCheckin.js';
 import { getBinSchedule, upsertBinSchedule } from './services/binSchedule.js';
-import { logFood, getDailyLog, getDailySummary, deleteLogEntry, getNutritionGoal, setNutritionGoal, getWeeklyAverage } from './services/foodLog.js';
+import { logFood, getDailyLog, getDailySummary, deleteLogEntry, getNutritionGoal, setNutritionGoal, getWeeklyAverage, lookupFoodCalories, deleteLastFoodEntry, deleteFoodEntryByName } from './services/foodLog.js';
 import { chatCompletion } from './llm/groq.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
@@ -1188,16 +1188,15 @@ app.get('/api/food-log', requireAuth, async (req, res) => {
     if (!userId) return res.status(404).json({ error: 'No user found' });
 
     const date = req.query.date || new Date().toLocaleDateString('en-CA');
-    const [entries, goal, weekly] = await Promise.all([
+    const [entries, weekly] = await Promise.all([
       getDailyLog(familyId, userId, date),
-      getNutritionGoal(familyId, userId),
       getWeeklyAverage(familyId, userId, date),
     ]);
     const summary = {
       total_calories: entries.reduce((s, e) => s + (e.calories || 0), 0),
       entry_count:    entries.length,
     };
-    res.json({ date, entries, summary, goal, weekly });
+    res.json({ date, entries, summary, weekly });
   } catch (err) {
     logError('Food log fetch', err);
     res.status(500).json({ error: err.message });
@@ -1216,6 +1215,7 @@ app.post('/api/food-log', requireAuth, async (req, res) => {
     if (!meal_type) return res.status(400).json({ error: 'meal_type required' });
 
     const entry = await logFood(familyId, userId, req.body);
+    invalidateCache();
     res.json({ entry });
   } catch (err) {
     logError('Food log add', err);
@@ -1232,6 +1232,7 @@ app.delete('/api/food-log/:id', requireAuth, async (req, res) => {
 
     const deleted = await deleteLogEntry(req.params.id, familyId, userId);
     if (!deleted) return res.status(404).json({ error: 'Entry not found or not yours' });
+    invalidateCache();
     res.json({ deleted: true });
   } catch (err) {
     logError('Food log delete', err);
@@ -1239,70 +1240,17 @@ app.delete('/api/food-log/:id', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/nutrition-goals', requireAuth, async (req, res) => {
-  try {
-    const familyId = await getFamilyId();
-    if (!familyId) return res.status(404).json({ error: 'No family found' });
-    const userId = await getUserId(familyId, req);
-    if (!userId) return res.status(404).json({ error: 'No user found' });
-
-    const goal = await getNutritionGoal(familyId, userId);
-    res.json({ goal });
-  } catch (err) {
-    logError('Nutrition goal fetch', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/nutrition-goals', requireAuth, async (req, res) => {
-  try {
-    const familyId = await getFamilyId();
-    if (!familyId) return res.status(404).json({ error: 'No family found' });
-    const userId = await getUserId(familyId, req);
-    if (!userId) return res.status(404).json({ error: 'No user found' });
-
-    const { daily_calories } = req.body;
-    if (!daily_calories || isNaN(parseInt(daily_calories))) {
-      return res.status(400).json({ error: 'daily_calories required' });
-    }
-    const goal = await setNutritionGoal(familyId, userId, { daily_calories: parseInt(daily_calories) });
-    res.json({ goal });
-  } catch (err) {
-    logError('Nutrition goal set', err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 app.post('/api/food-log/lookup', requireAuth, async (req, res) => {
   try {
     const { query } = req.body;
     if (!query?.trim()) return res.status(400).json({ error: 'query required' });
-
-    const messages = [
-      {
-        role: 'system',
-        content: 'You are a nutrition expert. Estimate the calories for the described food or meal. Respond with valid JSON only, no markdown or explanation: {"food_name": "...", "calories": 000, "serving": "description of portion size assumed", "confidence": "high|medium|low"}',
-      },
-      { role: 'user', content: query.trim().slice(0, 300) },
-    ];
-
-    const result = await chatCompletion(messages);
-    const text = result.choices[0].message.content.trim().replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-    const data = JSON.parse(text);
-
-    if (!data.calories || isNaN(Number(data.calories))) {
-      return res.status(422).json({ error: 'Could not estimate calories' });
-    }
-
-    res.json({
-      food_name: data.food_name || query.trim(),
-      calories: Math.round(Number(data.calories)),
-      serving: data.serving || null,
-      confidence: data.confidence || 'medium',
-    });
+    const data = await lookupFoodCalories(query);
+    res.json(data);
   } catch (err) {
     logError('Food lookup', err);
-    res.status(500).json({ error: err.message });
+    const status = err.message === 'Could not estimate calories' ? 422 : 500;
+    res.status(status).json({ error: err.message });
   }
 });
 
