@@ -2902,9 +2902,9 @@
           "countdown countdown"
           "today upcoming"
           "lists meals"
+          "foodlog foodlog"
           "foodexp reminders"
-          "goals goals"
-          "foodlog foodlog";
+          "goals goals";
       }
       .sidebar { display: none; }
       .mobile-kids { display: block; }
@@ -2926,10 +2926,10 @@
           "upcoming"
           "lists"
           "meals"
+          "foodlog"
           "foodexp"
           "reminders"
-          "goals"
-          "foodlog";
+          "goals";
       }
       .countdown-area { flex-direction: column; }
       .card { padding: 12px; }
@@ -4402,10 +4402,9 @@
     }
 
     function renderFoodLog(members) {
-      if (!members || members.length === 0) {
-        return '<div class="empty-state" style="font-size:12px">No data yet</div>';
-      }
-      return members.map(m => {
+      const active = (members || []).filter(m => m.entry_count > 0);
+      if (!active.length) return '';
+      return active.map(m => {
         const pct = m.goal_calories ? Math.min(100, Math.round((m.total_calories / m.goal_calories) * 100)) : null;
         const barColor = pct === null ? '#6c5ce7' : pct >= 100 ? '#e17055' : pct >= 90 ? '#fdcb6e' : '#00b894';
         return `
@@ -4597,7 +4596,7 @@
         </div>
 
         <!-- Countdowns -->
-        ${renderCountdowns(data.countdowns)}
+        ${data.countdowns.length > 0 ? renderCountdowns(data.countdowns) : ''}
 
         <!-- Today's Events -->
         <div class="card today-card">
@@ -4621,16 +4620,15 @@
         </div>
 
         <!-- Upcoming -->
+        ${data.week.events.length > 0 ? `
         <div class="card upcoming-card">
           <div class="card-title" data-expandable="upcoming">
             <span class="icon">&#x1F5D3;&#xFE0F;</span> Upcoming
           </div>
           <div class="card-body">
-            ${data.week.events.length === 0
-              ? '<div class="empty-state"><div class="icon">&#x1F4ED;</div>No upcoming events</div>'
-              : renderUpcomingEvents(data.week.events)}
+            ${renderUpcomingEvents(data.week.events)}
           </div>
-        </div>
+        </div>` : ''}
 
         <!-- Lists -->
         <div class="card lists-card">
@@ -4649,20 +4647,30 @@
         </div>
 
         <!-- Food Expiry -->
+        ${data.food_items.length > 0 ? `
         <div class="card foodexp-card">
           <div class="card-title"><span class="icon">&#x1F9CA;</span> Use It Up <button class="card-add-btn food-add-btn">+ Add</button></div>
           <div class="card-body">
             ${renderFoodExpiry(data.food_items)}
           </div>
-        </div>
+        </div>` : ''}
+
+        <!-- Food Log Today -->
+        ${(() => { const _fl = renderFoodLog(data.food_log_today); return _fl ? `
+        <div class="card foodlog-card">
+          <div class="card-title">
+            <span class="icon">&#x1F957;</span> Calories Today
+            <a href="/food-log${_urlSecret ? '?secret=' + encodeURIComponent(_urlSecret) : ''}" style="margin-left:auto;font-size:10px;color:var(--text-light);text-decoration:none;background:rgba(255,255,255,0.08);padding:2px 7px;border-radius:4px;" target="_self">Open Log</a>
+          </div>
+          <div class="card-body">${_fl}</div>
+        </div>` : ''; })()}
 
         <!-- Reminders -->
+        ${data.reminders.length > 0 ? `
         <div class="card reminders-card">
           <div class="card-title"><span class="icon">&#x23F0;</span> Pending Reminders <button class="card-add-btn reminder-add-btn">+ Add</button></div>
           <div class="card-body">
-            ${data.reminders.length === 0
-              ? '<div class="empty-state"><div class="icon">&#x2705;</div>No pending reminders</div>'
-              : data.reminders.map(r => `
+            ${data.reminders.map(r => `
                 <div class="reminder-item">
                   <div class="reminder-icon">&#x1F514;</div>
                   <div class="reminder-content">
@@ -4673,25 +4681,16 @@
                 </div>
               `).join('')}
           </div>
+        </div>` : ''}
 
         <!-- Goals -->
+        ${data.goals.length > 0 ? `
         <div class="card goals-card">
           <div class="card-title"><span class="icon">&#x1F3AF;</span> Family Goals</div>
           <div class="card-body">
             ${renderGoals(data.goals)}
           </div>
-        </div>
-
-        <!-- Food Log Today -->
-        <div class="card foodlog-card">
-          <div class="card-title">
-            <span class="icon">&#x1F957;</span> Calories Today
-            <a href="/food-log${_urlSecret ? '?secret=' + encodeURIComponent(_urlSecret) : ''}" style="margin-left:auto;font-size:10px;color:var(--text-light);text-decoration:none;background:rgba(255,255,255,0.08);padding:2px 7px;border-radius:4px;" target="_self">Open Log</a>
-          </div>
-          <div class="card-body">
-            ${renderFoodLog(data.food_log_today)}
-          </div>
-        </div>
+        </div>` : ''}
       `;
 
       // Update apps badge
