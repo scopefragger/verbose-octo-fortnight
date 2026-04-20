@@ -7,6 +7,7 @@ import { summariseMessages, getCachedSummary, saveSummary } from '../llm/summari
 import { getTodayRow, upsertDay } from '../services/officeCheckin.js';
 import { sendMessage, markRead } from './whatsapp.js';
 import { handleWhatsAppCommand } from './whatsappCommands.js';
+import { logError } from '../utils/errorLog.js';
 
 const MAX_HISTORY = 30;
 const RECENT_VERBATIM = 8;
@@ -16,7 +17,7 @@ const MAX_TOKEN_ESTIMATE = 6000;
 /**
  * Process an incoming WhatsApp message from the webhook payload.
  */
-export async function handleWhatsAppMessage({ from, text, messageId, displayName, isGroup, groupId }) {
+export async function handleWhatsAppMessage({ from, text, messageId, replyToId, displayName, isGroup, groupId }) {
   // Mark as read immediately (best-effort)
   if (messageId) markRead(messageId);
 
@@ -34,7 +35,8 @@ export async function handleWhatsAppMessage({ from, text, messageId, displayName
   }
 
   // Check if this is a reply to the daily digest → office check-in shortcut
-  if (messageId && user.last_digest_message_id === messageId) {
+  // replyToId is the ID of the message being replied to (from message.context.id in the webhook)
+  if (replyToId && user.last_digest_message_id === replyToId) {
     await handleDigestReply({ from, user, text: text.trim() });
     return;
   }
@@ -99,7 +101,7 @@ export async function handleWhatsAppMessage({ from, text, messageId, displayName
       await saveMessage(user.id, 'assistant', reply);
     }
   } catch (err) {
-    console.error('WhatsApp message handling error:', err);
+    logError('WhatsApp message handler', err);
     await sendMessage(from, "Sorry, I hit an error. Please try again in a moment.");
   }
 }

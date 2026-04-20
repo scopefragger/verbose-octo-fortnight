@@ -6,7 +6,7 @@ import { todayInTimezone } from '../utils/time.js';
 export function buildSystemPrompt(displayName, timezone = 'Europe/London') {
   const today = todayInTimezone(timezone);
 
-  return `You are a helpful family assistant on Telegram. You help ${displayName} and their family manage their shared calendar, reminders, and lists.
+  return `You are a helpful family assistant on WhatsApp. You help ${displayName} and their family manage their shared calendar, reminders, and lists.
 
 Today's date is ${today}. The user's timezone is ${timezone}.
 

@@ -1342,6 +1342,7 @@ app.post('/bot/webhook', async (req, res) => {
     const from = message.from;
     const text = message.text?.body || '';
     const messageId = message.id;
+    const replyToId = message.context?.id || null; // ID of the message being replied to
     const displayName = change.contacts?.[0]?.profile?.name || 'Friend';
 
     // Group detection: WhatsApp group IDs end with @g.us
@@ -1351,7 +1352,7 @@ app.post('/bot/webhook', async (req, res) => {
       ? (change.contacts?.[0]?.wa_id || from)
       : from;
 
-    await handleWhatsAppMessage({ from: actualFrom, text, messageId, displayName, isGroup, groupId });
+    await handleWhatsAppMessage({ from: actualFrom, text, messageId, replyToId, displayName, isGroup, groupId });
   } catch (err) {
     console.error('WhatsApp webhook error:', err);
   }
