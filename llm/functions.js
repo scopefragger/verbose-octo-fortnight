@@ -827,15 +827,36 @@ export const tools = [
 ];
 
 /**
+ * Tools that only read data — no cache invalidation needed on dispatch.
+ * Must be kept in sync with the tools array above.
+ */
+export const readOnlyTools = new Set([
+  'list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns',
+  'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals',
+  'list_dashboard_themes', 'list_food_items', 'list_goals', 'get_goal_progress',
+  'get_watchlist', 'list_birthdays', 'get_office_stats', 'get_weather',
+  'get_next_bin', 'get_daily_nutrition',
+]);
+
+/**
+ * Destructive tools that require explicit user confirmation before execution.
+ * The message handler intercepts these and requests confirmation first.
+ */
+export const confirmationRequiredTools = new Set([
+  'delete_event',
+  'clear_list',
+  'delete_goal',
+  'clear_meals',
+]);
+
+/**
  * Dispatch a function call to the appropriate service.
  * Returns a JSON string result for Groq.
  */
 export async function dispatch(functionName, args, context) {
   const { familyId, userId, timezone } = context;
 
-  // Invalidate dashboard cache for any write operation
-  const readOnlyFns = new Set(['list_events', 'list_reminders', 'get_list', 'get_all_lists', 'list_countdowns', 'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals', 'list_dashboard_themes', 'list_food_items', 'list_goals', 'get_goal_progress', 'get_watchlist', 'list_birthdays', 'get_office_stats', 'get_weather', 'get_next_bin', 'get_daily_nutrition']);
-  if (!readOnlyFns.has(functionName)) {
+  if (!readOnlyTools.has(functionName)) {
     invalidateDashboardCache();
   }
 

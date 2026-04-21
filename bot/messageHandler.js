@@ -1,10 +1,11 @@
 import { getUserByTelegramId } from '../services/family.js';
 import { chatCompletion } from '../llm/groq.js';
 import { buildSystemPrompt } from '../llm/systemPrompt.js';
-import { tools, dispatch } from '../llm/functions.js';
+import { tools, dispatch, confirmationRequiredTools } from '../llm/functions.js';
 import { supabase } from '../db/supabase.js';
 import { summariseMessages, getCachedSummary, saveSummary } from '../llm/summarise.js';
 import { getTodayRow, upsertDay } from '../services/officeCheckin.js';
+import { checkRateLimit, logApiCall } from '../services/rateLimiter.js';
 
 const MAX_HISTORY = 30;
 const RECENT_VERBATIM = 8; // Keep last 8 messages as-is (4 exchanges)
@@ -55,8 +56,12 @@ export async function handleMessage(ctx) {
   await ctx.replyWithChatAction('typing');
 
   try {
+    // Rate limit check — throws with a user-friendly message if exceeded
+    await checkRateLimit(familyId);
+
     // Chat completion loop (handles multi-round tool calls)
     let response = await chatCompletion(messages, tools);
+    logApiCall(familyId, user.id, response.model, response.usage?.total_tokens);
     let rounds = 0;
 
     while (rounds < MAX_TOOL_ROUNDS) {
@@ -82,6 +87,21 @@ export async function handleMessage(ctx) {
             });
             continue;
           }
+
+          // Enforce confirmation for destructive tools if not already confirmed
+          if (confirmationRequiredTools.has(functionName) && !hasPendingConfirmation(messages, functionName)) {
+            messages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: JSON.stringify({
+                confirmation_required: true,
+                tool: functionName,
+                message: 'Ask the user to confirm this action before proceeding. Do not call this tool again until they explicitly confirm (e.g. "yes", "confirm", "go ahead").',
+              }),
+            });
+            continue;
+          }
+
           const context = { familyId, userId: user.id, timezone };
 
           let result;
@@ -102,6 +122,7 @@ export async function handleMessage(ctx) {
         // Get next response from Groq
         await ctx.replyWithChatAction('typing');
         response = await chatCompletion(messages, tools);
+        logApiCall(familyId, user.id, response.model, response.usage?.total_tokens);
         rounds++;
       } else {
         // No more tool calls — we have the final response
@@ -116,7 +137,7 @@ export async function handleMessage(ctx) {
     }
   } catch (err) {
     console.error('Message handling error:', err);
-    await ctx.reply("Sorry, I hit an error. Please try again in a moment.");
+    await ctx.reply(err.message?.startsWith('Daily message limit') ? err.message : "Sorry, I hit an error. Please try again in a moment.");
   }
 }
 
@@ -267,6 +288,27 @@ async function handleDigestReply(ctx, user, text) {
   const suffix = wasPlanned ? '' : existing ? ' (already confirmed)' : ' — logged & confirmed';
 
   await ctx.reply(`✅ Checked in — ${typeLabel} (${dateLabel})${suffix}`);
+}
+
+/**
+ * Check if a prior confirmation request for this tool exists in the messages array.
+ * Used to allow a destructive tool to proceed after the user has already confirmed.
+ * The confirmation_required result from a prior turn is loaded into messages via history.
+ */
+function hasPendingConfirmation(messages, toolName) {
+  for (const msg of messages) {
+    if (msg.role === 'tool' && msg.content) {
+      try {
+        const result = JSON.parse(msg.content);
+        if (result.confirmation_required === true && result.tool === toolName) {
+          return true;
+        }
+      } catch {
+        // ignore unparseable tool results
+      }
+    }
+  }
+  return false;
 }
 
 /**

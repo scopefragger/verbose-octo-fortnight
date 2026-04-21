@@ -46,18 +46,21 @@ async function handleStart(ctx) {
 async function handleHelp(ctx) {
   await ctx.reply(
     `Here's what I can help with:\n\n` +
-    `📅 Calendar\n` +
-    `  "Add dinner at 7pm Friday"\n` +
-    `  "What's on the calendar this week?"\n` +
-    `  "Cancel the dentist appointment"\n\n` +
-    `⏰ Reminders\n` +
-    `  "Remind me to take out the trash at 8pm"\n` +
-    `  "What reminders do I have?"\n\n` +
-    `📝 Shared Lists\n` +
-    `  "Add eggs to the grocery list"\n` +
-    `  "Show me the grocery list"\n` +
-    `  "Check off milk"\n\n` +
-    `💬 Or just chat — I'm happy to help with anything!\n\n` +
+    `📅 Calendar — "Add dentist Tuesday 2pm" · "What's on this week?"\n` +
+    `⏰ Reminders — "Remind me to call mum at 6pm" · "Snooze that reminder"\n` +
+    `📝 Lists — "Add milk to shopping" · "Show the grocery list" · "Tick off eggs"\n` +
+    `🍽️ Meal planning — "What's for dinner?" · "Plan pasta for Wednesday"\n` +
+    `⭐ Kid points — "Give Sam 5 points for tidying up"\n` +
+    `⏳ Countdowns — "Create a countdown to Disney in July"\n` +
+    `🎂 Birthdays — "Add Gran's birthday, 12th June 1948"\n` +
+    `👀 Watchlist — "Add Moana 2 to our watchlist"\n` +
+    `🥗 Food expiry — "Track the chicken, use by Thursday"\n` +
+    `🍎 Calorie log — "Log a banana for breakfast"\n` +
+    `🎯 Family goals — "Add a goal: read 10 books this month"\n` +
+    `🏢 Office tracker — "I'm in the office today"\n` +
+    `🌤️ Weather — "What's the weather like?"\n` +
+    `🗑️ Bins — "Which bin goes out this week?"\n` +
+    `🎨 Dashboard theme — "Set the theme to Christmas"\n\n` +
     `Commands:\n` +
     `/start — Register\n` +
     `/link — Link with your partner\n` +

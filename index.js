@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { handleWhatsAppMessage } from './bot/whatsappHandler.js';
-import { checkReminders, sendDailyDigest, sendWeeklyDigest } from './routes/cron.js';
+import { checkReminders, sendDailyDigest, sendWeeklyDigest, cleanupOldData } from './routes/cron.js';
 import { getDashboardData } from './routes/dashboard.js';
 import authRoutes from './routes/auth.js';
 import { requireAuth, requireCronSecret } from './middleware/auth.js';
@@ -90,6 +90,17 @@ app.get('/cron/weekly', requireCronSecret, async (req, res) => {
   } catch (err) {
     logError('weekly-digest', err);
     res.status(500).json({ error: 'digest failed' });
+  }
+});
+
+// Nightly cleanup — delete old conversations, food logs, and audit records
+app.get('/cron/cleanup', requireCronSecret, async (req, res) => {
+  try {
+    const result = await cleanupOldData();
+    res.json(result);
+  } catch (err) {
+    logError('cron-cleanup', err);
+    res.status(500).json({ error: 'cleanup failed' });
   }
 });
 

@@ -470,6 +470,54 @@ export async function sendWeeklyDigest() {
 }
 
 /**
+ * Delete old data to keep log tables from growing unbounded.
+ * Safe to run nightly — scoped deletes with no cascading risk.
+ */
+export async function cleanupOldData() {
+  const results = {};
+
+  // Conversations older than 90 days (already summarised by then)
+  const cutoff90 = new Date();
+  cutoff90.setDate(cutoff90.getDate() - 90);
+  const { error: convErr } = await supabase
+    .from('conversations')
+    .delete()
+    .lt('created_at', cutoff90.toISOString());
+  if (convErr) console.error('Conversation cleanup failed:', convErr.message);
+  else results.conversations = 'cleaned';
+
+  // Conversation summaries older than 180 days
+  const cutoff180 = new Date();
+  cutoff180.setDate(cutoff180.getDate() - 180);
+  const { error: sumErr } = await supabase
+    .from('conversation_summaries')
+    .delete()
+    .lt('created_at', cutoff180.toISOString());
+  if (sumErr) console.error('Summary cleanup failed:', sumErr.message);
+  else results.summaries = 'cleaned';
+
+  // Food logs older than 24 months
+  const cutoffFood = new Date();
+  cutoffFood.setMonth(cutoffFood.getMonth() - 24);
+  const { error: foodErr } = await supabase
+    .from('food_logs')
+    .delete()
+    .lt('logged_at', cutoffFood.toLocaleDateString('en-CA'));
+  if (foodErr) console.error('Food log cleanup failed:', foodErr.message);
+  else results.foodLogs = 'cleaned';
+
+  // Groq API audit log older than 90 days
+  const { error: groqErr } = await supabase
+    .from('groq_api_calls')
+    .delete()
+    .lt('called_at', cutoff90.toISOString());
+  if (groqErr) console.error('Groq audit cleanup failed:', groqErr.message);
+  else results.groqAudit = 'cleaned';
+
+  return results;
+}
+
+/**
  * Get all registered users with their family info.
  */
 async function getAllUsers() {
