@@ -789,7 +789,7 @@ export const tools = [
         properties: {
           food_name: { type: 'string',  description: 'Name of the food or drink (e.g. "Banana", "Chicken sandwich", "Latte")' },
           meal_type: { type: 'string',  enum: ['breakfast', 'lunch', 'dinner', 'snack'], description: 'Which meal this belongs to' },
-          calories:  { type: 'integer', description: 'Calories (kcal). Estimate if not provided.' },
+          calories:  { type: 'number', description: 'Calories (kcal). Estimate if not provided. Must be a number.' },
           notes:     { type: 'string',  description: 'Optional notes (e.g. "homemade", "large portion")' },
           logged_at: { type: 'string',  description: 'Date in YYYY-MM-DD format. Omit for today.' },
         },

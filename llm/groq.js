@@ -27,7 +27,17 @@ export async function chatCompletion(messages, tools = []) {
   } catch (err) {
     if (err.status === 429) {
       console.warn('Groq rate limited, falling back to', FALLBACK_MODEL);
+      // The 8b fallback model has poor tool-calling reliability — strip tools to avoid
+      // compounding the failure with another malformed generation.
       params.model = FALLBACK_MODEL;
+      delete params.tools;
+      delete params.tool_choice;
+      return await groq.chat.completions.create(params);
+    }
+    if (err.status === 400 && err.error?.code === 'tool_use_failed') {
+      console.warn('Groq tool_use_failed — retrying without tools');
+      delete params.tools;
+      delete params.tool_choice;
       return await groq.chat.completions.create(params);
     }
     throw err;
