@@ -1057,7 +1057,7 @@
     }
 
     .weather-title {
-      font-size: 9px;
+      font-size: 13px;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -1078,25 +1078,25 @@
     }
 
     .weather-day-name {
-      font-size: 9px;
+      font-size: 13px;
       font-weight: 600;
       color: var(--text-light);
       text-transform: uppercase;
     }
 
     .weather-day-icon {
-      font-size: 20px;
+      font-size: 28px;
       margin: 2px 0;
     }
 
     .weather-day-temp {
-      font-size: 11px;
+      font-size: 16px;
       font-weight: 700;
       color: var(--text);
     }
 
     .weather-day-low {
-      font-size: 9px;
+      font-size: 13px;
       color: var(--text-light);
     }
 
@@ -1284,7 +1284,7 @@
     }
 
     .header h1 {
-      font-size: 20px;
+      font-size: 24px;
       font-weight: 600;
     }
 
@@ -1362,14 +1362,14 @@
     }
 
     .countdown-title {
-      font-size: 11px;
+      font-size: 18px;
       font-weight: 600;
-      margin-bottom: 2px;
+      margin-bottom: 4px;
       position: relative;
     }
 
     .countdown-days {
-      font-size: 32px;
+      font-size: 80px;
       font-weight: 800;
       line-height: 1;
       position: relative;
@@ -1377,17 +1377,17 @@
     }
 
     .countdown-label {
-      font-size: 10px;
+      font-size: 14px;
       font-weight: 500;
       opacity: 0.9;
-      margin-top: 1px;
+      margin-top: 2px;
       position: relative;
     }
 
     .countdown-date {
-      font-size: 9px;
+      font-size: 13px;
       opacity: 0.75;
-      margin-top: 2px;
+      margin-top: 4px;
       position: relative;
     }
 
@@ -1640,12 +1640,12 @@
     .event-time-badge {
       background: var(--primary-light);
       color: var(--primary);
-      font-size: 10px;
+      font-size: 13px;
       font-weight: 600;
-      padding: 4px 8px;
+      padding: 5px 10px;
       border-radius: 6px;
       white-space: nowrap;
-      min-width: 65px;
+      min-width: 70px;
       text-align: center;
     }
 
@@ -1655,13 +1655,13 @@
     }
 
     .event-details h3 {
-      font-size: 13px;
+      font-size: 16px;
       font-weight: 600;
       margin-bottom: 1px;
     }
 
     .event-details p {
-      font-size: 11px;
+      font-size: 13px;
       color: var(--text-light);
     }
 
@@ -1690,7 +1690,7 @@
     .day-group:last-child { margin-bottom: 0; }
 
     .day-label {
-      font-size: 10px;
+      font-size: 13px;
       font-weight: 700;
       color: var(--primary);
       text-transform: uppercase;
@@ -1704,8 +1704,8 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 4px 0;
-      font-size: 12px;
+      padding: 5px 0;
+      font-size: 15px;
     }
 
     .day-event.past-event {
@@ -1726,7 +1726,7 @@
     }
 
     .day-event .time {
-      font-size: 10px;
+      font-size: 13px;
       color: var(--text-light);
       min-width: 60px;
     }
@@ -2937,6 +2937,15 @@
       .card-title { font-size: 12px; }
     }
 
+    /* === TV REFRESH FADE-IN === */
+    @keyframes tvFadeIn {
+      from { opacity: 0.5; }
+      to   { opacity: 1; }
+    }
+    .tv-fade-in {
+      animation: tvFadeIn 0.8s ease-out forwards;
+    }
+
     /* Loading */
     .loading {
       display: flex;
@@ -2961,7 +2970,7 @@
   </style>
 </head>
 <body>
-  <div class="dashboard" id="dashboard">
+  <div class="dashboard" id="dashboard" data-auto-rotate="false">
     <div class="loading" id="loading">
       <div class="spinner"></div>
       Loading dashboard...
@@ -6324,6 +6333,11 @@
         window._lastWeather = weather;
         render(data, weather);
         updateMobileWeather();
+        document.querySelectorAll('.card-body').forEach(el => {
+          el.classList.remove('tv-fade-in');
+          void el.offsetWidth;
+          el.classList.add('tv-fade-in');
+        });
       } catch (e) { /* silently retry */ }
     }
 
