@@ -24,24 +24,30 @@ A family assistant with four surfaces: **Telegram bot** (natural language), **TV
 ## PRE-IMPLEMENTATION VALIDATOR PROTOCOL — MANDATORY
 
 > **THIS IS NOT OPTIONAL.** Before writing, editing, or deleting ANY code for a new feature or
-> significant change, you MUST run the 5-persona validator panel and incorporate their agreed plan.
+> significant change, you MUST run the validator panel and incorporate their agreed plan.
 > No exceptions. The validators run as Haiku sub-agents inside Claude Code.
 
 ### What It Does
 
-Five expert AI personas independently review the task, then discuss each other's findings, then a
+Expert AI personas independently review the task, then discuss each other's findings, then a
 synthesis agent produces a final agreed design plan. This catches security gaps, UX problems,
 architecture issues, and misunderstood requirements *before* any code is committed.
 
-The 5 personas are defined in `validators/personas/`:
+The personas are defined in `validators/personas/`. Five are the **standing panel** (included when their domain is touched). Two are **on-demand specialists** (spawned only when tasks specifically require their expertise):
 
-| File | Persona | Role |
-|---|---|---|
-| `cecile.md` | Cecile | BISO — security, threat modeling, data protection |
-| `enriqua.md` | Enriqua | Senior UX Expert — mobile, conversational, end-user flows |
-| `mike.md` | Mike | Staff Engineer — system design, scalability, architecture |
-| `bob.md` | Bob | Director of Product — customer need, scope, real-family value |
-| `dan.md` | Dan | Senior Data Engineer — schema design, migrations, data patterns |
+| File | Persona | Role | Type |
+|---|---|---|---|
+| `cecile.md` | Cecile | BISO — security, threat modeling, data protection | Standing |
+| `enriqua.md` | Enriqua | Senior UX Expert — mobile, conversational, end-user flows | Standing |
+| `mike.md` | Mike | Staff Engineer — system design, scalability, architecture | Standing |
+| `bob.md` | Bob | Director of Product — customer need, scope, real-family value | Standing |
+| `dan.md` | Dan | Senior Data Engineer — schema design, migrations, data patterns | Standing |
+| `ops.md` | Jordan | Operations/DevOps Engineer — cron reliability, perf, observability | On-demand |
+| `integration.md` | Priya | Integration/API Engineer — external services, retries, webhooks | On-demand |
+
+**On-demand triage rules:**
+- Include **Jordan** when the task adds a cron job, bulk data operation, or an endpoint expected to sustain significant traffic.
+- Include **Priya** when the task integrates a brand-new external service, adds a webhook handler, or makes meaningful changes to retry/timeout logic for Groq, GitHub, Telegram, or Supabase.
 
 ### When to Run
 
