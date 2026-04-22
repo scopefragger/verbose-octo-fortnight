@@ -13,6 +13,7 @@ import * as birthdays from '../services/birthdays.js';
 import { upsertDay, getMonthStats } from '../services/officeCheckin.js';
 import { upsertBinSchedule, getBinSchedule, getNextCollection } from '../services/binSchedule.js';
 import * as foodLog from '../services/foodLog.js';
+import * as flights from '../services/flights.js';
 import { formatForUser } from '../utils/time.js';
 import { invalidateDashboardCache } from '../utils/cache.js';
 
@@ -824,6 +825,50 @@ export const tools = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'track_flight',
+      description: 'Register a flight to track. You will get a reminder 12 hours before departure. Requires the flight code (e.g. BA492) and departure date/time.',
+      parameters: {
+        type: 'object',
+        properties: {
+          flight_code: { type: 'string', description: 'IATA flight code, e.g. BA492 or AA1234' },
+          departure_scheduled: { type: 'string', description: 'Departure date and time in ISO 8601 format' },
+          arrival_scheduled: { type: 'string', description: 'Arrival date and time in ISO 8601 format (optional but recommended)' },
+          airline_name: { type: 'string', description: 'Airline name, e.g. British Airways (optional)' },
+          from_airport: { type: 'string', description: 'Departure airport IATA code, e.g. LHR (optional)' },
+          to_airport: { type: 'string', description: 'Arrival airport IATA code, e.g. JFK (optional)' },
+        },
+        required: ['flight_code', 'departure_scheduled'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_flights',
+      description: 'List your currently tracked flights.',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'remove_flight',
+      description: 'Stop tracking a flight. Call list_flights first to find the flight ID.',
+      parameters: {
+        type: 'object',
+        properties: {
+          flight_id: { type: 'string', description: 'The ID of the flight to stop tracking' },
+        },
+        required: ['flight_id'],
+      },
+    },
+  },
 ];
 
 /**
@@ -835,7 +880,7 @@ export const readOnlyTools = new Set([
   'get_points', 'get_point_history', 'get_meals', 'get_weekly_meals',
   'list_dashboard_themes', 'list_food_items', 'list_goals', 'get_goal_progress',
   'get_watchlist', 'list_birthdays', 'get_office_stats', 'get_weather',
-  'get_next_bin', 'get_daily_nutrition',
+  'get_next_bin', 'get_daily_nutrition', 'list_flights',
 ]);
 
 /**
@@ -1546,6 +1591,37 @@ export async function dispatch(functionName, args, context) {
       const deleted = await foodLog.deleteLogEntry(args.entry_id, familyId, userId);
       if (!deleted) return JSON.stringify({ success: false, error: 'Entry not found or does not belong to you.' });
       return JSON.stringify({ success: true, message: `Removed "${deleted.food_name}" from the log.` });
+    }
+
+    case 'track_flight': {
+      const flight = await flights.trackFlight(familyId, userId, args);
+      const dep = formatForUser(flight.departure_scheduled, timezone);
+      const route = [flight.from_airport, flight.to_airport].filter(Boolean).join(' → ');
+      return JSON.stringify({
+        success: true,
+        flight: { id: flight.id, flight_code: flight.flight_code, departure: dep, route: route || undefined },
+        message: `Got it! I'll send you a reminder 12 hours before ${flight.flight_code} departs${route ? ` (${route})` : ''} on ${dep}.`,
+      });
+    }
+
+    case 'list_flights': {
+      const list = await flights.listFlights(familyId, userId);
+      return JSON.stringify({
+        flights: list.map(f => ({
+          id: f.id,
+          flight_code: f.flight_code,
+          airline: f.airline_name || undefined,
+          route: [f.from_airport, f.to_airport].filter(Boolean).join(' → ') || undefined,
+          departure: formatForUser(f.departure_scheduled, timezone),
+          arrival: f.arrival_scheduled ? formatForUser(f.arrival_scheduled, timezone) : undefined,
+          reminder_sent: f.notified_12h,
+        })),
+      });
+    }
+
+    case 'remove_flight': {
+      const removed = await flights.removeFlight(args.flight_id, familyId, userId);
+      return JSON.stringify({ success: true, message: `Stopped tracking ${removed.flight_code}.` });
     }
 
     default:
