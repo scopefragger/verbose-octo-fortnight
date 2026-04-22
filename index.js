@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { handleWhatsAppMessage } from './bot/whatsappHandler.js';
-import { checkReminders, sendDailyDigest, sendWeeklyDigest, cleanupOldData } from './routes/cron.js';
+import { checkReminders, sendDailyDigest, sendWeeklyDigest, cleanupOldData, checkFlightNotifications } from './routes/cron.js';
 import { getDashboardData } from './routes/dashboard.js';
 import authRoutes from './routes/auth.js';
 import { requireAuth, requireCronSecret } from './middleware/auth.js';
@@ -101,6 +101,17 @@ app.get('/cron/cleanup', requireCronSecret, async (req, res) => {
   } catch (err) {
     logError('cron-cleanup', err);
     res.status(500).json({ error: 'cleanup failed' });
+  }
+});
+
+// Flight notifications — send 12h pre-departure reminders, archive old flights
+app.get('/cron/flights', requireCronSecret, async (req, res) => {
+  try {
+    const result = await checkFlightNotifications();
+    res.json(result);
+  } catch (err) {
+    logError('cron-flights', err);
+    res.status(500).json({ error: 'flight check failed' });
   }
 });
 

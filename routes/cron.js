@@ -1,4 +1,5 @@
 import { getDueReminders, markSent, listReminders, createReminder, getNextOccurrence } from '../services/reminders.js';
+import { getFlightsDueForNotification, markFlightNotified, archiveOldFlights } from '../services/flights.js';
 import { listEvents } from '../services/calendar.js';
 import { getMealsForDate, getMealsForWeek } from '../services/meals.js';
 import { getAllPoints } from '../services/points.js';
@@ -515,6 +516,46 @@ export async function cleanupOldData() {
   else results.groqAudit = 'cleaned';
 
   return results;
+}
+
+/**
+ * Send 12-hour pre-departure reminders for tracked flights, then archive old ones.
+ * Called by cron-job.org hitting GET /cron/flights (every 30 minutes).
+ */
+export async function checkFlightNotifications() {
+  const due = await getFlightsDueForNotification();
+  let sent = 0;
+
+  for (const flight of due) {
+    const waNumber = flight.users?.whatsapp_number;
+    if (!waNumber) continue;
+
+    try {
+      const tz = flight.users?.timezone || 'Europe/London';
+      const depTime = new Date(flight.departure_scheduled).toLocaleTimeString('en-GB', {
+        hour: '2-digit', minute: '2-digit', timeZone: tz,
+      });
+      const depDate = new Date(flight.departure_scheduled).toLocaleDateString('en-GB', {
+        weekday: 'short', day: 'numeric', month: 'short', timeZone: tz,
+      });
+
+      const route = [flight.from_airport, flight.to_airport].filter(Boolean).join(' → ');
+      let msg = `✈️ Flight reminder: *${flight.flight_code}* departs in ~12 hours`;
+      if (flight.airline_name) msg += ` (${flight.airline_name})`;
+      msg += `\n📅 ${depDate} at ${depTime}`;
+      if (route) msg += `\n🛫 ${route}`;
+      msg += `\nHave a great flight! 🧳`;
+
+      await sendMessage(waNumber, msg);
+      await markFlightNotified(flight.id);
+      sent++;
+    } catch (err) {
+      console.error(`Failed to send flight notification for ${flight.id}:`, err.message);
+    }
+  }
+
+  await archiveOldFlights();
+  return { checked: due.length, sent };
 }
 
 /**
