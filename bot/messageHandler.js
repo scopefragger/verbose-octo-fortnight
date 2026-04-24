@@ -6,6 +6,8 @@ import { supabase } from '../db/supabase.js';
 import { summariseMessages, getCachedSummary, saveSummary } from '../llm/summarise.js';
 import { getTodayRow, upsertDay } from '../services/officeCheckin.js';
 import { checkRateLimit, logApiCall } from '../services/rateLimiter.js';
+import { logError } from '../utils/errorLog.js';
+import { classifyError } from '../utils/classifyError.js';
 
 const MAX_HISTORY = 30;
 const RECENT_VERBATIM = 8; // Keep last 8 messages as-is (4 exchanges)
@@ -108,8 +110,8 @@ export async function handleMessage(ctx) {
           try {
             result = await dispatch(functionName, args, context);
           } catch (err) {
-            console.error(`Tool ${functionName} failed:`, err.message);
-            result = JSON.stringify({ error: `Failed to execute ${functionName}: ${err.message}` });
+            logError(`Tool ${functionName}`, err);
+            result = JSON.stringify({ error: classifyError(err).userMessage });
           }
 
           messages.push({
@@ -136,8 +138,8 @@ export async function handleMessage(ctx) {
       await saveMessage(user.id, 'assistant', reply);
     }
   } catch (err) {
-    console.error('Message handling error:', err);
-    await ctx.reply(err.message?.startsWith('Daily message limit') ? err.message : "Sorry, I hit an error. Please try again in a moment.");
+    logError('Telegram message handler', err);
+    await ctx.reply(classifyError(err).userMessage);
   }
 }
 
@@ -272,7 +274,8 @@ async function handleDigestReply(ctx, user, text) {
   try {
     await upsertDay(user.family_id, todayStr, fields);
   } catch (err) {
-    await ctx.reply(`Couldn't check in: ${err.message}`);
+    logError('Telegram digest check-in', err);
+    await ctx.reply("Couldn't check in right now. Please try again in a moment.");
     return;
   }
 
@@ -320,6 +323,6 @@ async function saveMessage(userId, role, content) {
     .insert({ user_id: userId, role, content });
 
   if (error) {
-    console.error('Failed to save message:', error);
+    logError('saveMessage', error);
   }
 }

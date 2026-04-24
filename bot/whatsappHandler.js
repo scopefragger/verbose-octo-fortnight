@@ -8,6 +8,7 @@ import { getTodayRow, upsertDay } from '../services/officeCheckin.js';
 import { sendMessage, markRead } from './whatsapp.js';
 import { handleWhatsAppCommand } from './whatsappCommands.js';
 import { logError } from '../utils/errorLog.js';
+import { classifyError } from '../utils/classifyError.js';
 
 const MAX_HISTORY = 30;
 const RECENT_VERBATIM = 8;
@@ -82,8 +83,8 @@ export async function handleWhatsAppMessage({ from, text, messageId, replyToId, 
           try {
             result = await dispatch(functionName, args, context);
           } catch (err) {
-            console.error(`Tool ${functionName} failed:`, err.message);
-            result = JSON.stringify({ error: `Failed to execute ${functionName}: ${err.message}` });
+            logError(`Tool ${functionName}`, err);
+            result = JSON.stringify({ error: classifyError(err).userMessage });
           }
           messages.push({ role: 'tool', tool_call_id: toolCall.id, content: result });
         }
@@ -102,7 +103,11 @@ export async function handleWhatsAppMessage({ from, text, messageId, replyToId, 
     }
   } catch (err) {
     logError('WhatsApp message handler', err);
-    await sendMessage(from, "Sorry, I hit an error. Please try again in a moment.");
+    try {
+      await sendMessage(from, classifyError(err).userMessage);
+    } catch (sendErr) {
+      logError('WhatsApp sendMessage failed', sendErr, { from });
+    }
   }
 }
 
@@ -148,7 +153,12 @@ async function handleDigestReply({ from, user, text }) {
   try {
     await upsertDay(user.family_id, todayStr, fields);
   } catch (err) {
-    await sendMessage(from, `Couldn't check in: ${err.message}`);
+    logError('WhatsApp digest check-in', err);
+    try {
+      await sendMessage(from, "Couldn't check in right now. Please try again in a moment.");
+    } catch (sendErr) {
+      logError('WhatsApp sendMessage failed', sendErr, { from });
+    }
     return;
   }
 
@@ -218,5 +228,5 @@ function trimToTokenBudget(messages) {
 
 async function saveMessage(userId, role, content) {
   const { error } = await supabase.from('conversations').insert({ user_id: userId, role, content });
-  if (error) console.error('Failed to save message:', error);
+  if (error) logError('saveMessage', error);
 }

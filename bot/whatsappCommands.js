@@ -7,6 +7,7 @@ import {
 } from '../services/family.js';
 import { supabase } from '../db/supabase.js';
 import { sendMessage } from './whatsapp.js';
+import { logError } from '../utils/errorLog.js';
 
 const HELP_TEXT =
   `Here's what I can help with:\n\n` +
@@ -61,56 +62,63 @@ export async function handleWhatsAppCommand({ from, text, isGroup, groupId }) {
 }
 
 async function handleRegister(from, text) {
-  const existing = await getUserByWhatsAppNumber(from);
-  if (existing) {
+  try {
+    const existing = await getUserByWhatsAppNumber(from);
+    if (existing) {
+      await sendMessage(from,
+        `Welcome back, ${existing.display_name}! 👋\n\nJust send me a message and I'll help with your calendar, reminders, lists and more.`
+      );
+      return;
+    }
+
+    const displayName = text.split(' ').find(w => w.length > 1 && !/^(hi|hello|hey|start)$/i.test(w)) || 'Friend';
+
+    const user = await registerWhatsAppUser(from, displayName);
     await sendMessage(from,
-      `Welcome back, ${existing.display_name}! 👋\n\nJust send me a message and I'll help with your calendar, reminders, lists and more.`
+      `Hi ${user.display_name}! 🎉 You're registered.\n\n` +
+      `Here's what I can do:\n` +
+      `📅 Calendar — "Add dentist Tuesday 2pm"\n` +
+      `⏰ Reminders — "Remind me to call mum in 2 hours"\n` +
+      `📝 Lists — "Add milk to the grocery list"\n` +
+      `🗑️ Bins — "Which bin is it this week?"\n` +
+      `💬 Chat — Ask me anything!\n\n` +
+      `To share with your partner, send: link`
     );
-    return;
+  } catch (err) {
+    logError('WhatsApp handleRegister', err);
+    await sendMessage(from, "Something went wrong getting you set up. Please try again in a moment.");
   }
-
-  // Use the first word of whatever they sent as a display name hint, otherwise "Friend"
-  const displayName = text.split(' ').find(w => w.length > 1 && !/^(hi|hello|hey|start)$/i.test(w)) || 'Friend';
-
-  const user = await registerWhatsAppUser(from, displayName);
-  await sendMessage(from,
-    `Hi ${user.display_name}! 🎉 You're registered.\n\n` +
-    `Here's what I can do:\n` +
-    `📅 Calendar — "Add dentist Tuesday 2pm"\n` +
-    `⏰ Reminders — "Remind me to call mum in 2 hours"\n` +
-    `📝 Lists — "Add milk to the grocery list"\n` +
-    `🗑️ Bins — "Which bin is it this week?"\n` +
-    `💬 Chat — Ask me anything!\n\n` +
-    `To share with your partner, send: link`
-  );
 }
 
 async function handleLink(from, text) {
-  const user = await getUserByWhatsAppNumber(from);
-  if (!user) {
-    await sendMessage(from, 'Send "hi" first to register.');
-    return;
-  }
-
-  const parts = text.split(' ');
-  const code = parts[1]?.toUpperCase();
-
-  if (code) {
-    // Joining with a code
-    const family = await joinFamily(user, code);
-    if (!family) {
-      await sendMessage(from, 'Invalid or expired code. Ask your partner to send "link" again to get a fresh one.');
+  try {
+    const user = await getUserByWhatsAppNumber(from);
+    if (!user) {
+      await sendMessage(from, 'Send "hi" first to register.');
       return;
     }
-    const members = await getFamilyMembers(family.id);
-    const names = members.map((m) => m.display_name).join(' and ');
-    await sendMessage(from, `You're now linked! 🎉 ${names} are sharing calendars, lists, and more.`);
-  } else {
-    // Generating a code
-    const linkCode = await generateLinkCode(user);
-    await sendMessage(from,
-      `Share this code with your partner:\n\n🔗 ${linkCode}\n\nThey should send: link ${linkCode}`
-    );
+
+    const parts = text.split(' ');
+    const code = parts[1]?.toUpperCase();
+
+    if (code) {
+      const family = await joinFamily(user, code);
+      if (!family) {
+        await sendMessage(from, 'Invalid or expired code. Ask your partner to send "link" again to get a fresh one.');
+        return;
+      }
+      const members = await getFamilyMembers(family.id);
+      const names = members.map((m) => m.display_name).join(' and ');
+      await sendMessage(from, `You're now linked! 🎉 ${names} are sharing calendars, lists, and more.`);
+    } else {
+      const linkCode = await generateLinkCode(user);
+      await sendMessage(from,
+        `Share this code with your partner:\n\n🔗 ${linkCode}\n\nThey should send: link ${linkCode}`
+      );
+    }
+  } catch (err) {
+    logError('WhatsApp handleLink', err);
+    await sendMessage(from, "Something went wrong with the link command. Please try again in a moment.");
   }
 }
 
@@ -132,7 +140,7 @@ async function handleSetGroup(from, isGroup, groupId) {
     .eq('id', user.family_id);
 
   if (error) {
-    console.error('Failed to set WhatsApp group:', error);
+    logError('WhatsApp handleSetGroup', error);
     await sendMessage(from, 'Failed to save group. Please try again.');
     return;
   }
