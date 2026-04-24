@@ -302,7 +302,7 @@ Never `git checkout main` inside a worktree — `main` is already checked out by
 - **`index.js` is monolithic** — ~800 lines of routes, intentionally not split yet.
 - **No automated migration runner** — migrations are applied manually in Supabase SQL Editor.
 - **Secret in URL** — dashboard passes `?secret=` as a query param; visible in server logs.
-- **No rate limiting** — the Telegram bot has no per-user rate limiting on LLM calls.
+- **No rate limiting** — the WhatsApp bot has no per-user rate limiting on LLM calls.
 
 ---
 
@@ -311,7 +311,7 @@ Never `git checkout main` inside a worktree — `main` is already checked out by
 1. **Migration** — add `db/migrations/0XX_name.sql` if schema changes needed
 2. **Service** — add `services/name.js` with functions scoped by `familyId`
 3. **Route** — add endpoint in `index.js` following the standard route pattern
-4. **Bot tool** (optional) — add tool definition + dispatch case in `llm/functions.js`
+4. **Bot tool** (optional) — add tool definition + dispatch case in `llm/functions.js`. Any numeric parameter in a tool definition must be coerced and validated in `dispatch()` using `coercePositiveNumber(value, fieldName)` — the LLM occasionally outputs numbers as quoted strings.
 5. **Frontend** (optional) — update the relevant `.html` file; use `esc()` everywhere
 6. **Cache** — call `invalidateCache()` after mutations that the dashboard should reflect
 7. **Deploy** — `git push origin <worktree-branch>:main`

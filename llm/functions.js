@@ -894,6 +894,16 @@ export const confirmationRequiredTools = new Set([
   'clear_meals',
 ]);
 
+// Groq's LLM occasionally outputs numeric fields as quoted strings (e.g. "550" instead of 550).
+// This helper coerces and validates before the value reaches the service or database.
+function coercePositiveNumber(value, fieldName) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) {
+    throw new Error(`Invalid ${fieldName}: expected positive number, got ${JSON.stringify(value)}`);
+  }
+  return num;
+}
+
 /**
  * Dispatch a function call to the appropriate service.
  * Returns a JSON string result for Groq.
@@ -1549,6 +1559,7 @@ export async function dispatch(functionName, args, context) {
 
     // --- Food Log dispatch ---
     case 'log_food': {
+      if (args.calories !== undefined) args.calories = coercePositiveNumber(args.calories, 'calories');
       const date = args.logged_at || new Date().toLocaleDateString('en-CA', { timeZone: timezone });
       const entry = await foodLog.logFood(familyId, userId, { ...args, logged_at: date });
       const calNote = entry.calories ? ` (${entry.calories} kcal)` : '';
