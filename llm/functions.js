@@ -91,7 +91,7 @@ export const tools = [
     type: 'function',
     function: {
       name: 'create_reminder',
-      description: 'Set a personal reminder. The bot will send a Telegram message at the specified time. Can be one-off or recurring.',
+      description: 'Set a personal reminder. The bot will send a WhatsApp message at the specified time. Can be one-off or recurring.',
       parameters: {
         type: 'object',
         properties: {

@@ -95,7 +95,7 @@ export async function deleteReminder(reminderId, userId) {
 
 /**
  * Get all reminders that are due (remind_at <= now, not yet sent).
- * Returns reminders with their associated user's telegram_id.
+ * Returns reminders with their associated user's whatsapp_number.
  */
 export async function getDueReminders() {
   const { data, error } = await supabase

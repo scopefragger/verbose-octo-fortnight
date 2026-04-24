@@ -34,21 +34,21 @@ async function getProjectContext() {
 
     _projectContext = `
 PROJECT CONTEXT (from GitHub repo ${REPO}):
-Tech Stack: Node.js/Express, Supabase (PostgreSQL), Grammy (Telegram bot), Groq LLM (llama-3.3-70b), single-page dashboard HTML
+Tech Stack: Node.js/Express, Supabase (PostgreSQL), WhatsApp bot (Meta Business API), Groq LLM (llama-3.3-70b), single-page dashboard HTML
 Dependencies: ${deps}
 Services: ${serviceNames}
 DB Migrations: ${migrationNames}
 LLM modules: ${llmFileNames}
 ${productIdeas ? `\nExisting Product Ideas:\n${productIdeas.substring(0, 1500)}` : ''}
 
-The app is a family assistant with: Telegram bot (natural language), TV dashboard, meal planner, calendar, reminders, points system, watchlist, birthdays, food expiry tracker, countdown timers, and an ideas queue.
+The app is a family assistant with: WhatsApp bot (natural language), TV dashboard, meal planner, calendar, reminders, points system, watchlist, birthdays, food expiry tracker, countdown timers, and an ideas queue.
 API uses Express with secret-based auth. Dashboard is a single HTML file with inline CSS/JS. All data is per-family via family_id FK.
 `.trim();
 
     _contextFetchedAt = Date.now();
   } catch (err) {
     console.error('Failed to fetch project context:', err.message);
-    _projectContext = 'PROJECT: Family assistant app with Telegram bot, TV dashboard, Supabase DB, Groq LLM. Features: meals, calendar, reminders, points, watchlist, birthdays, food expiry, countdowns, ideas.';
+    _projectContext = 'PROJECT: Family assistant app with WhatsApp bot, TV dashboard, Supabase DB, Groq LLM. Features: meals, calendar, reminders, points, watchlist, birthdays, food expiry, countdowns, ideas.';
     _contextFetchedAt = Date.now();
   }
 
@@ -206,7 +206,7 @@ Look at what already exists and identify:
 - Missing features that would make the app more useful for a family
 - Improvements to existing features (UX, performance, reliability)
 - Integrations with external services that would add value
-- Quality of life improvements for the dashboard or Telegram bot
+- Quality of life improvements for the dashboard or WhatsApp bot
 - Fun or creative features that fit the family assistant theme
 
 ${existingTitles.length ? `\nALREADY SUGGESTED (do NOT repeat these):\n${existingTitles.join('\n')}` : ''}
@@ -326,14 +326,14 @@ Be specific and grounded — this is for a real family assistant app.`,
 1. Which existing services (services/*.js) need changes and what changes?
 2. What new database table(s) or columns are needed? Write the actual SQL.
 3. What new API endpoints are needed? List METHOD /path and request/response shape.
-4. What new LLM tools/functions should be added for the Telegram bot? (llm/functions.js)
+4. What new LLM tools/functions should be added for the WhatsApp bot? (llm/functions.js)
 5. Any external APIs or services required? (costs, rate limits, free tier?)
 6. What can be reused from existing code patterns?`,
   },
   {
     name: 'UI/UX Design',
     prompt: `Design the user interface and experience:
-1. Where does this live? (Dashboard card, standalone page, Telegram bot command, all three?)
+1. Where does this live? (Dashboard card, standalone page, WhatsApp bot command, all three?)
 2. Walk through the complete user flow step by step — from first interaction to completion
 3. What does the MVP (minimum viable) version look like? What's the simplest thing we can ship?
 4. What does the "full" version look like with all bells and whistles?
@@ -354,7 +354,7 @@ Be specific and grounded — this is for a real family assistant app.`,
     name: 'Risks & Trade-offs',
     prompt: `Evaluate risks, trade-offs, and potential issues:
 1. Security or privacy concerns?
-2. Performance impact on the dashboard or Telegram bot?
+2. Performance impact on the dashboard or WhatsApp bot?
 3. API costs (Groq tokens, external services)?
 4. Maintenance burden — will this need ongoing attention?
 5. What could we cut to ship faster without losing the core value?
@@ -735,7 +735,7 @@ You are implementing this feature for an existing Node.js/Express family assista
 **Key constraints:**
 - Express 5 with ES modules (import/export)
 - Supabase (PostgreSQL) for database — use the existing \`supabase\` client from \`db/supabase.js\`
-- Grammy for Telegram bot
+- WhatsApp Business API
 - Groq LLM (llama-3.3-70b) via \`llm/groq.js\` chatCompletion()
 - Dashboard is single HTML files with inline CSS/JS (no build step)
 - Auth via \`requireAuth\` middleware (supports both \`?secret=\` and cookie auth)

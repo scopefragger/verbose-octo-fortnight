@@ -2,62 +2,6 @@ import { supabase } from '../db/supabase.js';
 import crypto from 'crypto';
 
 /**
- * Look up a user by their Telegram ID. Returns null if not found.
- */
-export async function getUserByTelegramId(telegramId) {
-  const { data, error } = await supabase
-    .from('users')
-    .select('*, families(*)')
-    .eq('telegram_id', telegramId)
-    .single();
-
-  if (error && error.code === 'PGRST116') return null; // not found
-  if (error) throw error;
-  return data;
-}
-
-/**
- * Register a new user. Joins existing family if one exists (single-family app),
- * otherwise creates a new family.
- */
-export async function registerUser(telegramId, displayName, username) {
-  // Single-family app: reuse existing family if one exists
-  let family;
-  const { data: existing } = await supabase
-    .from('families')
-    .select('id, name')
-    .limit(1)
-    .single();
-
-  if (existing) {
-    family = existing;
-  } else {
-    const { data: newFamily, error: famErr } = await supabase
-      .from('families')
-      .insert({ name: `${displayName}'s Family` })
-      .select()
-      .single();
-    if (famErr) throw famErr;
-    family = newFamily;
-  }
-
-  // Create the user in that family
-  const { data: user, error: userErr } = await supabase
-    .from('users')
-    .insert({
-      telegram_id: telegramId,
-      display_name: displayName,
-      telegram_username: username || null,
-      family_id: family.id,
-    })
-    .select('*, families(*)')
-    .single();
-  if (userErr) throw userErr;
-
-  return user;
-}
-
-/**
  * Look up a user by their WhatsApp number. Returns null if not found.
  */
 export async function getUserByWhatsAppNumber(number) {
@@ -173,7 +117,7 @@ export async function joinFamily(joiningUser, code) {
 export async function getFamilyMembers(familyId) {
   const { data, error } = await supabase
     .from('users')
-    .select('id, display_name, telegram_id')
+    .select('id, display_name')
     .eq('family_id', familyId);
   if (error) throw error;
   return data;

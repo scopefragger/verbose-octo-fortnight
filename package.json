@@ -1,7 +1,7 @@
 {
-  "name": "telegram-assistant",
+  "name": "family-assistant",
   "version": "1.0.0",
-  "description": "Telegram family assistant bot with Groq AI, Supabase, hosted on Render",
+  "description": "Family assistant bot (WhatsApp) with Groq AI, Supabase, hosted on Render",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -15,7 +15,6 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "grammy": "^1.41.1",
     "groq-sdk": "^1.1.1"
   }
 }

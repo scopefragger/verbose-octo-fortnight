@@ -22,7 +22,7 @@ export async function getDashboardData(familyId) {
   // Get all family members
   const { data: members } = await supabase
     .from('users')
-    .select('id, display_name, telegram_username, timezone')
+    .select('id, display_name, timezone')
     .eq('family_id', familyId);
 
   const tz = members?.[0]?.timezone || 'Europe/London';
@@ -107,7 +107,6 @@ export async function getDashboardData(familyId) {
     family_name: members.map((m) => m.display_name).join(' & '),
     members: members.map((m) => ({
       display_name: m.display_name,
-      username: m.telegram_username,
     })),
     today: {
       date: new Date(now).toLocaleDateString('en-US', {

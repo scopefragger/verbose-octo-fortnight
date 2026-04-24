@@ -14,7 +14,7 @@ import { formatForUser } from '../utils/time.js';
 import { sendMessage } from '../bot/whatsapp.js';
 
 /**
- * Check for due reminders and send them via Telegram.
+ * Check for due reminders and send them via WhatsApp.
  * Called by cron-job.org hitting GET /cron/check.
  */
 export async function checkReminders() {
