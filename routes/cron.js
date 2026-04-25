@@ -564,7 +564,8 @@ export async function checkFlightNotifications() {
 async function getAllUsers() {
   const { data, error } = await supabase
     .from('users')
-    .select('id, whatsapp_number, display_name, family_id, timezone');
+    .select('id, whatsapp_number, display_name, family_id, timezone')
+    .limit(100);
   if (error) throw error;
   return data;
 }

@@ -3,6 +3,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import { handleWhatsAppMessage } from './bot/whatsappHandler.js';
 import { checkReminders, sendDailyDigest, sendWeeklyDigest, cleanupOldData, checkFlightNotifications } from './routes/cron.js';
+import { isDbReady, seedCrons, getCronStatus, startCronRun, completeCronRun, failCronRun } from './services/cronSchedules.js';
 import { getDashboardData } from './routes/dashboard.js';
 import authRoutes from './routes/auth.js';
 import { requireAuth, requireCronSecret } from './middleware/auth.js';
@@ -42,6 +43,7 @@ const HTML = {
   ideas: fs.readFileSync(path.join(__dirname, 'public', 'ideas.html'), 'utf-8'),
   officeCheckin: fs.readFileSync(path.join(__dirname, 'public', 'office-checkin.html'), 'utf-8'),
   foodLog: fs.readFileSync(path.join(__dirname, 'public', 'food-log.html'), 'utf-8'),
+  cronManagement: fs.readFileSync(path.join(__dirname, 'public', 'cron-management.html'), 'utf-8'),
 };
 
 const app = express();
@@ -60,63 +62,67 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
-// Cron endpoint for reminder delivery
-app.get('/cron/check', requireCronSecret, async (req, res) => {
+// Runs a named cron with enabled-check, overlap guard, and audit logging.
+async function runCron(cronName, handlerFn, res) {
+  let familyId, runId;
   try {
-    const result = await checkReminders();
+    const ready = await isDbReady();
+    if (!ready) return res.status(503).json({ error: 'db not ready — retry shortly' });
+
+    familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'no family' });
+
+    runId = await startCronRun(familyId, cronName);
+    if (runId === null) return res.json({ skipped: true, reason: 'disabled or already running' });
+  } catch (err) {
+    logError(`cron-${cronName}-start`, err);
+    return res.status(500).json({ error: err.message });
+  }
+
+  try {
+    const result = await handlerFn();
+    await completeCronRun(familyId, cronName, runId, result);
     res.json(result);
   } catch (err) {
-    logError('cron-check', err);
-    res.status(500).json({ error: 'check failed' });
+    await failCronRun(familyId, cronName, runId, err.message);
+    logError(`cron-${cronName}`, err);
+    res.status(500).json({ error: err.message });
   }
-});
+}
+
+// Cron endpoint for reminder delivery
+app.get('/cron/check', requireCronSecret, (req, res) => runCron('check', checkReminders, res));
 
 // Daily digest — called by cron-job.org at 8am
-app.get('/cron/daily', requireCronSecret, async (req, res) => {
-  try {
-    const result = await sendDailyDigest();
-    res.json(result);
-  } catch (err) {
-    logError('daily-digest', err);
-    res.status(500).json({ error: 'digest failed' });
-  }
-});
+app.get('/cron/daily', requireCronSecret, (req, res) => runCron('daily', sendDailyDigest, res));
 
 // Weekly digest — called by cron-job.org every Sunday
-app.get('/cron/weekly', requireCronSecret, async (req, res) => {
-  try {
-    const result = await sendWeeklyDigest();
-    res.json(result);
-  } catch (err) {
-    logError('weekly-digest', err);
-    res.status(500).json({ error: 'digest failed' });
-  }
-});
+app.get('/cron/weekly', requireCronSecret, (req, res) => runCron('weekly', sendWeeklyDigest, res));
 
 // Nightly cleanup — delete old conversations, food logs, and audit records
-app.get('/cron/cleanup', requireCronSecret, async (req, res) => {
-  try {
-    const result = await cleanupOldData();
-    res.json(result);
-  } catch (err) {
-    logError('cron-cleanup', err);
-    res.status(500).json({ error: 'cleanup failed' });
-  }
-});
+app.get('/cron/cleanup', requireCronSecret, (req, res) => runCron('cleanup', cleanupOldData, res));
 
 // Flight notifications — send 12h pre-departure reminders, archive old flights
-app.get('/cron/flights', requireCronSecret, async (req, res) => {
-  try {
-    const result = await checkFlightNotifications();
-    res.json(result);
-  } catch (err) {
-    logError('cron-flights', err);
-    res.status(500).json({ error: 'flight check failed' });
-  }
-});
+app.get('/cron/flights', requireCronSecret, (req, res) => runCron('flights', checkFlightNotifications, res));
 
 // Dashboard HTML page
 app.get('/dashboard', requireAuth, (req, res) => res.type('html').send(HTML.dashboard));
+
+// Cron management page — read-only view of automated tasks and their health
+app.get('/cron-management', requireAuth, (req, res) => res.type('html').send(HTML.cronManagement));
+
+// Cron status API — returns all crons with plain-English last-run info and health
+app.get('/api/cron/status', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const status = await getCronStatus(familyId);
+    res.json(status);
+  } catch (err) {
+    logError('cron-status', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // MTG Commander page
 app.get('/mtg-commander', requireAuth, (req, res) => res.type('html').send(HTML.mtgCommander));
@@ -996,34 +1002,24 @@ app.post('/api/ideas/generate', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/cron/ideas', requireCronSecret, async (req, res) => {
-  try {
-    const familyId = await getFamilyId();
-    if (!familyId) return res.status(404).json({ error: 'No family found' });
-    const result = await processIdeaQueue(familyId);
-    invalidateCache();
-    res.json(result);
-  } catch (err) {
-    logError('Cron ideas', err);
-    res.status(500).json({ error: err.message });
-  }
-});
+app.get('/cron/ideas', requireCronSecret, (req, res) => runCron('ideas', async () => {
+  const familyId = await getFamilyId();
+  if (!familyId) throw new Error('No family found');
+  const result = await processIdeaQueue(familyId);
+  invalidateCache();
+  return result;
+}, res));
 
 // Nightly cron: generate new ideas from codebase analysis, then process any pending
-app.get('/cron/ideas/generate', requireCronSecret, async (req, res) => {
-  try {
-    const familyId = await getFamilyId();
-    if (!familyId) return res.status(404).json({ error: 'No family found' });
-    const count = parseInt(req.query.count) || 3;
-    const generated = await generateIdeas(familyId, count);
-    const processed = await processIdeaQueue(familyId);
-    invalidateCache();
-    res.json({ generated: generated.generated || 0, processed: processed.processed || 0 });
-  } catch (err) {
-    logError('Cron ideas generate', err);
-    res.status(500).json({ error: err.message });
-  }
-});
+app.get('/cron/ideas/generate', requireCronSecret, (req, res) => runCron('ideas-generate', async () => {
+  const familyId = await getFamilyId();
+  if (!familyId) throw new Error('No family found');
+  const count = parseInt(req.query.count) || 3;
+  const generated = await generateIdeas(familyId, count);
+  const processed = await processIdeaQueue(familyId);
+  invalidateCache();
+  return { generated: generated.generated || 0, processed: processed.processed || 0 };
+}, res));
 
 // Theorize an idea — runs multi-pass deep analysis
 app.post('/api/ideas/:id/theorize', requireAuth, async (req, res) => {
@@ -1384,6 +1380,14 @@ async function start() {
   await new Promise((resolve) => app.listen(PORT, resolve));
   console.log(`Server listening on port ${PORT}`);
   console.log('WhatsApp webhook ready at /bot/webhook');
+
+  // Seed cron definitions for the family so the management UI has rows to display
+  try {
+    const familyId = await getFamilyId();
+    if (familyId) await seedCrons(familyId);
+  } catch (err) {
+    console.error('Failed to seed cron definitions:', err.message);
+  }
 }
 
 start().catch(console.error);
