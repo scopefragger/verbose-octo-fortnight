@@ -12,7 +12,7 @@ try {
   const data = JSON.parse(raw);
   const lines = data.restaurants.map(
     (r) =>
-      `• ${r.name} [${r.park}|${r.cuisine}|${r.price_tier}|${r.type.replace('_', '-')}${r.dietary_tags.length ? '|' + r.dietary_tags.join(',') : ''}] ${r.description}`
+      `• ${r.name} [${r.park}|${r.cuisine}|${r.price_tier}|${r.type.replace('_', '-')}${r.dietary_tags.length ? '|' + r.dietary_tags.join(',') : ''}]`
   );
   wdwDiningContext = `\nWDW DINING REFERENCE (⚠️ allergen info advisory — verify with Cast Member):\n${lines.join('\n')}\n`;
 } catch {
