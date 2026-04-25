@@ -11,7 +11,7 @@ import { logError } from '../utils/errorLog.js';
 import { classifyError } from '../utils/classifyError.js';
 
 const MAX_HISTORY = 30;
-const RECENT_VERBATIM = 8;
+const RECENT_VERBATIM = 1;
 const MAX_TOOL_ROUNDS = 5;
 const MAX_TOKEN_ESTIMATE = 6000;
 
