@@ -24,6 +24,7 @@ import { listDecklists, getDecklist, saveDecklist, updateDecklist, deleteDecklis
 import { upsertDay, deleteDay, getDaysForMonth, getMonthStats } from './services/officeCheckin.js';
 import { getBinSchedule, upsertBinSchedule } from './services/binSchedule.js';
 import { logFood, getDailyLog, getDailySummary, deleteLogEntry, getNutritionGoal, setNutritionGoal, getWeeklyAverage } from './services/foodLog.js';
+import { createHoliday, listHolidays, addMealOption, listMealOptions, voteMeal, archiveHoliday } from './services/wdwPlanner.js';
 import { chatCompletion } from './llm/groq.js';
 import { supabase } from './db/supabase.js';
 import { registerInvalidator } from './utils/cache.js';
@@ -43,6 +44,7 @@ const HTML = {
   officeCheckin: fs.readFileSync(path.join(__dirname, 'public', 'office-checkin.html'), 'utf-8'),
   foodLog: fs.readFileSync(path.join(__dirname, 'public', 'food-log.html'), 'utf-8'),
 };
+
 
 const app = express();
 app.use(express.json());
@@ -1324,6 +1326,89 @@ app.post('/api/food-log/lookup', requireAuth, async (req, res) => {
     });
   } catch (err) {
     logError('Food lookup', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── WDW Holiday Planner ──
+
+app.get('/api/wdw/holidays', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const holidays = await listHolidays(familyId);
+    res.json(holidays);
+  } catch (err) {
+    logError('WDW list holidays', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/wdw/holidays', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { name, start_date, end_date } = req.body;
+    if (!name || !start_date || !end_date) return res.status(400).json({ error: 'name, start_date, and end_date required' });
+    const holiday = await createHoliday(familyId, { name, start_date, end_date });
+    invalidateCache();
+    res.json(holiday);
+  } catch (err) {
+    logError('WDW create holiday', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/wdw/holidays/:id/meals', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const options = await listMealOptions(familyId, req.params.id);
+    res.json(options);
+  } catch (err) {
+    logError('WDW list meal options', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/wdw/holidays/:id/meals', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const { meal_id, meal_name, url } = req.body;
+    if (!meal_id || !meal_name) return res.status(400).json({ error: 'meal_id and meal_name required' });
+    const option = await addMealOption(familyId, req.params.id, { meal_id, meal_name, url });
+    res.json(option);
+  } catch (err) {
+    logError('WDW add meal option', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/wdw/holidays/:id/vote', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const userId = await getUserId(familyId, req);
+    const { meal_id, vote_type } = req.body;
+    if (!meal_id || !vote_type) return res.status(400).json({ error: 'meal_id and vote_type required' });
+    const vote = await voteMeal(familyId, userId, { holiday_id: req.params.id, meal_id, vote_type });
+    res.json(vote);
+  } catch (err) {
+    logError('WDW vote meal', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/wdw/holidays/:id/archive', requireAuth, async (req, res) => {
+  try {
+    const familyId = await getFamilyId();
+    if (!familyId) return res.status(404).json({ error: 'No family found' });
+    const holiday = await archiveHoliday(familyId, req.params.id);
+    invalidateCache();
+    res.json(holiday);
+  } catch (err) {
+    logError('WDW archive holiday', err);
     res.status(500).json({ error: err.message });
   }
 });

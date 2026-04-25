@@ -1,4 +1,23 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { todayInTimezone } from '../utils/time.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Load WDW dining reference at module level — injected into system prompt for restaurant suggestions
+let wdwDiningContext = '';
+try {
+  const raw = fs.readFileSync(path.join(__dirname, '../data/wdw-dining.json'), 'utf-8');
+  const data = JSON.parse(raw);
+  const lines = data.restaurants.map(
+    (r) =>
+      `• ${r.name} [${r.park} | ${r.cuisine} | ${r.price_tier} | ${r.type.replace('_', '-')}${r.dietary_tags.length ? ' | ' + r.dietary_tags.join(',') : ''}] — ${r.description}`
+  );
+  wdwDiningContext = `\nWDW DINING REFERENCE (⚠️ allergen info is advisory only — always verify with a Cast Member before ordering):\n${lines.join('\n')}\n`;
+} catch {
+  // data file absent — context omitted gracefully
+}
 
 /**
  * Build the system prompt, injecting the current date and user's timezone.
@@ -135,11 +154,22 @@ Trigger phrases: "set up bin reminders", "which bin is it this week", "what bin 
 - get_next_bin: always fetch live — never guess from memory which week it is.
 - Days: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday.
 
+WDW HOLIDAY MEAL PLANNER (use create_wdw_holiday / list_wdw_holidays / add_wdw_meal_option / list_wdw_meal_options / vote_wdw_meal / confirm_wdw_meal):
+Trigger phrases: "plan our Disney meals", "what should we eat at Disney", "Disney restaurant", "WDW dining", "book a restaurant for Disney", "plan food for our trip", "Disney meal planner", "vote on restaurants", "what restaurants are there at Disney", "add X to the Disney shortlist", "I vote for X", "I veto X for Disney", "show me the vote", "add Disney dinner to the calendar", "confirm our Disney reservation".
+- Use list_wdw_holidays first to find the active trip ID before adding meals or voting.
+- Use add_wdw_meal_option to put a restaurant on the shortlist. Use the restaurant id from the WDW dining reference as meal_id.
+- Use vote_wdw_meal for family votes: "yes" = want to go, "no" = not keen, "veto" = hard no (blocks the restaurant for everyone).
+- Use list_wdw_meal_options to show the shortlist with current vote counts.
+- Use confirm_wdw_meal to add a decided restaurant to the family calendar as a dining event.
+- When suggesting restaurants, use the WDW dining reference below. Filter by family preferences (dietary tags, price tier, park). Present 3–5 options maximum, one at a time.
+- Always include the allergen advisory when discussing food: "⚠️ Allergen info is advisory — verify with a Cast Member."
+- Remind families that popular restaurants need reservations via the My Disney Experience app, often 60 days in advance.
+
 IMPORTANT BEHAVIOUR RULES:
 - When the user asks a question about existing data (meals, events, points, lists), ALWAYS call the relevant list/get function first to check — never guess from memory or conversation history.
 - For destructive actions (delete, clear, remove), confirm with the user before proceeding. Say what you're about to delete and ask "shall I go ahead?".
 - If the user's message is ambiguous about timing (e.g. "Tuesday" without specifying which Tuesday, or a time without AM/PM), ask for clarification rather than guessing.
 - When multiple items could match a delete request, list the options and ask which one.
 
-Keep responses concise and friendly. Use simple formatting — no markdown tables or complex structures in WhatsApp messages.`;
+Keep responses concise and friendly. Use simple formatting — no markdown tables or complex structures in WhatsApp messages.${wdwDiningContext}`;
 }

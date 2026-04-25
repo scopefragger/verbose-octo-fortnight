@@ -14,6 +14,7 @@ import { upsertDay, getMonthStats } from '../services/officeCheckin.js';
 import { upsertBinSchedule, getBinSchedule, getNextCollection } from '../services/binSchedule.js';
 import * as foodLog from '../services/foodLog.js';
 import * as flights from '../services/flights.js';
+import * as wdwPlanner from '../services/wdwPlanner.js';
 import { formatForUser } from '../utils/time.js';
 import { invalidateDashboardCache } from '../utils/cache.js';
 
@@ -869,6 +870,97 @@ export const tools = [
       },
     },
   },
+
+  // ── WDW Holiday Meal Planner ──
+  {
+    type: 'function',
+    function: {
+      name: 'create_wdw_holiday',
+      description: 'Create a new Walt Disney World holiday trip for meal planning. Use when the family wants to start planning meals for a WDW visit.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Name for the trip, e.g. "WDW Summer 2025"' },
+          start_date: { type: 'string', description: 'Trip start date in YYYY-MM-DD format' },
+          end_date: { type: 'string', description: 'Trip end date in YYYY-MM-DD format' },
+        },
+        required: ['name', 'start_date', 'end_date'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_wdw_holidays',
+      description: 'List the family\'s active WDW holiday trips.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_wdw_meal_option',
+      description: 'Add a WDW restaurant to the voting shortlist for a holiday. Use the restaurant id from the WDW dining reference data as meal_id (e.g. "be-our-guest").',
+      parameters: {
+        type: 'object',
+        properties: {
+          holiday_id: { type: 'string', description: 'UUID of the WDW holiday trip' },
+          meal_id: { type: 'string', description: 'Restaurant slug from WDW dining data, e.g. "be-our-guest"' },
+          meal_name: { type: 'string', description: 'Restaurant display name, e.g. "Be Our Guest Restaurant"' },
+          url: { type: 'string', description: 'Disney dining URL for the restaurant (optional)' },
+        },
+        required: ['holiday_id', 'meal_id', 'meal_name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_wdw_meal_options',
+      description: 'Show the current restaurant shortlist for a WDW holiday with vote tallies.',
+      parameters: {
+        type: 'object',
+        properties: {
+          holiday_id: { type: 'string', description: 'UUID of the WDW holiday trip' },
+        },
+        required: ['holiday_id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'vote_wdw_meal',
+      description: 'Cast or update a vote on a restaurant option for a WDW holiday. vote_type: "yes" = want to go, "no" = not keen, "veto" = hard no. Each person can vote once per restaurant; voting again updates their vote.',
+      parameters: {
+        type: 'object',
+        properties: {
+          holiday_id: { type: 'string', description: 'UUID of the WDW holiday trip' },
+          meal_id: { type: 'string', description: 'Restaurant slug (e.g. "be-our-guest")' },
+          vote_type: { type: 'string', enum: ['yes', 'no', 'veto'], description: '"yes" = want to go, "no" = not keen, "veto" = hard no for everyone' },
+        },
+        required: ['holiday_id', 'meal_id', 'vote_type'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'confirm_wdw_meal',
+      description: 'Add a chosen WDW restaurant to the family calendar as a dining event. Use when the family has decided on a restaurant for a specific day.',
+      parameters: {
+        type: 'object',
+        properties: {
+          holiday_id: { type: 'string', description: 'UUID of the WDW holiday trip' },
+          meal_name: { type: 'string', description: 'Restaurant name to put in the calendar event' },
+          meal_date: { type: 'string', description: 'Date of the dining in YYYY-MM-DD format' },
+          meal_type: { type: 'string', enum: ['breakfast', 'lunch', 'dinner'], description: 'Meal slot for the dining' },
+          notes: { type: 'string', description: 'Optional notes, e.g. reservation time or dietary reminders' },
+        },
+        required: ['holiday_id', 'meal_name', 'meal_date', 'meal_type'],
+      },
+    },
+  },
 ];
 
 /**
@@ -881,6 +973,7 @@ export const readOnlyTools = new Set([
   'list_dashboard_themes', 'list_food_items', 'list_goals', 'get_goal_progress',
   'get_watchlist', 'list_birthdays', 'get_office_stats', 'get_weather',
   'get_next_bin', 'get_daily_nutrition', 'list_flights',
+  'list_wdw_holidays', 'list_wdw_meal_options',
 ]);
 
 /**
@@ -1633,6 +1726,86 @@ export async function dispatch(functionName, args, context) {
     case 'remove_flight': {
       const removed = await flights.removeFlight(args.flight_id, familyId, userId);
       return JSON.stringify({ success: true, message: `Stopped tracking ${removed.flight_code}.` });
+    }
+
+    // ── WDW Holiday Meal Planner dispatch ──
+    case 'create_wdw_holiday': {
+      const holiday = await wdwPlanner.createHoliday(familyId, {
+        name: args.name,
+        start_date: args.start_date,
+        end_date: args.end_date,
+      });
+      return JSON.stringify({
+        success: true,
+        holiday: { id: holiday.id, name: holiday.name, start_date: holiday.start_date, end_date: holiday.end_date },
+        message: `Created "${holiday.name}" (${holiday.start_date} – ${holiday.end_date}). Add restaurants to vote on with add_wdw_meal_option.`,
+      });
+    }
+
+    case 'list_wdw_holidays': {
+      const holidays = await wdwPlanner.listHolidays(familyId);
+      if (!holidays.length) {
+        return JSON.stringify({ holidays: [], message: 'No active WDW holidays yet. Create one with create_wdw_holiday.' });
+      }
+      return JSON.stringify({
+        holidays: holidays.map((h) => ({ id: h.id, name: h.name, start_date: h.start_date, end_date: h.end_date })),
+      });
+    }
+
+    case 'add_wdw_meal_option': {
+      const option = await wdwPlanner.addMealOption(familyId, args.holiday_id, {
+        meal_id: args.meal_id,
+        meal_name: args.meal_name,
+        url: args.url || null,
+      });
+      return JSON.stringify({
+        success: true,
+        option: { id: option.id, meal_id: option.meal_id, meal_name: option.meal_name },
+        message: `Added "${option.meal_name}" to the shortlist. Family members can now vote with vote_wdw_meal.`,
+      });
+    }
+
+    case 'list_wdw_meal_options': {
+      const options = await wdwPlanner.listMealOptions(familyId, args.holiday_id);
+      if (!options.length) {
+        return JSON.stringify({ options: [], message: 'No restaurants on the shortlist yet. Add some with add_wdw_meal_option.' });
+      }
+      const formatted = options.map((o) => ({
+        meal_id: o.meal_id,
+        name: o.meal_name,
+        votes: o.votes,
+        vetoed: o.vetoed,
+      }));
+      return JSON.stringify({ options: formatted });
+    }
+
+    case 'vote_wdw_meal': {
+      const result = await wdwPlanner.voteMeal(familyId, userId, {
+        holiday_id: args.holiday_id,
+        meal_id: args.meal_id,
+        vote_type: args.vote_type,
+      });
+      const emoji = { yes: '👍', no: '👎', veto: '🚫' }[args.vote_type] || '';
+      return JSON.stringify({
+        success: true,
+        message: `${emoji} Vote recorded: ${args.vote_type} for "${result.meal_name}".`,
+      });
+    }
+
+    case 'confirm_wdw_meal': {
+      const title = `🍽️ ${args.meal_name} (Disney)`;
+      const starts_at = `${args.meal_date}T${args.meal_type === 'breakfast' ? '08:00' : args.meal_type === 'lunch' ? '12:00' : '19:00'}:00`;
+      const event = await calendar.createEvent(familyId, userId, {
+        title,
+        starts_at,
+        description: args.notes || `WDW dining — ${args.meal_type}. ⚠️ Verify allergens with Cast Member.`,
+        all_day: false,
+      });
+      return JSON.stringify({
+        success: true,
+        event: { id: event.id, title: event.title, starts_at: formatForUser(event.starts_at, timezone) },
+        message: `Added "${args.meal_name}" to the calendar on ${args.meal_date} (${args.meal_type}). Don't forget to book your reservation on the My Disney Experience app!`,
+      });
     }
 
     default:
