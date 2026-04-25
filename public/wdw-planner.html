@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WDW Meal Planner</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a18;
+      --surface: #12122a;
+      --surface-2: #1a1a38;
+      --surface-3: #222248;
+      --accent: #4a7af7;
+      --accent-light: #7fa4ff;
+      --accent-glow: rgba(74,122,247,0.25);
+      --gold: #f5c518;
+      --gold-glow: rgba(245,197,24,0.2);
+      --green: #00b894;
+      --green-glow: rgba(0,184,148,0.2);
+      --amber: #fdcb6e;
+      --amber-glow: rgba(253,203,110,0.2);
+      --red: #e17055;
+      --red-glow: rgba(225,112,85,0.2);
+      --purple: #9b6dff;
+      --purple-glow: rgba(155,109,255,0.2);
+      --text: #dfe6e9;
+      --text-dim: #636e72;
+      --text-muted: #4a5568;
+      --border: rgba(255,255,255,0.07);
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 15% 60%, rgba(74,122,247,0.07) 0%, transparent 50%),
+        radial-gradient(ellipse at 85% 20%, rgba(155,109,255,0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 90%, rgba(245,197,24,0.04) 0%, transparent 50%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: rgba(10,10,24,0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .topbar-left { display: flex; align-items: center; gap: 14px; }
+
+    .back-btn {
+      display: flex; align-items: center; gap: 6px;
+      color: var(--text-dim); text-decoration: none;
+      font-size: 13px; font-weight: 500;
+      padding: 6px 12px; border-radius: 8px;
+      border: 1px solid transparent;
+      transition: all 0.2s; cursor: pointer; background: none;
+    }
+    .back-btn:hover { color: var(--text); background: var(--surface-2); border-color: var(--border); }
+
+    .topbar-title {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .topbar-title h1 {
+      font-size: 18px; font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-light), var(--gold));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .topbar-title .castle-icon { font-size: 22px; line-height: 1; }
+
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+
+    .refresh-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      color: var(--text-dim); font-size: 12px; font-weight: 500;
+      padding: 6px 12px; border-radius: 8px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .refresh-btn:hover { color: var(--text); border-color: var(--accent); }
+    .refresh-btn.spinning .refresh-icon { animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .refresh-icon { display: inline-block; font-style: normal; }
+
+    .last-updated { font-size: 11px; color: var(--text-muted); }
+
+    /* ── Content ── */
+    .content {
+      position: relative; z-index: 1;
+      max-width: 860px; margin: 0 auto;
+      padding: 28px 20px 60px;
+    }
+
+    /* ── Holiday selector ── */
+    .holiday-selector {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 28px; flex-wrap: wrap;
+    }
+    .holiday-selector label {
+      font-size: 13px; font-weight: 600;
+      color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    .holiday-select {
+      flex: 1; min-width: 200px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      color: var(--text); font-size: 14px; font-weight: 500;
+      padding: 10px 14px; border-radius: var(--radius-sm);
+      appearance: none; cursor: pointer; outline: none;
+      transition: border-color 0.2s;
+    }
+    .holiday-select:focus { border-color: var(--accent); }
+
+    .trip-meta {
+      font-size: 12px; color: var(--text-dim);
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 4px 12px;
+      white-space: nowrap;
+    }
+
+    /* ── Section header ── */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 13px; font-weight: 700;
+      color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.07em;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-title .count-badge {
+      font-size: 11px; background: var(--surface-3); color: var(--text-dim);
+      border-radius: 10px; padding: 1px 8px; font-weight: 600;
+    }
+
+    /* ── Allergen advisory ── */
+    .allergen-bar {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(245,197,24,0.08); border: 1px solid rgba(245,197,24,0.2);
+      border-radius: var(--radius-sm); padding: 10px 14px;
+      margin-bottom: 20px; font-size: 12px; color: var(--amber);
+    }
+    .allergen-bar .warn-icon { font-size: 14px; flex-shrink: 0; }
+
+    /* ── Restaurant cards ── */
+    .restaurants-grid {
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    .restaurant-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative; overflow: hidden;
+    }
+    .restaurant-card:hover { border-color: rgba(74,122,247,0.3); }
+    .restaurant-card.vetoed {
+      opacity: 0.6;
+      border-color: rgba(225,112,85,0.35);
+    }
+    .restaurant-card.vetoed::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: rgba(225,112,85,0.04);
+      pointer-events: none;
+    }
+
+    .card-top {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 12px;
+      margin-bottom: 10px;
+    }
+    .card-info { flex: 1; min-width: 0; }
+    .restaurant-name {
+      font-size: 15px; font-weight: 600; color: var(--text);
+      margin-bottom: 5px;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .veto-badge {
+      font-size: 10px; font-weight: 700;
+      background: rgba(225,112,85,0.18); color: var(--red);
+      border: 1px solid rgba(225,112,85,0.3);
+      border-radius: 4px; padding: 1px 7px;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      white-space: nowrap;
+    }
+    .restaurant-meta {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .meta-tag {
+      font-size: 11px; padding: 2px 8px; border-radius: 5px;
+      font-weight: 500; white-space: nowrap;
+    }
+    .tag-park { background: var(--surface-3); color: var(--accent-light); }
+    .tag-price { background: var(--surface-3); color: var(--gold); }
+    .tag-type { background: var(--surface-3); color: var(--text-dim); }
+    .tag-diet {
+      background: rgba(0,184,148,0.1); color: var(--green);
+      border: 1px solid rgba(0,184,148,0.15);
+    }
+
+    .card-link {
+      color: var(--text-muted); font-size: 13px; text-decoration: none;
+      flex-shrink: 0; padding: 4px;
+      transition: color 0.2s;
+    }
+    .card-link:hover { color: var(--accent-light); }
+
+    /* ── Vote section ── */
+    .card-bottom {
+      display: flex; align-items: center;
+      justify-content: space-between; gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .vote-buttons {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+
+    .vote-btn {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 12px; font-weight: 600;
+      padding: 6px 14px; border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer; transition: all 0.18s;
+      background: var(--surface-3); color: var(--text-dim);
+    }
+    .vote-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .vote-btn.want {
+      background: rgba(0,184,148,0.12); color: var(--green);
+      border-color: rgba(0,184,148,0.2);
+    }
+    .vote-btn.want:hover:not(:disabled) { background: rgba(0,184,148,0.22); border-color: var(--green); }
+    .vote-btn.want.active {
+      background: rgba(0,184,148,0.25); border-color: var(--green);
+      box-shadow: 0 0 0 1px var(--green);
+    }
+    .vote-btn.skip {
+      background: rgba(253,203,110,0.1); color: var(--amber);
+      border-color: rgba(253,203,110,0.18);
+    }
+    .vote-btn.skip:hover:not(:disabled) { background: rgba(253,203,110,0.2); border-color: var(--amber); }
+    .vote-btn.skip.active {
+      background: rgba(253,203,110,0.22); border-color: var(--amber);
+      box-shadow: 0 0 0 1px var(--amber);
+    }
+    .vote-btn.noway {
+      background: rgba(225,112,85,0.1); color: var(--red);
+      border-color: rgba(225,112,85,0.18);
+    }
+    .vote-btn.noway:hover:not(:disabled) { background: rgba(225,112,85,0.2); border-color: var(--red); }
+    .vote-btn.noway.active {
+      background: rgba(225,112,85,0.22); border-color: var(--red);
+      box-shadow: 0 0 0 1px var(--red);
+    }
+
+    /* Veto confirmation inline */
+    .veto-confirm {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .veto-confirm-text {
+      font-size: 12px; color: var(--red); font-weight: 500;
+    }
+    .veto-confirm-yes {
+      font-size: 12px; font-weight: 600; padding: 5px 12px;
+      background: rgba(225,112,85,0.2); color: var(--red);
+      border: 1px solid rgba(225,112,85,0.4);
+      border-radius: 7px; cursor: pointer; transition: all 0.15s;
+    }
+    .veto-confirm-yes:hover { background: rgba(225,112,85,0.35); }
+    .veto-confirm-cancel {
+      font-size: 12px; font-weight: 500; padding: 5px 10px;
+      background: transparent; color: var(--text-dim);
+      border: 1px solid var(--border); border-radius: 7px;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .veto-confirm-cancel:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+
+    /* ── Vote tallies ── */
+    .vote-tally {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .tally-item {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 12px; color: var(--text-muted);
+    }
+    .tally-item.has-votes { color: var(--text-dim); }
+    .tally-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+    }
+    .tally-dot.want { background: var(--green); }
+    .tally-dot.skip { background: var(--amber); }
+    .tally-dot.veto { background: var(--red); }
+    .tally-num { font-weight: 600; }
+
+    /* ── Empty states ── */
+    .empty-state {
+      text-align: center; padding: 60px 20px;
+      color: var(--text-dim);
+    }
+    .empty-state .empty-icon { font-size: 52px; margin-bottom: 16px; line-height: 1; }
+    .empty-state h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+    .empty-state p { font-size: 14px; color: var(--text-dim); max-width: 320px; margin: 0 auto; line-height: 1.6; }
+
+    /* ── Loading spinner ── */
+    .loading-state {
+      text-align: center; padding: 60px 20px; color: var(--text-dim);
+    }
+    .spinner {
+      display: inline-block; width: 32px; height: 32px;
+      border: 3px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+      margin-bottom: 14px;
+    }
+
+    /* ── Error toast ── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: var(--surface-3); border: 1px solid var(--border);
+      color: var(--text); font-size: 13px; font-weight: 500;
+      padding: 10px 20px; border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      z-index: 999; transition: transform 0.3s ease;
+      white-space: nowrap; pointer-events: none;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.error { border-color: rgba(225,112,85,0.4); color: var(--red); }
+    #toast.success { border-color: rgba(0,184,148,0.4); color: var(--green); }
+
+    /* ── Responsive ── */
+    @media (max-width: 520px) {
+      .topbar { padding: 12px 16px; }
+      .content { padding: 20px 14px 60px; }
+      .restaurant-card { padding: 14px; }
+      .topbar-title h1 { font-size: 16px; }
+      .last-updated { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-left">
+      <a href="javascript:void(0)" class="back-btn" onclick="goBack()">&#x2190; Back</a>
+      <div class="topbar-title">
+        <span class="castle-icon">&#x1F3F0;</span>
+        <h1>WDW Meal Planner</h1>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="last-updated" id="lastUpdated"></span>
+      <button class="refresh-btn" id="refreshBtn" onclick="refreshMeals()">
+        <i class="refresh-icon" id="refreshIcon">&#x21BA;</i> Refresh
+      </button>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- Holiday selector -->
+    <div class="holiday-selector" id="holidaySelector" style="display:none">
+      <label for="holidaySelect">Trip</label>
+      <select class="holiday-select" id="holidaySelect" onchange="onHolidayChange()"></select>
+      <span class="trip-meta" id="tripMeta"></span>
+    </div>
+
+    <!-- Main panel -->
+    <div id="mainPanel">
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Loading trips&hellip;</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const SECRET = new URLSearchParams(location.search).get('secret') || '';
+    let currentHolidayId = null;
+    let pollTimer = null;
+    let lastUpdatedAt = null;
+
+    function api(path) {
+      return path + (SECRET ? (path.includes('?') ? '&' : '?') + 'secret=' + encodeURIComponent(SECRET) : '');
+    }
+
+    function esc(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function goBack() {
+      const base = '/dashboard';
+      window.location.href = SECRET ? base + '?secret=' + encodeURIComponent(SECRET) : base;
+    }
+
+    function showToast(msg, type = '') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = type ? 'show ' + type : 'show';
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => { t.className = type; }, 3000);
+    }
+
+    function setLastUpdated() {
+      lastUpdatedAt = Date.now();
+      document.getElementById('lastUpdated').textContent = 'Updated just now';
+    }
+
+    function tickLastUpdated() {
+      if (!lastUpdatedAt) return;
+      const secs = Math.floor((Date.now() - lastUpdatedAt) / 1000);
+      const el = document.getElementById('lastUpdated');
+      if (secs < 60) el.textContent = 'Updated just now';
+      else {
+        const mins = Math.floor(secs / 60);
+        el.textContent = `Updated ${mins}m ago`;
+      }
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso + 'T00:00:00');
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    async function loadHolidays() {
+      try {
+        const res = await fetch(api('/api/wdw/holidays'), { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to load trips');
+        const holidays = await res.json();
+        renderHolidaySelector(holidays);
+      } catch (err) {
+        renderNoTrips();
+      }
+    }
+
+    function renderHolidaySelector(holidays) {
+      const selector = document.getElementById('holidaySelector');
+      const sel = document.getElementById('holidaySelect');
+
+      if (!holidays.length) {
+        selector.style.display = 'none';
+        renderNoTrips();
+        return;
+      }
+
+      sel.innerHTML = holidays.map(h =>
+        `<option value="${esc(h.id)}">${esc(h.name)}</option>`
+      ).join('');
+      selector.style.display = 'flex';
+
+      // Pick first holiday
+      currentHolidayId = holidays[0].id;
+      updateTripMeta(holidays[0]);
+      loadMeals(currentHolidayId);
+    }
+
+    function onHolidayChange() {
+      const sel = document.getElementById('holidaySelect');
+      const id = sel.value;
+      currentHolidayId = id;
+      // Update trip meta
+      fetch(api('/api/wdw/holidays'), { credentials: 'include' })
+        .then(r => r.json())
+        .then(holidays => {
+          const h = holidays.find(x => x.id === id);
+          if (h) updateTripMeta(h);
+        });
+      loadMeals(id);
+    }
+
+    function updateTripMeta(h) {
+      const el = document.getElementById('tripMeta');
+      if (h.start_date && h.end_date) {
+        el.textContent = formatDate(h.start_date) + ' – ' + formatDate(h.end_date);
+      } else {
+        el.textContent = '';
+      }
+    }
+
+    function renderNoTrips() {
+      document.getElementById('mainPanel').innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">&#x1F3F0;</div>
+          <h3>No upcoming Disney trips</h3>
+          <p>Ask in WhatsApp to plan your holiday — "plan our Disney meals for August"</p>
+        </div>`;
+    }
+
+    async function loadMeals(holidayId) {
+      const panel = document.getElementById('mainPanel');
+      panel.innerHTML = `<div class="loading-state"><div class="spinner"></div><p>Loading shortlist&hellip;</p></div>`;
+      try {
+        const res = await fetch(api('/api/wdw/holidays/' + encodeURIComponent(holidayId) + '/meals'), { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to load meals');
+        const meals = await res.json();
+        setLastUpdated();
+        renderMeals(holidayId, meals);
+      } catch (err) {
+        panel.innerHTML = `<div class="empty-state"><div class="empty-icon">&#x26A0;&#xFE0F;</div><h3>Couldn't load restaurants</h3><p>${esc(err.message)}</p></div>`;
+      }
+    }
+
+    async function refreshMeals() {
+      if (!currentHolidayId) return;
+      const btn = document.getElementById('refreshBtn');
+      btn.classList.add('spinning');
+      try {
+        const res = await fetch(api('/api/wdw/holidays/' + encodeURIComponent(currentHolidayId) + '/meals'), { credentials: 'include' });
+        if (!res.ok) throw new Error('Refresh failed');
+        const meals = await res.json();
+        setLastUpdated();
+        renderMeals(currentHolidayId, meals);
+      } catch (err) {
+        showToast('Refresh failed', 'error');
+      } finally {
+        btn.classList.remove('spinning');
+      }
+    }
+
+    function renderMeals(holidayId, meals) {
+      const panel = document.getElementById('mainPanel');
+
+      if (!meals.length) {
+        panel.innerHTML = `
+          <div class="allergen-bar">
+            <span class="warn-icon">&#x26A0;&#xFE0F;</span>
+            Allergen info is advisory only — always verify with a Cast Member before ordering.
+          </div>
+          <div class="empty-state">
+            <div class="empty-icon">&#x1F37D;&#xFE0F;</div>
+            <h3>No restaurants yet</h3>
+            <p>Ask in WhatsApp to add restaurants — "add Be Our Guest to the Disney shortlist"</p>
+          </div>`;
+        return;
+      }
+
+      const cards = meals.map(m => renderCard(holidayId, m)).join('');
+      panel.innerHTML = `
+        <div class="allergen-bar">
+          <span class="warn-icon">&#x26A0;&#xFE0F;</span>
+          Allergen info is advisory only — always verify with a Cast Member before ordering.
+        </div>
+        <div class="section-header">
+          <div class="section-title">
+            Shortlist
+            <span class="count-badge">${meals.length}</span>
+          </div>
+        </div>
+        <div class="restaurants-grid" id="restaurantsGrid">
+          ${cards}
+        </div>`;
+    }
+
+    function renderCard(holidayId, m) {
+      const vetoed = m.vetoed;
+      const yes = m.votes.yes || 0;
+      const no = m.votes.no || 0;
+      const veto = m.votes.veto || 0;
+
+      const vetoedBadge = vetoed ? `<span class="veto-badge">Vetoed</span>` : '';
+      const linkHtml = m.url
+        ? `<a href="${esc(m.url)}" class="card-link" target="_blank" rel="noopener noreferrer" title="View on Disney website">&#x1F517;</a>`
+        : '';
+
+      const tallyHtml = `
+        <div class="vote-tally">
+          <div class="tally-item ${yes > 0 ? 'has-votes' : ''}">
+            <span class="tally-dot want"></span>
+            <span class="tally-num">${yes}</span> want
+          </div>
+          <div class="tally-item ${no > 0 ? 'has-votes' : ''}">
+            <span class="tally-dot skip"></span>
+            <span class="tally-num">${no}</span> skip
+          </div>
+          <div class="tally-item ${veto > 0 ? 'has-votes' : ''}">
+            <span class="tally-dot veto"></span>
+            <span class="tally-num">${veto}</span> veto
+          </div>
+        </div>`;
+
+      const voteAreaId = 'vote-area-' + esc(m.meal_id).replace(/[^a-z0-9]/gi, '_');
+
+      const voteButtons = `
+        <div class="vote-buttons" id="${voteAreaId}">
+          <button class="vote-btn want" onclick="castVote('${esc(holidayId)}','${esc(m.meal_id)}','yes','${voteAreaId}')" ${vetoed ? 'disabled' : ''}>
+            &#x1F44D; Want
+          </button>
+          <button class="vote-btn skip" onclick="castVote('${esc(holidayId)}','${esc(m.meal_id)}','no','${voteAreaId}')" ${vetoed ? 'disabled' : ''}>
+            &#x1F44E; Skip
+          </button>
+          <button class="vote-btn noway" onclick="showVetoConfirm('${esc(holidayId)}','${esc(m.meal_id)}','${voteAreaId}')" ${vetoed ? 'disabled' : ''}>
+            &#x1F6AB; No Way
+          </button>
+        </div>`;
+
+      return `
+        <div class="restaurant-card ${vetoed ? 'vetoed' : ''}" id="card-${esc(m.meal_id).replace(/[^a-z0-9]/gi, '_')}">
+          <div class="card-top">
+            <div class="card-info">
+              <div class="restaurant-name">
+                ${esc(m.meal_name)}
+                ${vetoedBadge}
+              </div>
+            </div>
+            ${linkHtml}
+          </div>
+          <div class="card-bottom">
+            ${voteButtons}
+            ${tallyHtml}
+          </div>
+        </div>`;
+    }
+
+    function showVetoConfirm(holidayId, mealId, voteAreaId) {
+      const area = document.getElementById(voteAreaId);
+      if (!area) return;
+      area.innerHTML = `
+        <div class="veto-confirm">
+          <span class="veto-confirm-text">&#x1F6AB; This blocks it for everyone —</span>
+          <button class="veto-confirm-yes" onclick="castVote('${esc(holidayId)}','${esc(mealId)}','veto','${voteAreaId}')">Confirm veto</button>
+          <button class="veto-confirm-cancel" onclick="cancelVetoConfirm('${esc(holidayId)}','${esc(mealId)}','${voteAreaId}')">Cancel</button>
+        </div>`;
+    }
+
+    function cancelVetoConfirm(holidayId, mealId, voteAreaId) {
+      // Re-render just the buttons (meal may not be vetoed yet so keep enabled)
+      const area = document.getElementById(voteAreaId);
+      if (!area) return;
+      area.innerHTML = `
+        <button class="vote-btn want" onclick="castVote('${esc(holidayId)}','${esc(mealId)}','yes','${voteAreaId}')">
+          &#x1F44D; Want
+        </button>
+        <button class="vote-btn skip" onclick="castVote('${esc(holidayId)}','${esc(mealId)}','no','${voteAreaId}')">
+          &#x1F44E; Skip
+        </button>
+        <button class="vote-btn noway" onclick="showVetoConfirm('${esc(holidayId)}','${esc(mealId)}','${voteAreaId}')">
+          &#x1F6AB; No Way
+        </button>`;
+    }
+
+    async function castVote(holidayId, mealId, voteType, voteAreaId) {
+      const area = document.getElementById(voteAreaId);
+      if (area) {
+        // Disable all buttons while request is in flight
+        area.querySelectorAll('button').forEach(b => b.disabled = true);
+      }
+      try {
+        const res = await fetch(api('/api/wdw/holidays/' + encodeURIComponent(holidayId) + '/vote'), {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ meal_id: mealId, vote_type: voteType }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || 'Vote failed');
+        }
+        const label = voteType === 'yes' ? 'Voted Want' : voteType === 'no' ? 'Voted Skip' : 'Vetoed';
+        showToast(label + '!', 'success');
+        // Refresh full shortlist to update tallies and veto state
+        await refreshMeals();
+      } catch (err) {
+        showToast(err.message || 'Vote failed', 'error');
+        // Re-enable buttons on error
+        if (area) area.querySelectorAll('button').forEach(b => b.disabled = false);
+      }
+    }
+
+    function startPoll() {
+      clearInterval(pollTimer);
+      // Tick the "updated X ago" display every 30s, and also refresh votes
+      pollTimer = setInterval(async () => {
+        tickLastUpdated();
+        if (currentHolidayId) {
+          try {
+            const res = await fetch(api('/api/wdw/holidays/' + encodeURIComponent(currentHolidayId) + '/meals'), { credentials: 'include' });
+            if (res.ok) {
+              const meals = await res.json();
+              setLastUpdated();
+              renderMeals(currentHolidayId, meals);
+            }
+          } catch (_) {
+            // silent — don't interrupt user on background poll failure
+          }
+        }
+      }, 30000);
+
+      // Also tick display more frequently
+      setInterval(tickLastUpdated, 15000);
+    }
+
+    loadHolidays().then(startPoll);
+  </script>
+</body>
+</html>

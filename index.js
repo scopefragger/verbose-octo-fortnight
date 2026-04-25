@@ -43,6 +43,7 @@ const HTML = {
   ideas: fs.readFileSync(path.join(__dirname, 'public', 'ideas.html'), 'utf-8'),
   officeCheckin: fs.readFileSync(path.join(__dirname, 'public', 'office-checkin.html'), 'utf-8'),
   foodLog: fs.readFileSync(path.join(__dirname, 'public', 'food-log.html'), 'utf-8'),
+  wdwPlanner: fs.readFileSync(path.join(__dirname, 'public', 'wdw-planner.html'), 'utf-8'),
 };
 
 
@@ -231,6 +232,9 @@ app.get('/ideas', requireAuth, (req, res) => res.type('html').send(HTML.ideas));
 
 // Office Check-In page
 app.get('/office-checkin', requireAuth, (req, res) => res.type('html').send(HTML.officeCheckin));
+
+// WDW Meal Planner page
+app.get('/wdw-planner', requireAuth, (req, res) => res.type('html').send(HTML.wdwPlanner));
 
 // Dashboard API — returns JSON data for the dashboard (cached to reduce Supabase load)
 let dashboardCache = { data: null, timestamp: 0 };
