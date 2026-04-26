@@ -49,7 +49,7 @@ export async function summariseMessages(messages) {
 export async function getCachedSummary(userId) {
   const { data, error } = await supabase
     .from('conversation_summaries')
-    .select('summary, covers_up_to')
+    .select('summary, covers_up_to, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(1)

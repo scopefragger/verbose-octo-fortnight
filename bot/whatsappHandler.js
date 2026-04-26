@@ -89,7 +89,7 @@ export async function handleWhatsAppMessage({ from, text, messageId, replyToId, 
           messages.push({ role: 'tool', tool_call_id: toolCall.id, content: result });
         }
 
-        response = await chatCompletion(messages, tools);
+        response = await chatCompletion(messages);
         rounds++;
       } else {
         break;
@@ -195,8 +195,12 @@ async function loadSmartHistory(userId) {
 
   const cached = await getCachedSummary(userId);
   let summaryText = null;
+  const ONE_HOUR_MS = 60 * 60 * 1000;
+  const summaryFresh = cached &&
+    cached.covers_up_to >= olderMessages[olderMessages.length - 1]?.created_at &&
+    Date.now() - new Date(cached.created_at).getTime() < ONE_HOUR_MS;
 
-  if (cached && cached.covers_up_to >= olderMessages[olderMessages.length - 1]?.created_at) {
+  if (summaryFresh) {
     summaryText = cached.summary;
   } else {
     summaryText = await summariseMessages(olderMessages);
