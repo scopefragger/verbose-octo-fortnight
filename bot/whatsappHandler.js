@@ -15,6 +15,11 @@ const RECENT_VERBATIM = 1;
 const MAX_TOOL_ROUNDS = 5;
 const MAX_TOKEN_ESTIMATE = 6000;
 
+const FALLBACK_MESSAGES = {
+  EMPTY_REPLY: "Got it — I've taken care of that for you.",
+  ERROR:       "Sorry, something went wrong on my end. Please try again in a moment.",
+};
+
 /**
  * Process an incoming WhatsApp message from the webhook payload.
  */
@@ -96,15 +101,18 @@ export async function handleWhatsAppMessage({ from, text, messageId, replyToId, 
       }
     }
 
-    const reply = response.choices[0].message.content;
-    if (reply) {
-      await sendMessage(from, reply);
-      await saveMessage(user.id, 'assistant', reply);
+    let reply = response.choices[0].message.content;
+    if (!reply) {
+      logError('WhatsApp message handler: empty reply from LLM', new Error('Empty LLM reply'), { rounds });
+      reply = FALLBACK_MESSAGES.EMPTY_REPLY;
     }
+    await sendMessage(from, reply);
+    await saveMessage(user.id, 'assistant', reply);
   } catch (err) {
     logError('WhatsApp message handler', err);
+    const errorReply = classifyError(err).userMessage || FALLBACK_MESSAGES.ERROR;
     try {
-      await sendMessage(from, classifyError(err).userMessage);
+      await sendMessage(from, errorReply);
     } catch (sendErr) {
       logError('WhatsApp sendMessage failed', sendErr, { from });
     }
