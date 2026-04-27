@@ -26,12 +26,17 @@ export async function sendMessage(to, text) {
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
+    const body = await res.text();
     if (!res.ok) {
-      const body = await res.text();
       throw new Error(`WhatsApp sendMessage failed (${res.status}): ${body}`);
     }
-    const data = await res.json();
-    return data.messages?.[0]?.id ?? null;
+    let data;
+    try { data = JSON.parse(body); } catch { data = {}; }
+    const msgId = data.messages?.[0]?.id ?? null;
+    if (!msgId) {
+      console.error('[WhatsApp sendMessage] No message ID in response — delivery uncertain. Body:', body);
+    }
+    return msgId;
   } catch (err) {
     clearTimeout(timeoutId);
     if (err.name === 'AbortError') throw new Error('WhatsApp sendMessage timed out after 8s');
