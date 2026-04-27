@@ -1,29 +1,7 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { todayInTimezone } from '../utils/time.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Load WDW dining reference at module level — injected into system prompt for restaurant suggestions
-let wdwDiningContext = '';
-try {
-  const raw = fs.readFileSync(path.join(__dirname, '../data/wdw-dining.json'), 'utf-8');
-  const data = JSON.parse(raw);
-  const lines = data.restaurants.map(
-    (r) =>
-      `• ${r.name} [${r.park}|${r.cuisine}|${r.price_tier}|${r.type.replace('_', '-')}${r.dietary_tags.length ? '|' + r.dietary_tags.join(',') : ''}]`
-  );
-  wdwDiningContext = `\nWDW DINING REFERENCE (⚠️ allergen info advisory — verify with Cast Member):\n${lines.join('\n')}\n`;
-} catch {
-  // data file absent — context omitted gracefully
-}
-
-const WDW_KEYWORDS = /disney|wdw|magic kingdom|epcot|animal kingdom|hollywood studios|dining plan|meal plan.*disney|disney.*restaurant|shortlist/i;
-
-export function buildSystemPrompt(displayName, timezone = 'Europe/London', message = '') {
+export function buildSystemPrompt(displayName, timezone = 'Europe/London') {
   const today = todayInTimezone(timezone);
-  const includeWdw = WDW_KEYWORDS.test(message);
 
   return `You are a helpful family WhatsApp assistant for ${displayName}. Today: ${today}. Timezone: ${timezone}.
 Use the provided functions for actionable requests. For general chat, respond naturally.
@@ -107,8 +85,5 @@ Triggers: set up bin reminders, which bin this week, what bin goes out, is it re
 - setup_bin_schedule: ask collection day, next bin, order of others. reference_date=next collection, bins[0]=that bin. Days: 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat.
 - get_next_bin: always fetch live — never guess.
 
-WDW HOLIDAY MEAL PLANNER (create_wdw_holiday/list_wdw_holidays/add_wdw_meal_option/list_wdw_meal_options/vote_wdw_meal/confirm_wdw_meal)
-Triggers: plan our Disney meals, what should we eat at Disney, Disney restaurant, WDW dining, book a restaurant for Disney, plan food for our trip, Disney meal planner, vote on restaurants, add X to Disney shortlist, I vote for/veto X, show me the vote, confirm our Disney reservation.
-- list_wdw_holidays first for trip ID. meal_id = restaurant id from WDW dining reference. vote: yes=want, no=not keen, veto=hard no (blocks everyone). confirm_wdw_meal → adds to family calendar.
-- Suggest 3–5 options max filtered by preferences. Always: "⚠️ Allergen info is advisory — verify with a Cast Member." Remind: reservations via My Disney Experience, often 60 days ahead.${includeWdw ? wdwDiningContext : ''}`;
+Keep responses concise and friendly. No markdown tables or complex structures in WhatsApp messages.`;
 }

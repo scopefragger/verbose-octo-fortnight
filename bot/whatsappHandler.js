@@ -47,7 +47,7 @@ export async function handleWhatsAppMessage({ from, text, messageId, replyToId, 
 
   const history = await loadSmartHistory(user.id);
   const messages = [
-    { role: 'system', content: buildSystemPrompt(user.display_name, timezone, text) },
+    { role: 'system', content: buildSystemPrompt(user.display_name, timezone) },
     ...history,
     { role: 'user', content: text },
   ];
