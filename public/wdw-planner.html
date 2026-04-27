@@ -409,6 +409,54 @@
     }
     .btn-cancel:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
 
+    /* ── Add to shortlist panel ── */
+    .add-panel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 18px;
+      margin-top: 20px;
+    }
+    .add-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .add-panel-title {
+      font-size: 13px; font-weight: 700; color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: 0.07em;
+    }
+    .search-input {
+      width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+      color: var(--text); font-size: 14px; padding: 9px 12px;
+      border-radius: var(--radius-sm); outline: none; font-family: inherit;
+      transition: border-color 0.2s; margin-bottom: 10px;
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input::placeholder { color: var(--text-muted); }
+    .restaurant-results {
+      display: flex; flex-direction: column; gap: 6px;
+      max-height: 300px; overflow-y: auto;
+    }
+    .result-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; padding: 9px 12px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); transition: border-color 0.15s;
+    }
+    .result-row:hover { border-color: rgba(74,122,247,0.3); }
+    .result-row.already-added { opacity: 0.45; pointer-events: none; }
+    .result-info { flex: 1; min-width: 0; }
+    .result-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .result-meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    .add-btn {
+      flex-shrink: 0; background: rgba(74,122,247,0.15); color: var(--accent-light);
+      border: 1px solid rgba(74,122,247,0.25); font-size: 12px; font-weight: 600;
+      padding: 5px 12px; border-radius: 7px; cursor: pointer; transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .add-btn:hover { background: rgba(74,122,247,0.28); border-color: var(--accent); }
+    .add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .already-label { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+    .no-results { text-align: center; padding: 20px; color: var(--text-dim); font-size: 13px; }
+
     @media (max-width: 520px) {
       .topbar { padding: 12px 16px; }
       .content { padding: 20px 14px 60px; }
@@ -475,6 +523,16 @@
         <div class="spinner"></div>
         <p>Loading trips&hellip;</p>
       </div>
+    </div>
+
+    <!-- Add to shortlist panel (shown when a holiday is active) -->
+    <div class="add-panel" id="addPanel" style="display:none">
+      <div class="add-panel-header">
+        <span class="add-panel-title">&#x2B; Add to shortlist</span>
+      </div>
+      <input class="search-input" id="restaurantSearch" type="text"
+        placeholder="Search restaurants&hellip;" oninput="filterRestaurants()" />
+      <div class="restaurant-results" id="restaurantResults"></div>
     </div>
   </div>
 
@@ -602,10 +660,14 @@
       ).join('');
       selector.style.display = 'flex';
 
+      // Show add-to-shortlist panel
+      document.getElementById('addPanel').style.display = 'block';
+
       // Pick first holiday
       currentHolidayId = holidays[0].id;
       updateTripMeta(holidays[0]);
       loadMeals(currentHolidayId);
+      loadRestaurants();
     }
 
     function onHolidayChange() {
@@ -672,6 +734,7 @@
     }
 
     function renderMeals(holidayId, meals) {
+      updateShortlistedIds(meals);
       const panel = document.getElementById('mainPanel');
 
       if (!meals.length) {
@@ -683,7 +746,7 @@
           <div class="empty-state">
             <div class="empty-icon">&#x1F37D;&#xFE0F;</div>
             <h3>No restaurants yet</h3>
-            <p>Ask in WhatsApp to add restaurants — "add Be Our Guest to the Disney shortlist"</p>
+            <p>Search below to add restaurants to the shortlist.</p>
           </div>`;
         return;
       }
@@ -841,6 +904,84 @@
 
       // Also tick display more frequently
       setInterval(tickLastUpdated, 15000);
+    }
+
+    // ── Restaurant search ──
+    let allRestaurants = [];
+    let shortlistedIds = new Set();
+
+    async function loadRestaurants() {
+      try {
+        const res = await fetch(api('/api/wdw/restaurants'), { credentials: 'include' });
+        if (res.ok) allRestaurants = await res.json();
+        filterRestaurants();
+      } catch (_) {}
+    }
+
+    function updateShortlistedIds(meals) {
+      shortlistedIds = new Set(meals.map(m => m.meal_id));
+      filterRestaurants();
+    }
+
+    function filterRestaurants() {
+      const q = (document.getElementById('restaurantSearch')?.value || '').toLowerCase();
+      const container = document.getElementById('restaurantResults');
+      if (!container) return;
+
+      const filtered = allRestaurants.filter(r =>
+        !q ||
+        r.name.toLowerCase().includes(q) ||
+        r.park.toLowerCase().includes(q) ||
+        r.cuisine.toLowerCase().includes(q)
+      );
+
+      if (!filtered.length) {
+        container.innerHTML = `<div class="no-results">No restaurants match "${esc(q)}"</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(r => {
+        const added = shortlistedIds.has(r.id);
+        const typeLabel = r.type.replace('_', ' ');
+        const tags = r.dietary_tags.length ? ' · ' + r.dietary_tags.join(', ') : '';
+        return `
+          <div class="result-row ${added ? 'already-added' : ''}" id="result-${esc(r.id)}">
+            <div class="result-info">
+              <div class="result-name">${esc(r.name)}</div>
+              <div class="result-meta">${esc(r.park)} · ${esc(r.cuisine)} · ${esc(r.price_tier)} · ${esc(typeLabel)}${esc(tags)}</div>
+            </div>
+            ${added
+              ? `<span class="already-label">On shortlist</span>`
+              : `<button class="add-btn" id="addbtn-${esc(r.id)}"
+                   onclick="addToShortlist('${esc(r.id)}','${esc(r.name)}','${esc(r.url || '')}')">
+                   Add
+                 </button>`
+            }
+          </div>`;
+      }).join('');
+    }
+
+    async function addToShortlist(mealId, mealName, url) {
+      if (!currentHolidayId) { showToast('Select a trip first', 'error'); return; }
+      const btn = document.getElementById('addbtn-' + mealId);
+      if (btn) { btn.disabled = true; btn.textContent = '…'; }
+      try {
+        const res = await fetch(api('/api/wdw/holidays/' + encodeURIComponent(currentHolidayId) + '/meals'), {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ meal_id: mealId, meal_name: mealName, url: url || undefined }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || 'Failed to add');
+        }
+        showToast(`${mealName} added!`, 'success');
+        await refreshMeals();
+      } catch (err) {
+        showToast(err.message, 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Add'; }
+      }
     }
 
     loadHolidays().then(startPoll);

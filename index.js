@@ -46,6 +46,9 @@ const HTML = {
   wdwPlanner: fs.readFileSync(path.join(__dirname, 'public', 'wdw-planner.html'), 'utf-8'),
 };
 
+// WDW dining reference — served to the UI for restaurant search
+const wdwDiningData = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'wdw-dining.json'), 'utf-8'));
+
 
 const app = express();
 app.use(express.json());
@@ -1335,6 +1338,12 @@ app.post('/api/food-log/lookup', requireAuth, async (req, res) => {
 });
 
 // ── WDW Holiday Planner ──
+
+app.get('/api/wdw/restaurants', requireAuth, (_req, res) => {
+  res.json(wdwDiningData.restaurants.map(({ id, name, park, cuisine, price_tier, type, dietary_tags, url }) => ({
+    id, name, park, cuisine, price_tier, type, dietary_tags, url,
+  })));
+});
 
 app.get('/api/wdw/holidays', requireAuth, async (req, res) => {
   try {
