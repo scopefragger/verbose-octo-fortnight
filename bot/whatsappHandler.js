@@ -34,8 +34,8 @@ export async function handleWhatsAppMessage({ from, text, messageId, replyToId, 
   // Look up registered user
   const user = await getUserByWhatsAppNumber(from);
   if (!user) {
-    await sendMessage(from,
-      `Hi! I don't recognise your number. Send "hi" to register and get started.`
+    await sendMessage(from, `Hi! I don't recognise your number. Send "hi" to register and get started.`).catch((err) =>
+      logError('WhatsApp sendMessage failed', err, { from, attempt: 'registration_welcome' })
     );
     return;
   }
@@ -110,12 +110,7 @@ export async function handleWhatsAppMessage({ from, text, messageId, replyToId, 
     await saveMessage(user.id, 'assistant', reply);
   } catch (err) {
     logError('WhatsApp message handler', err);
-    const errorReply = classifyError(err).userMessage || FALLBACK_MESSAGES.ERROR;
-    try {
-      await sendMessage(from, errorReply);
-    } catch (sendErr) {
-      logError('WhatsApp sendMessage failed', sendErr, { from });
-    }
+    await sendMessage(from, classifyError(err).userMessage || FALLBACK_MESSAGES.ERROR);
   }
 }
 
@@ -162,11 +157,7 @@ async function handleDigestReply({ from, user, text }) {
     await upsertDay(user.family_id, todayStr, fields);
   } catch (err) {
     logError('WhatsApp digest check-in', err);
-    try {
-      await sendMessage(from, "Couldn't check in right now. Please try again in a moment.");
-    } catch (sendErr) {
-      logError('WhatsApp sendMessage failed', sendErr, { from });
-    }
+    await sendMessage(from, "Couldn't check in right now. Please try again in a moment.");
     return;
   }
 

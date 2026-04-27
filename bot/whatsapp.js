@@ -11,22 +11,32 @@ const headers = () => ({
  * Returns the WhatsApp message ID (wamid.xxx) for digest reply tracking.
  */
 export async function sendMessage(to, text) {
-  const res = await fetch(messagesUrl(), {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      to,
-      type: 'text',
-      text: { body: text, preview_url: false },
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`WhatsApp sendMessage failed (${res.status}): ${body}`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(messagesUrl(), {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to,
+        type: 'text',
+        text: { body: text, preview_url: false },
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`WhatsApp sendMessage failed (${res.status}): ${body}`);
+    }
+    const data = await res.json();
+    return data.messages?.[0]?.id ?? null;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') throw new Error('WhatsApp sendMessage timed out after 8s');
+    throw err;
   }
-  const data = await res.json();
-  return data.messages?.[0]?.id ?? null;
 }
 
 /**
