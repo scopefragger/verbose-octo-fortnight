@@ -896,11 +896,20 @@ export const confirmationRequiredTools = new Set([
 ]);
 
 // Groq's LLM occasionally outputs numeric fields as quoted strings (e.g. "550" instead of 550).
-// This helper coerces and validates before the value reaches the service or database.
+// These helpers coerce and validate before values reach the service or database.
+// CONVENTION: every numeric parameter in every dispatch() case MUST use one of these helpers.
 function coercePositiveNumber(value, fieldName) {
   const num = Number(value);
   if (!Number.isFinite(num) || num <= 0) {
     throw new Error(`Invalid ${fieldName}: expected positive number, got ${JSON.stringify(value)}`);
+  }
+  return num;
+}
+
+function coerceInteger(value, fieldName) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || !Number.isInteger(num)) {
+    throw new Error(`Invalid ${fieldName}: expected integer, got ${JSON.stringify(value)}`);
   }
   return num;
 }
@@ -1129,7 +1138,7 @@ export async function dispatch(functionName, args, context) {
     // --- Kid points dispatch ---
     case 'adjust_points': {
       const result = await points.adjustPoints(
-        familyId, args.kid_name, args.change, args.reason, userId
+        familyId, args.kid_name, coerceInteger(args.change, 'change'), args.reason, userId
       );
       return JSON.stringify({ success: true, ...result });
     }
@@ -1255,7 +1264,7 @@ export async function dispatch(functionName, args, context) {
     }
 
     case 'seed_uk_holidays': {
-      const year = args.year || new Date().getFullYear();
+      const year = coercePositiveNumber(args.year || new Date().getFullYear(), 'year');
       const results = await seedUKHolidays(familyId, userId, year);
       const created = results.filter(r => r.status === 'created').length;
       return JSON.stringify({
@@ -1424,7 +1433,8 @@ export async function dispatch(functionName, args, context) {
     }
 
     case 'mark_watched': {
-      const item = await watchlist.markWatched(args.item_id, familyId, args.rating || null);
+      const rating = args.rating != null ? coercePositiveNumber(args.rating, 'rating') : null;
+      const item = await watchlist.markWatched(args.item_id, familyId, rating);
       return JSON.stringify({
         success: true,
         title: item.title,
@@ -1504,8 +1514,8 @@ export async function dispatch(functionName, args, context) {
 
     case 'get_office_stats': {
       const now = new Date();
-      const yr = args.year || now.getFullYear();
-      const mo = args.month || (now.getMonth() + 1);
+      const yr = coercePositiveNumber(args.year || now.getFullYear(), 'year');
+      const mo = coercePositiveNumber(args.month || (now.getMonth() + 1), 'month');
       const stats = await getMonthStats(familyId, yr, mo);
       const monthName = new Date(yr, mo - 1, 1).toLocaleString('en-US', { month: 'long' });
       const targetIcon = stats.actualTargetMet ? '✅' : (stats.plannedTargetMet ? '🟡' : '❌');
@@ -1527,7 +1537,7 @@ export async function dispatch(functionName, args, context) {
     // --- Bin collection dispatch ---
     case 'setup_bin_schedule': {
       const schedule = await upsertBinSchedule(familyId, {
-        collection_day: args.collection_day,
+        collection_day: coerceInteger(args.collection_day, 'collection_day'),
         bins: args.bins,
         reference_date: args.reference_date,
       });
