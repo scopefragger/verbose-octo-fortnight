@@ -2967,9 +2967,34 @@
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* === Error banner (shown if JS fails to init) === */
+    #js-error-banner {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: #c0392b;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      text-align: center;
+      padding: 14px 20px;
+      z-index: 99999;
+    }
+
+    /* === Flex-gap fallback for Safari < 14.1 / iOS < 14.5 ===
+       Applied when JS adds .no-flex-gap to <html>.
+       gap on display:grid works from Safari 10.1 (iOS 10.3) onwards,
+       but gap on display:flex only landed in Safari 14.1 (iOS 14.5).       */
+    .no-flex-gap .sidebar > * + * { margin-top: 10px; }
+    .no-flex-gap .card-title > * + * { margin-left: 6px; }
+    .no-flex-gap .mickey-heads > * { margin: 2px; }
+    .no-flex-gap .points-adjust > * + * { margin-left: 6px; }
+    .no-flex-gap .points-history-item > * + * { margin-left: 12px; }
   </style>
 </head>
 <body>
+  <div id="js-error-banner">Dashboard failed to load. Please refresh the page.</div>
   <div class="dashboard" id="dashboard" data-auto-rotate="false">
     <div class="loading" id="loading">
       <div class="spinner"></div>
@@ -3094,6 +3119,20 @@
   </div>
 
   <script>
+    // Flex-gap feature detection (gap on flex needs Safari 14.1 / iOS 14.5+)
+    (function() {
+      var parent = document.createElement('div');
+      var c1 = document.createElement('div');
+      var c2 = document.createElement('div');
+      c1.style.width = '10px'; c2.style.width = '10px';
+      parent.style.cssText = 'display:flex;gap:5px;position:absolute;top:-9999px;left:-9999px;visibility:hidden';
+      parent.appendChild(c1);
+      parent.appendChild(c2);
+      document.body.appendChild(parent);
+      if (c2.offsetLeft < 15) document.documentElement.classList.add('no-flex-gap');
+      document.body.removeChild(parent);
+    })();
+
     const REFRESH_INTERVAL = 300000; // 5 minutes
     const POINTS_PER_MICKEY = 20;
 
@@ -3417,7 +3456,7 @@
             const retry = await fetch('/api/dashboard', { credentials: 'same-origin' });
             if (retry.ok) return retry.json();
           }
-        } catch { /* refresh failed */ }
+        } catch (e) { /* refresh failed */ }
 
         // Refresh failed — redirect to login
         _authRedirecting = true;
@@ -3564,7 +3603,7 @@
     // Refresh auth token periodically (every 50 min)
     setInterval(async () => {
       try { await _origFetch('/api/auth/refresh', { method: 'POST' }); }
-      catch { /* ignore */ }
+      catch (e) { /* ignore */ }
     }, 50 * 60 * 1000);
 
     function getTodayStr() {
@@ -3671,7 +3710,7 @@
     }
 
     async function handleDeleteMeal(date, type, btnEl) {
-      const row = btnEl?.closest('.meal-slot');
+      const row = btnEl && btnEl.closest('.meal-slot');
       if (row) {
         row.classList.add('removing');
         await new Promise(r => setTimeout(r, 400));
@@ -3700,7 +3739,7 @@
 
       // Optimistically update the number in the UI
       const card = btn.closest('.kid-points-card');
-      const totalEl = card?.querySelector('.points-total');
+      const totalEl = card && card.querySelector('.points-total');
       if (totalEl) {
         const current = parseInt(totalEl.textContent, 10) || 0;
         totalEl.textContent = Math.max(0, current + change);
@@ -4236,7 +4275,7 @@
         itemEl.remove();
         // If the list group is now empty, remove it too
         const group = itemEl.closest && document.querySelectorAll('.list-group');
-        group?.forEach(g => {
+        group && group.forEach(function(g) {
           if (g.querySelectorAll('.list-item').length === 0) g.remove();
         });
         refreshDashboard();
@@ -4301,8 +4340,8 @@
     }
 
     function renderMeals(meals) {
-      const todayMeals = meals?.today || [];
-      const weekMeals = meals?.week || [];
+      const todayMeals = (meals && meals.today) || [];
+      const weekMeals = (meals && meals.week) || [];
       const todayStr = getTodayStr();
 
       // Group week meals by day, excluding today (shown separately above)
@@ -4821,8 +4860,8 @@
         title = 'Meal Planner';
 
         const todayStr = getTodayStr();
-        const todayMeals = data.meals?.today || [];
-        const weekMeals = data.meals?.week || [];
+        const todayMeals = (data.meals && data.meals.today) || [];
+        const weekMeals = (data.meals && data.meals.week) || [];
         const foodItems = data.food_items || [];
         const mealEmojis = { breakfast: '🥐', lunch: '🥪', dinner: '🍝', snack: '🍪' };
 
@@ -4939,7 +4978,7 @@
       const panel = document.getElementById('fullscreen-panel');
       if (!overlay && !panel) return;
 
-      if (panel?._escHandler) {
+      if (panel && panel._escHandler) {
         document.removeEventListener('keydown', panel._escHandler);
       }
 
@@ -4947,8 +4986,8 @@
       if (panel) panel.classList.remove('active');
 
       setTimeout(() => {
-        overlay?.remove();
-        panel?.remove();
+        if (overlay) overlay.remove();
+        if (panel) panel.remove();
       }, 350);
     }
 
@@ -4961,7 +5000,7 @@
         const json = await res.json();
         items = json.items || [];
       } catch (e) {
-        items = window._dashData?.watchlist || [];
+        items = (window._dashData && window._dashData.watchlist) || [];
       }
 
       const unwatched = items.filter(i => !i.watched);
@@ -5465,7 +5504,7 @@
 
     /* ---- Food Expiry (Use It Up) App ---- */
     function openFoodExpiryApp() {
-      const items = window._dashData?.food_items || [];
+      const items = (window._dashData && window._dashData.food_items) || [];
 
       const overlay = document.createElement('div');
       overlay.className = 'birthday-overlay';
@@ -5587,7 +5626,7 @@
 
     /* ---- Lists App ---- */
     function openListsApp() {
-      const lists = window._dashData?.lists || [];
+      const lists = (window._dashData && window._dashData.lists) || [];
 
       const overlay = document.createElement('div');
       overlay.className = 'birthday-overlay';
@@ -5691,7 +5730,8 @@
       modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
       modal.querySelector('.btn-cancel').onclick = () => modal.remove();
       modal.querySelector('.btn-save').onclick = async () => {
-        const name = listName || modal.querySelector('#list-app-name')?.value?.trim();
+        var _nameInput = modal.querySelector('#list-app-name');
+        const name = listName || (_nameInput && _nameInput.value && _nameInput.value.trim());
         const text = modal.querySelector('#list-app-item').value.trim();
         if (!name) { modal.querySelector('#list-app-name').style.borderColor = '#e74c3c'; return; }
         if (!text) { modal.querySelector('#list-app-item').style.borderColor = '#e74c3c'; return; }
@@ -5711,7 +5751,7 @@
 
     /* ---- Reminders App ---- */
     function openRemindersApp() {
-      const reminders = window._dashData?.reminders || [];
+      const reminders = (window._dashData && window._dashData.reminders) || [];
 
       const overlay = document.createElement('div');
       overlay.className = 'birthday-overlay'; // reuse same overlay style
@@ -5787,7 +5827,7 @@
 
     /* ---- Goals App ---- */
     async function openGoalsApp() {
-      const goals = window._dashData?.goals || [];
+      const goals = (window._dashData && window._dashData.goals) || [];
 
       const overlay = document.createElement('div');
       overlay.className = 'birthday-overlay';
@@ -6028,7 +6068,7 @@
 
     /* ---- Birthday Manager ---- */
     async function openBirthdayManager() {
-      let birthdays = window._dashData?.birthdays || [];
+      let birthdays = (window._dashData && window._dashData.birthdays) || [];
 
       const overlay = document.createElement('div');
       overlay.className = 'birthday-overlay';
@@ -6236,7 +6276,7 @@
     }
 
     async function handleLogout() {
-      try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+      try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (e) {}
       window.location.href = '/login';
     }
 
@@ -6257,7 +6297,7 @@
       try {
         const res = await fetch(`/api/themes`);
         const themes = await res.json();
-        const currentTheme = window._dashData?.theme || 'default';
+        const currentTheme = (window._dashData && window._dashData.theme) || 'default';
 
         let html = '';
         const sections = [
@@ -6354,6 +6394,8 @@
       } catch (err) {
         document.getElementById('dashboard').innerHTML =
           '<div class="loading">Failed to load dashboard. Check your URL.</div>';
+        var banner = document.getElementById('js-error-banner');
+        if (banner) banner.style.display = 'block';
       }
 
       setInterval(refreshDashboard, REFRESH_INTERVAL);
